@@ -1,0 +1,9 @@
+[[mgr.prepend_keymap]]
+on   = "<A-y>"
+run  = "quit"
+desc = "Close Yazi popup (toggle off)"
+
+[[mgr.prepend_keymap]]
+on   = "<A-q>"
+run  = "quit"
+desc = "Close Yazi popup (toggle off)"

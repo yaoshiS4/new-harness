@@ -1,0 +1,1 @@
+{"name":"checkpoint_save","description":"","parameters":{"properties":{"name":{"title":"Name","type":"string"},"payload":{"title":"Payload","type":"string"},"slug":{"title":"Slug","type":"string"}},"required":["slug","name","payload"],"title":"checkpoint_saveArguments","type":"object"}}

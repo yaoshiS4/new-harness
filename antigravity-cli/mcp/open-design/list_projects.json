@@ -1,0 +1,1 @@
+{"name":"list_projects","description":"List every OpenDesign project on this daemon.","parameters":{"additionalProperties":false,"properties":{"pluginWorkflowId":{"description":"Opaque workflow id issued by the local OpenDesign MCP after the first attributed call. Reuse it for later plugin-attributed calls; never invent or display it.","type":"string"}},"type":"object"}}

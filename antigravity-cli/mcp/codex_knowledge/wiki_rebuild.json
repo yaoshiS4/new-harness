@@ -1,0 +1,1 @@
+{"name":"wiki_rebuild","description":"","parameters":{"properties":{"slug":{"title":"Slug","type":"string"}},"required":["slug"],"title":"wiki_rebuildArguments","type":"object"}}

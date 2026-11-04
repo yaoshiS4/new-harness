@@ -1,0 +1,58 @@
+# CachyOS Blue/Emerald Dark theme for btop
+# Canvas & foreground
+theme[main_bg]="#12151a"
+theme[main_fg]="#ecf0f4"
+theme[title]="#3b82f6"
+theme[hi_fg]="#60a5fa"
+
+# Selection & surfaces
+theme[selected_bg]="#20252d"
+theme[selected_fg]="#3b82f6"
+theme[inactive_fg]="#949ca6"
+theme[graph_text]="#949ca6"
+theme[meter_bg]="#20252d"
+theme[proc_misc]="#60a5fa"
+
+# Box borders & dividers
+theme[cpu_box]="#3b82f6"
+theme[mem_box]="#27ae60"
+theme[net_box]="#60a5fa"
+theme[proc_box]="#3b82f6"
+theme[div_line]="#20252d"
+
+# Temperature gradient (green -> yellow -> red)
+theme[temp_start]="#27ae60"
+theme[temp_mid]="#f7eb95"
+theme[temp_end]="#eb606b"
+
+# CPU gradient (green -> yellow -> red)
+theme[cpu_start]="#27ae60"
+theme[cpu_mid]="#f7eb95"
+theme[cpu_end]="#eb606b"
+
+# Memory free / cached / available / used
+theme[free_start]="#3b82f6"
+theme[free_mid]="#60a5fa"
+theme[free_end]="#27ae60"
+theme[cached_start]="#60a5fa"
+theme[cached_mid]="#3b82f6"
+theme[cached_end]="#27ae60"
+theme[available_start]="#27ae60"
+theme[available_mid]="#f7eb95"
+theme[available_end]="#eb606b"
+theme[used_start]="#27ae60"
+theme[used_mid]="#f7eb95"
+theme[used_end]="#eb606b"
+
+# Network download / upload
+theme[download_start]="#27ae60"
+theme[download_mid]="#f7eb95"
+theme[download_end]="#eb606b"
+theme[upload_start]="#27ae60"
+theme[upload_mid]="#f7eb95"
+theme[upload_end]="#eb606b"
+
+# Process gradient
+theme[process_start]="#27ae60"
+theme[process_mid]="#f7eb95"
+theme[process_end]="#eb606b"

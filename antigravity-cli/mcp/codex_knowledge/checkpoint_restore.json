@@ -1,0 +1,1 @@
+{"name":"checkpoint_restore","description":"","parameters":{"properties":{"name":{"title":"Name","type":"string"},"slug":{"title":"Slug","type":"string"}},"required":["slug","name"],"title":"checkpoint_restoreArguments","type":"object"}}

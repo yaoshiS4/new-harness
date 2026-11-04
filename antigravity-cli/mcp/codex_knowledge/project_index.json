@@ -1,0 +1,1 @@
+{"name":"project_index","description":"","parameters":{"properties":{"project":{"default":"","title":"Project","type":"string"},"slug":{"default":"","title":"Slug","type":"string"}},"title":"project_indexArguments","type":"object"}}

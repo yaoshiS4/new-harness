@@ -1,0 +1,1 @@
+{"name":"handoff_write","description":"","parameters":{"properties":{"name":{"title":"Name","type":"string"},"payload":{"title":"Payload","type":"string"},"slug":{"title":"Slug","type":"string"}},"required":["slug","name","payload"],"title":"handoff_writeArguments","type":"object"}}

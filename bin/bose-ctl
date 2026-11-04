@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+"""bose-ctl: Self-contained CLI for Bose Portable Smart Speaker ('Black Diamond')."""
+
+import argparse
+import base64
+import json
+import os
+import re
+import socket
+import ssl
+import struct
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+DEFAULT_IP = os.environ.get("BOSE_IP", "10.42.0.178")
+DEFAULT_BT_MAC = os.environ.get("BOSE_BT_MAC", "60:AB:D2:18:9C:FF")
+DEFAULT_GUID = "3bfad61c-a444-e8b9-aad1-2af9f7460aab"
+TOKEN_PATH = Path.home() / ".config" / "bose-ctl" / "token.jwt"
+
+
+def http_get(url: str, timeout: float = 3.0) -> str:
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def parse_diag_index(html: str) -> Dict[str, str]:
+    info: Dict[str, str] = {}
+    sw_match = re.search(r"<li>Software Version\s*<div[^>]*>\s*([^\r\n<]+)", html, re.I)
+    if sw_match:
+        info["software_version"] = sw_match.group(1).strip()
+
+    lpm_match = re.search(r"Blob Version:\s*([^\r\n<]+)", html, re.I)
+    if lpm_match:
+        info["lpm_version"] = lpm_match.group(1).strip()
+
+    hsp_match = re.search(r"HSP\s+([0-9.]+)", html, re.I)
+    if hsp_match:
+        info["hsp_version"] = hsp_match.group(1).strip()
+
+    for key in ("snSystem", "productType", "productName", "guid", "country_code"):
+        m = re.search(rf"<td>{re.escape(key)}</td>\s*<td>([^<]+)</td>", html, re.I)
+        if m:
+            info[key] = m.group(1).strip()
+    return info
+
+
+def parse_battery_html(html: str) -> Dict[str, str]:
+    rows: Dict[str, str] = {}
+    for m in re.finditer(
+        r"<th[^>]*>\s*([^<]+?)\s*</th>\s*<td>\s*<div>(.*?)</div>\s*</td>",
+        html,
+        re.I | re.S,
+    ):
+        k = m.group(1).strip()
+        v = re.sub(r"<br\s*/?>", "\n", m.group(2), flags=re.I)
+        v = re.sub(r"<[^>]+>", "", v).strip()
+        rows[k] = v
+
+    parsed: Dict[str, str] = {
+        "soc": rows.get("Relative State of Charge %", "?"),
+        "soh": rows.get("Relative State of Health %", "?"),
+        "capacity": rows.get("Remaining Battery Capacity", "?"),
+        "status": rows.get("Battery Status", "?"),
+        "current": rows.get("Battery Current", "?"),
+        "voltage": rows.get("Battery Voltage", "?"),
+        "temperature": rows.get("Battery Temperature", "?"),
+        "faults": rows.get("Battery Faults", "?"),
+        "fault_status": rows.get("Battery Fault Status", "?"),
+        "last_ship_reason": rows.get("Last reason for ship mode", "?"),
+        "charger_status": rows.get("USB Charger Status", "?"),
+        "vbus_voltage": rows.get("USB VBUS Voltage", "?"),
+    }
+
+    balance = rows.get("Battery Cell Balance", "")
+    c1 = re.search(r"cell1\s*:\s*(\d+)", balance)
+    c2 = re.search(r"cell2\s*:\s*(\d+)", balance)
+    stack = re.search(r"cell stack\s*:\s*(\d+)", balance)
+    parsed["cell1_mv"] = f"{c1.group(1)} mV" if c1 else "?"
+    parsed["cell2_mv"] = f"{c2.group(1)} mV" if c2 else "?"
+    parsed["stack_mv"] = f"{stack.group(1)} mV" if stack else "?"
+
+    batt_id = rows.get("Battery ID", "")
+    sn_m = re.search(r"Serial #:\s*([^\s]+)", batt_id)
+    dev_m = re.search(r"Device name:\s*([^\s]+)", batt_id)
+    parsed["gauge_ic"] = dev_m.group(1) if dev_m else "bq28z610"
+    parsed["battery_serial"] = sn_m.group(1) if sn_m else "?"
+    return parsed
+
+
+def parse_wifi_diag(raw: str) -> Dict[str, Any]:
+    idx = raw.find("{")
+    if idx != -1:
+        try:
+            return json.loads(raw[idx:])
+        except Exception:
+            pass
+    return {"raw": raw.strip()}
+
+
+def get_bluetooth_pipewire_state(bt_mac: str) -> Dict[str, Any]:
+    mac_underscored = bt_mac.replace(":", "_")
+    env = os.environ.copy()
+    env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+
+    sink_line = ""
+    codec = ""
+    suspend_state = ""
+
+    # 1. Check pactl list sinks short | rg <MAC>
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", f"pactl list sinks short 2>/dev/null | rg {mac_underscored}"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            sink_line = proc.stdout.strip().splitlines()[0]
+            parts = sink_line.split()
+            if len(parts) >= 7:
+                suspend_state = parts[-1]
+    except Exception:
+        pass
+
+    # 2. Check pactl list cards for active codec profile
+    try:
+        proc = subprocess.run(
+            ["pactl", "list", "cards"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if proc.returncode == 0 and mac_underscored in proc.stdout:
+            block = proc.stdout.split(mac_underscored, 1)[1][:3000]
+            m = re.search(r"Active Profile:\s*([^\r\n]+)", block)
+            if m:
+                codec = m.group(1).strip()
+            c_m = re.search(r"api\.bluez5\.codec\s*=\s*\"([^\"]+)\"", block)
+            if c_m:
+                codec = f"{codec} ({c_m.group(1)})" if codec else c_m.group(1)
+    except Exception:
+        pass
+
+    # 3. Fallback / enrich via org.bluez MediaTransport1 on system D-Bus
+    bluez_state = ""
+    bluez_vol = None
+    try:
+        tree = subprocess.run(
+            ["busctl", "tree", "org.bluez"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        m_fd = re.search(
+            rf"(/org/bluez/hci\d+/dev_{mac_underscored}/sep\d+/fd\d+)",
+            tree.stdout,
+        )
+        if m_fd:
+            fd_path = m_fd.group(1)
+            intro = subprocess.run(
+                ["busctl", "introspect", "org.bluez", fd_path, "org.bluez.MediaTransport1"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            st_m = re.search(r"\.State\s+property\s+s\s+\"([^\"]+)\"", intro.stdout)
+            if st_m:
+                bluez_state = st_m.group(1)
+            vol_m = re.search(r"\.Volume\s+property\s+q\s+(\d+)", intro.stdout)
+            if vol_m:
+                bluez_vol = int(vol_m.group(1))
+            cfg_m = re.search(r"\.Configuration\s+property\s+ay\s+\d+\s+([0-9\s]+)", intro.stdout)
+            if cfg_m and not codec:
+                octets = [int(x) for x in cfg_m.group(1).split()]
+                if len(octets) >= 4 and (octets[0] & 0x04) and octets[3] >= 38:
+                    codec = f"a2dp-sink-sbc_xq (DualChannel bitpool={octets[3]})"
+                elif len(octets) >= 4:
+                    codec = f"a2dp-sink-sbc (bitpool={octets[3]})"
+    except Exception:
+        pass
+
+    if not suspend_state and bluez_state:
+        suspend_state = "SUSPENDED (idle)" if bluez_state == "idle" else bluez_state.upper()
+
+    return {
+        "mac": bt_mac,
+        "sink_short": sink_line or f"bluez_output.{mac_underscored}.1",
+        "codec": codec or "unknown",
+        "state": suspend_state or "DISCONNECTED",
+        "bluez_transport_state": bluez_state or "none",
+        "avrcp_volume": bluez_vol,
+    }
+
+
+def ws_send_text(ssock: ssl.SSLSocket, text: str) -> None:
+    payload = text.encode("utf-8")
+    mask_key = os.urandom(4)
+    header = bytearray([0x81])
+    n = len(payload)
+    if n < 126:
+        header.append(0x80 | n)
+    elif n < 65536:
+        header.append(0x80 | 126)
+        header.extend(struct.pack(">H", n))
+    else:
+        header.append(0x80 | 127)
+        header.extend(struct.pack(">Q", n))
+    header.extend(mask_key)
+    masked = bytes(b ^ mask_key[i % 4] for i, b in enumerate(payload))
+    ssock.sendall(bytes(header) + masked)
+
+
+def ws_recv_text(ssock: ssl.SSLSocket) -> Optional[str]:
+    hdr = ssock.recv(2)
+    if not hdr or len(hdr) < 2:
+        return None
+    length = hdr[1] & 0x7F
+    if length == 126:
+        length = struct.unpack(">H", ssock.recv(2))[0]
+    elif length == 127:
+        length = struct.unpack(">Q", ssock.recv(8))[0]
+    data = bytearray()
+    while len(data) < length:
+        chunk = ssock.recv(length - len(data))
+        if not chunk:
+            break
+        data.extend(chunk)
+    return data.decode("utf-8", errors="replace")
+
+
+def frontdoor_request(
+    ip: str,
+    method: str,
+    resource: str,
+    body: Optional[Dict[str, Any]],
+    jwt_token: str,
+    guid: str = DEFAULT_GUID,
+    timeout: float = 4.0,
+) -> Dict[str, Any]:
+    ctx = ssl._create_unverified_context()
+    with socket.create_connection((ip, 8082), timeout=timeout) as sock:
+        sock.settimeout(timeout)
+        with ctx.wrap_socket(sock, server_hostname=ip) as ssock:
+            ws_key = base64.b64encode(os.urandom(16)).decode("ascii")
+            handshake = (
+                "GET / HTTP/1.1\r\n"
+                f"Host: {ip}:8082\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Key: {ws_key}\r\n"
+                "Sec-WebSocket-Version: 13\r\n"
+                "Sec-WebSocket-Protocol: eco2\r\n\r\n"
+            )
+            ssock.sendall(handshake.encode("ascii"))
+            resp_hdr = ssock.recv(1024).decode("utf-8", errors="replace")
+            if "101" not in resp_hdr.splitlines()[0]:
+                raise RuntimeError(f"WebSocket handshake failed: {resp_hdr.splitlines()[0]}")
+
+            # Read initial VersionInfo notify if sent immediately
+            device_guid = guid
+            init_raw = ws_recv_text(ssock)
+            if init_raw:
+                try:
+                    init_pkt = json.loads(init_raw)
+                    device_guid = init_pkt.get("header", {}).get("device", device_guid)
+                except Exception:
+                    pass
+
+            req_pkt: Dict[str, Any] = {
+                "header": {
+                    "device": device_guid,
+                    "method": method.upper(),
+                    "msgtype": "REQUEST",
+                    "reqid": 1,
+                    "resource": resource,
+                    "token": jwt_token,
+                    "version": 2,
+                },
+                "body": body if body is not None else {},
+            }
+            ws_send_text(ssock, json.dumps(req_pkt, separators=(",", ":")))
+
+            for _ in range(6):
+                frame = ws_recv_text(ssock)
+                if not frame:
+                    break
+                parsed = json.loads(frame)
+                hdr = parsed.get("header", {})
+                if hdr.get("reqid") == 1 or hdr.get("msgtype") in ("RESPONSE", "ERROR"):
+                    return parsed
+            return {"error": "Timed out waiting for FrontDoor RESPONSE frame"}
+
+
+def load_saved_token(explicit_token: Optional[str]) -> Optional[str]:
+    if explicit_token:
+        return explicit_token.strip()
+    if os.environ.get("BOSE_JWT_TOKEN"):
+        return os.environ["BOSE_JWT_TOKEN"].strip()
+    if TOKEN_PATH.is_file():
+        return TOKEN_PATH.read_text(encoding="utf-8").strip()
+    return None
+
+
+def cmd_status(ip: str, bt_mac: str, as_json: bool) -> int:
+    info_port_8091 = ""
+    try:
+        info_port_8091 = http_get(f"http://{ip}:8091/info")
+    except Exception as e:
+        info_port_8091 = f"unreachable ({e})"
+
+    diag_info: Dict[str, str] = {}
+    try:
+        diag_info = parse_diag_index(http_get(f"http://{ip}/diag/"))
+    except Exception:
+        pass
+
+    # If :8091/info returned JSON on some firmware, merge it
+    if info_port_8091.strip().startswith("{"):
+        try:
+            j = json.loads(info_port_8091)
+            diag_info.update({k: str(v) for k, v in j.items()})
+        except Exception:
+            pass
+
+    battery = parse_battery_html(http_get(f"http://{ip}/diag/battery"))
+    wifi = parse_wifi_diag(http_get(f"http://{ip}/diag/wifi"))
+    bt = get_bluetooth_pipewire_state(bt_mac)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "ip": ip,
+                    "device": diag_info,
+                    "info_8091_reachable": not info_port_8091.startswith("unreachable"),
+                    "battery": battery,
+                    "wifi": wifi,
+                    "bluetooth_pipewire": bt,
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    name = diag_info.get("productName", "Bose Portable Home Speaker")
+    codename = diag_info.get("productType", "taylor")
+    fw = diag_info.get("software_version", "?")
+    lpm = diag_info.get("lpm_version", "?")
+    hsp = diag_info.get("hsp_version", "?")
+    sn = diag_info.get("snSystem", "?")
+    guid = diag_info.get("guid", DEFAULT_GUID)
+
+    print(f"Device        : {name} ('Black Diamond' / {codename}) @ {ip}")
+    print(f"Firmware      : {fw}")
+    print(f"LPM / HSP     : LPM {lpm} | HSP {hsp}")
+    print(f"Serial / GUID : SN {sn} | GUID {guid}")
+    print(
+        f"Battery       : SoC {battery['soc']} | SoH {battery['soh']} ({battery['capacity']}) | "
+        f"{battery['status']} ({battery[' charger_status' if ' charger_status' in battery else 'charger_status']})"
+    )
+    print(
+        f"Pack / Cells  : {battery['voltage']} @ {battery['current']} ({battery['temperature']}) | "
+        f"Cell1 {battery['cell1_mv']} | Cell2 {battery['cell2_mv']} | VBUS {battery['vbus_voltage']}"
+    )
+    print(
+        f"Battery Fault : Faults={battery['faults']} | Status={battery['fault_status']} | "
+        f"LastShipMode={battery['last_ship_reason']}"
+    )
+    print(
+        f"Wi-Fi State   : {wifi.get('state', '?')} | SSID={wifi.get('ssid', '?')} | "
+        f"Signal={wifi.get('signalDbmLevel', '?')}"
+    )
+    vol_str = f" | AVRCP Vol={bt['avrcp_volume']}/127" if bt.get("avrcp_volume") is not None else ""
+    print(
+        f"Bluetooth PW  : {bt['mac']} | Codec={bt['codec']} | "
+        f"State={bt['state']}{vol_str}"
+    )
+    return 0
+
+
+def cmd_clear_fault(ip: str) -> int:
+    try:
+        http_get(f"http://{ip}/diag/battery/clearbrickfault")
+    except Exception:
+        # Bose Riviera CGI executes clearbrickfault and emits raw body without HTTP status line
+        pass
+    battery = parse_battery_html(http_get(f"http://{ip}/diag/battery"))
+    print(
+        f"OK: Called /diag/battery/clearbrickfault -> "
+        f"Battery Faults={battery['faults']} | Fault Status={battery['fault_status']} | "
+        f"SoC={battery['soc']} | Voltage={battery['voltage']}"
+    )
+    return 0
+
+
+def cmd_token_set(jwt: str) -> int:
+    TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TOKEN_PATH.write_text(jwt.strip() + "\n", encoding="utf-8")
+    os.chmod(TOKEN_PATH, 0o600)
+    print(f"OK: Saved Bose Cloud JWT token to {TOKEN_PATH} (chmod 600)")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="bose-ctl",
+        description="Bose Portable Smart Speaker ('Black Diamond') USB RNDIS & Bluetooth CLI",
+    )
+    parser.add_argument("--ip", default=DEFAULT_IP, help=f"Bose RNDIS IP (default: {DEFAULT_IP})")
+    parser.add_argument("--bt-mac", default=DEFAULT_BT_MAC, help=f"Bluetooth MAC (default: {DEFAULT_BT_MAC})")
+    parser.add_argument("--token", default=None, help="Bose Cloud JWT token override")
+    parser.add_argument("--json", action="store_true", help="Output status in JSON format")
+
+    sub = parser.add_subparsers(dest="subcommand")
+
+    st = sub.add_parser("status", help="Query speaker diagnostics, battery, Wi-Fi, and PipeWire BT state")
+    st.add_argument("--json", action="store_true", help="Output status in JSON format")
+
+    sub.add_parser("clear-fault", help="Clear bq28z610 battery brick fault and verify")
+
+    ts = sub.add_parser("token-set", help="Save Bose Cloud JWT token to ~/.config/bose-ctl/token.jwt")
+    ts.add_argument("jwt", help="JWT token string")
+
+    fd = sub.add_parser("frontdoor", help="Send raw FrontDoor v2 request over wss://<ip>:8082 (eco2)")
+    fd.add_argument("method", choices=["GET", "PUT", "POST", "DELETE"], help="HTTP-like FrontDoor method")
+    fd.add_argument("resource", help="FrontDoor resource path (e.g., /audio/eq, /system/info)")
+    fd.add_argument("body_json", nargs="?", default=None, help="Optional JSON body string")
+
+    eq = sub.add_parser("eq", help="Set bass/treble via FrontDoor PUT /audio/eq")
+    eq.add_argument("bass", type=int, help="Bass level (e.g. -100 to 100)")
+    eq.add_argument("treble", type=int, help="Treble level (e.g. -100 to 100)")
+
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    cmd = args.subcommand or "status"
+
+    try:
+        if cmd == "status":
+            return cmd_status(args.ip, args.bt_mac, getattr(args, "json", False))
+
+        if cmd == "clear-fault":
+            return cmd_clear_fault(args.ip)
+
+        if cmd == "token-set":
+            return cmd_token_set(args.jwt)
+
+        if cmd == "frontdoor":
+            token = load_saved_token(args.token)
+            if not token:
+                print(
+                    f"Error: No Bose JWT token configured. Run `bose-ctl token-set <jwt>` to save one to {TOKEN_PATH}, or pass `--token <jwt>`.",
+                    file=sys.stderr,
+                )
+                return 2
+            body = json.loads(args.body_json) if args.body_json else {}
+            resp = frontdoor_request(args.ip, args.method, args.resource, body, token)
+            print(json.dumps(resp, indent=2))
+            return 0
+
+        if cmd == "eq":
+            token = load_saved_token(args.token)
+            payload = {"bass": args.bass, "treble": args.treble}
+            if not token:
+                print(
+                    f"Note: Bose FrontDoor API on wss://{args.ip}:8082 requires a Bose Cloud JWT token for PUT /audio/eq.\n"
+                    f"1. Save your Bose JWT token:  bose-ctl token-set '<YOUR_BOSE_JWT>'\n"
+                    f"2. Run EQ command again:      bose-ctl eq {args.bass} {args.treble}\n"
+                    f"   (Will send FrontDoor v2 PUT /audio/eq {json.dumps(payload)})"
+                )
+                return 0
+            resp = frontdoor_request(args.ip, "PUT", "/audio/eq", payload, token)
+            print(json.dumps(resp, indent=2))
+            return 0
+
+    except Exception as exc:
+        print(f"Error executing bose-ctl {cmd}: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

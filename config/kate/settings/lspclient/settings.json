@@ -1,0 +1,65 @@
+{
+    "servers": {
+        "markdown": {
+            "command": ["/home/heocop/.local/bin/marksman", "server"],
+            "rootIndicationFileNames": [".marksman.toml", ".kateproject", ".obsidian", ".git"],
+            "url": "https://github.com/artempyanykh/marksman",
+            "highlightingModeRegex": "^Markdown$"
+        },
+        "typescript": {
+            "command": ["/home/heocop/.local/bin/typescript-language-server", "--stdio"],
+            "rootIndicationFileNames": ["package.json", "tsconfig.json", "jsconfig.json"],
+            "url": "https://github.com/typescript-language-server/typescript-language-server",
+            "highlightingModeRegex": "^(TypeScript.*|JavaScript.*)$"
+        },
+        "python": {
+            "command": ["/home/heocop/.local/bin/pyright-langserver", "--stdio"],
+            "rootIndicationFileNames": ["pyproject.toml", "setup.py", "pyrightconfig.json", "requirements.txt"],
+            "url": "https://github.com/microsoft/pyright",
+            "highlightingModeRegex": "^Python$"
+        },
+        "bash": {
+            "command": ["/home/heocop/.local/bin/bash-language-server", "start"],
+            "url": "https://github.com/bash-lsp/bash-language-server",
+            "highlightingModeRegex": "^(Bash|Zsh)$"
+        },
+        "rust": {
+            "command": ["/home/heocop/.cargo/bin/rust-analyzer"],
+            "rootIndicationFileNames": ["Cargo.lock", "Cargo.toml"],
+            "url": "https://rust-analyzer.github.io",
+            "highlightingModeRegex": "^Rust$"
+        },
+        "go": {
+            "command": ["/home/heocop/go/bin/gopls"],
+            "rootIndicationFileNames": ["go.mod", "go.sum", "go.work"],
+            "url": "https://pkg.go.dev/golang.org/x/tools/gopls",
+            "highlightingModeRegex": "^Go$"
+        },
+        "c": {
+            "command": ["/usr/bin/clangd", "-log=error", "--background-index"],
+            "rootIndicationFileNames": ["compile_commands.json", "compile_flags.txt", "CMakeLists.txt"],
+            "url": "https://clangd.llvm.org",
+            "highlightingModeRegex": "^(C|C\\+\\+|Objective-C|Objective-C\\+\\+)$"
+        },
+        "json": {
+            "command": ["/home/heocop/.local/bin/vscode-json-language-server", "--stdio"],
+            "url": "https://github.com/hrsh7th/vscode-langservers-extracted",
+            "highlightingModeRegex": "^JSON.*$"
+        },
+        "yaml": {
+            "command": ["/home/heocop/.local/bin/yaml-language-server", "--stdio"],
+            "url": "https://github.com/redhat-developer/yaml-language-server",
+            "highlightingModeRegex": "^YAML$"
+        },
+        "html": {
+            "command": ["/home/heocop/.local/bin/vscode-html-language-server", "--stdio"],
+            "url": "https://github.com/hrsh7th/vscode-langservers-extracted",
+            "highlightingModeRegex": "^HTML$"
+        },
+        "css": {
+            "command": ["/home/heocop/.local/bin/vscode-css-language-server", "--stdio"],
+            "url": "https://github.com/hrsh7th/vscode-langservers-extracted",
+            "highlightingModeRegex": "^(CSS|SCSS|Less)$"
+        }
+    }
+}

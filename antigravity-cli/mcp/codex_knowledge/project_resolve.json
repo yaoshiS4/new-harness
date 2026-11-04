@@ -1,0 +1,1 @@
+{"name":"project_resolve","description":"","parameters":{"properties":{"slug":{"title":"Slug","type":"string"}},"required":["slug"],"title":"project_resolveArguments","type":"object"}}

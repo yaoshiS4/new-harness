@@ -1,0 +1,7 @@
+# Oracle decision record. Consumer: skills/oracle-review/SKILL.md, AGENTS.md (PASS/CONDITIONAL/FAIL, fresh
+# execution evidence required; Stage 8 sign-off in implementation plans).
+contract_type: oracle_review
+decision: request_changes   # pass | conditional | request_changes | fail
+evidence: []                # spec/plan/diff references reviewed
+tests_executed: []          # raw command outputs from current turn only
+sign_off: ""                # oracle identifier + timestamp

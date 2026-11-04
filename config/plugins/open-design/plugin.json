@@ -1,0 +1,6 @@
+{
+  "name": "open-design",
+  "version": "1.0.0",
+  "description": "Open Design local daemon MCP bundle",
+  "disabled": true
+}

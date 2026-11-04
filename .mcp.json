@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "codegraph": {
+      "command": "bash",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/scripts/mcp-launch.sh", "codegraph"]
+    },
+    "codex_knowledge": {
+      "command": "bash",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/scripts/mcp-launch.sh", "codex_knowledge"]
+    },
+    "context_health": {
+      "command": "bash",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/scripts/mcp-launch.sh", "context_health"],
+      "env": {
+        "CODEX_BRAIN_DIR": "${HOME}/.claude/projects"
+      }
+    }
+  }
+}

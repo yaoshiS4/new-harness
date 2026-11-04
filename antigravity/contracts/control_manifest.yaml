@@ -1,0 +1,54 @@
+# Control Manifest Schema (BMAD / Antigravity Enterprise Governance)
+# Version: 1.2
+# Enforces explicit positive file scope, code exclusion zones, read exclusion for secrets, and deterministic verification.
+# Aligned with 3-Tier Adaptive Routing (Path 1 / Path 2 / Path 3) and 8-Stage Pipeline.
+
+manifest_version: 1.2
+task_id: "<unique-task-slug>"
+parent_epic: "<epic-id-or-none>"
+routing_path: "path_2" # path_1 (Quick Route <= 3 files) | path_2 (Normal Route 4-10 files) | path_3 (Long-Horizon Route > 10 files)
+pipeline_stage: "stage_4" # 1. Intake -> 2. Enrichment -> 3. Clarification -> 4. PM Contract & Story Shards -> 5. Disjoint Specialist Builders -> 6. Surgical Implementation -> 7. Two-Stage QC -> 8. Independent Oracle Audit
+
+# Denylist Inheritance (MANDATORY - O-R6)
+# Must inherit AGENTS.md / pre_tool_use_hook.py. Weakening global denylist is an automatic FAIL.
+inherits_denylist: "AGENTS.md / pre_tool_use_hook.py"
+
+boundaries:
+  # Positive Whitelist: Globs the agent is authorized to modify
+  in_scope_patterns:
+    - "src/features/target_module/**"
+    - "tests/features/target_module/**"
+  
+  # Hard Exclusion Zones: Forbidden write paths (Deny-over-Allow precedence - O-R2)
+  code_exclusion_zones:
+    - "auth/**"
+    - "payments/**"
+    - "config/**"
+    - "src/legacy_core/**"
+  
+  # Absolute Read Exclusion (MR-8): Secrets paths where transitive read is STRICTLY FORBIDDEN
+  read_excluded:
+    - ".env*"
+    - "**/secrets/**"
+    - "**/credentials/**"
+    - "**/keys/**"
+  
+  # Allow read-only access to non-secret exclusion zones for interface comprehension (O-R2, MR-8)
+  transitive_read_allowed: true
+  
+  # Limits
+  max_files_modified: 5
+  allowed_new_dependencies: [] # Empty = Zero new packages permitted without human escalation
+
+# Scope Expansion Protocol (O-R2, O-R7)
+scope_expansion_protocol:
+  on_unpredicted_dependency: "emit_break_request" # Emits BreakRequest contract to PM/User
+  l3_unattended_auto_expansion:
+    allowed: true # Auto-expand for files outside exclusion zones and AGENTS.md / pre_tool_use_hook.py denylist (O-R7)
+    log_to_drift_report: true
+
+verification_mandate:
+  test_commands:
+    - "npm test -- tests/features/target_module"
+  lint_command: "npm run lint"
+  typecheck_command: "npx tsc --noEmit"

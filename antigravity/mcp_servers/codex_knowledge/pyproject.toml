@@ -1,0 +1,23 @@
+[project]
+name = "codex-knowledge"
+version = "0.1.0"
+description = "Local MCP knowledge server for Codex global runtime"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp==1.27.0",
+  "langgraph==1.1.8",
+  "langmem>=0.0.30,<0.1",
+]
+
+[project.scripts]
+codex-knowledge = "codex_knowledge.server:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

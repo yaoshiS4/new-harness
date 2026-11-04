@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""lg-soundbar: Self-contained CLI for LG SC9S Soundbar (TCP 9741 AES-256-CBC)."""
+
+import argparse
+import json
+import os
+import socket
+import struct
+import subprocess
+import sys
+from typing import Any, Dict, List
+
+DEFAULT_IP = os.environ.get("LG_SOUNDBAR_IP", "192.168.50.155")
+DEFAULT_PORT = int(os.environ.get("LG_SOUNDBAR_PORT", "9741"))
+
+IV_HEX = b"\x27\x25\x5e\x55\x72\x37\x67\x79\x24\x7e\x74\x2b\x66\x29\x25\x40".hex()
+KEY_HEX = b"T^&*J%^7tr~4^%^&I(o%^!jIJ__+a0 k".hex()
+
+EQ_MODES: Dict[str, int] = {
+    "standard": 0,
+    "bass": 6,
+    "music": 7,
+    "game": 17,
+    "ai": 19,
+    "clear_voice": 21,
+    "sports": 22,
+    "cinema": 26,
+}
+
+EQ_NAMES: Dict[int, str] = {v: k for k, v in EQ_MODES.items()}
+
+FUNC_NAMES: Dict[int, str] = {
+    0: "Wi-Fi",
+    1: "Bluetooth",
+    4: "Optical / HDMI eARC",
+    6: "HDMI",
+    15: "USB",
+    20: "HDMI eARC / Optical",
+}
+
+PRESETS: Dict[str, Dict[str, Any]] = {
+    "atmos": {
+        "eq": 26,
+        "settings": {
+            "b_drc": False,
+            "b_night_time": False,
+            "i_center_level": 8,
+            "i_top_level": 9,
+            "i_woofer_level": 16,
+            "i_dialog_level": 2,
+        },
+    },
+    "reference": {
+        "eq": 0,
+        "settings": {
+            "b_drc": False,
+            "b_night_time": False,
+            "i_center_level": 6,
+            "i_top_level": 6,
+            "i_woofer_level": 15,
+            "i_dialog_level": 0,
+        },
+    },
+    "night": {
+        "eq": 21,
+        "settings": {
+            "b_drc": True,
+            "b_night_time": True,
+            "i_center_level": 8,
+            "i_top_level": 6,
+            "i_woofer_level": 10,
+            "i_dialog_level": 4,
+        },
+    },
+}
+
+
+def encrypt_packet(payload: Dict[str, Any]) -> bytes:
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    proc = subprocess.run(
+        ["openssl", "enc", "-aes-256-cbc", "-K", KEY_HEX, "-iv", IV_HEX],
+        input=raw,
+        capture_output=True,
+        check=True,
+    )
+    ciphertext = proc.stdout
+    return b"\x10" + struct.pack(">I", len(ciphertext)) + ciphertext
+
+
+def decrypt_packet(ciphertext: bytes) -> Dict[str, Any]:
+    proc = subprocess.run(
+        ["openssl", "enc", "-d", "-aes-256-cbc", "-K", KEY_HEX, "-iv", IV_HEX],
+        input=ciphertext,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(proc.stdout.decode("utf-8"))
+
+
+def recv_exact(sock: socket.socket, n: int) -> bytes:
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("Socket closed prematurely by soundbar")
+        buf.extend(chunk)
+    return bytes(buf)
+
+
+def exchange_packets(
+    ip: str, port: int, requests: List[Dict[str, Any]], timeout: float = 3.0
+) -> Dict[str, Dict[str, Any]]:
+    results: Dict[str, Dict[str, Any]] = {}
+    with socket.create_connection((ip, port), timeout=timeout) as sock:
+        sock.settimeout(timeout)
+        for req in requests:
+            sock.sendall(encrypt_packet(req))
+            hdr = recv_exact(sock, 5)
+            if hdr[0] != 0x10:
+                raise ValueError(f"Unexpected packet framing byte: 0x{hdr[0]:02x}")
+            length = struct.unpack(">I", hdr[1:5])[0]
+            body = recv_exact(sock, length)
+            decoded = decrypt_packet(body)
+            msg_name = decoded.get("msg", req.get("msg", "UNKNOWN"))
+            results[msg_name] = decoded
+    return results
+
+
+def parse_bool(val: str) -> bool:
+    v = val.strip().lower()
+    if v in ("on", "true", "1", "yes", "enable", "enabled"):
+        return True
+    if v in ("off", "false", "0", "no", "disable", "disabled"):
+        return False
+    raise argparse.ArgumentTypeError(f"Expected on|off, got '{val}'")
+
+
+def format_db(val: int) -> str:
+    return f"+{val} dB" if val > 0 else f"{val} dB"
+
+
+def cmd_status(ip: str, port: int, as_json: bool) -> int:
+    queries = [
+        {"cmd": "get", "msg": "SPK_LIST_VIEW_INFO"},
+        {"cmd": "get", "msg": "EQ_VIEW_INFO"},
+        {"cmd": "get", "msg": "SETTING_VIEW_INFO"},
+        {"cmd": "get", "msg": "UPDATE_VIEW_INFO"},
+        {"cmd": "get", "msg": "CALIBRATION_VIEW_INFO"},
+    ]
+    res = exchange_packets(ip, port, queries)
+
+    spk = res.get("SPK_LIST_VIEW_INFO", {}).get("data", {})
+    eq = res.get("EQ_VIEW_INFO", {}).get("data", {})
+    sett = res.get("SETTING_VIEW_INFO", {}).get("data", {})
+    upd = res.get("UPDATE_VIEW_INFO", {}).get("data", {})
+    cal = res.get("CALIBRATION_VIEW_INFO", {}).get("data", {})
+
+    curr_eq_id = eq.get("i_curr_eq", sett.get("i_curr_eq", -1))
+    curr_eq_name = EQ_NAMES.get(curr_eq_id, f"custom({curr_eq_id})")
+
+    woofer_raw = sett.get("i_woofer_level", 15)
+    center_raw = sett.get("i_center_level", 6)
+    top_raw = sett.get("i_top_level", 6)
+    rear_raw = sett.get("i_rear_level", 6)
+    dialog_raw = sett.get("i_dialog_level", 0)
+
+    trims_db = {
+        "woofer_db": woofer_raw - 15,
+        "center_db": center_raw - 6,
+        "top_db": top_raw - 6,
+        "rear_db": rear_raw - 6,
+        "dialog_level": dialog_raw,
+    }
+
+    if as_json:
+        out = {
+            "ip": sett.get("s_ipv4_addr", ip),
+            "name": spk.get("s_user_name") or sett.get("s_user_name", "LG Soundbar"),
+            "power": spk.get("b_powerstatus", True),
+            "source": spk.get("s_audio_source", "UNKNOWN"),
+            "function_id": spk.get("i_curr_func"),
+            "volume": spk.get("i_vol"),
+            "muted": spk.get("b_mute"),
+            "eq": {"id": curr_eq_id, "name": curr_eq_name},
+            "dsp": {
+                "drc": sett.get("b_drc"),
+                "night_time": sett.get("b_night_time"),
+                "surround_rear": sett.get("b_rear"),
+                "neuralx": sett.get("b_neuralx"),
+                "imax": sett.get("b_enable_imax"),
+                "av_sync_ms": sett.get("i_av_sync"),
+            },
+            "trims_db": trims_db,
+            "firmware": upd.get("o_system_ver", {}),
+            "calibration": cal,
+            "raw": res,
+        }
+        print(json.dumps(out, indent=2))
+        return 0
+
+    sys_ver = upd.get("o_system_ver", {})
+    fw_str = (
+        f"main {sys_ver.get('s_main', '?')} / "
+        f"micom {sys_ver.get('s_micom', '?')} / "
+        f"cast {sys_ver.get('s_c4a', '?')}"
+    )
+    func_id = spk.get("i_curr_func", -1)
+    func_label = FUNC_NAMES.get(func_id, f"func({func_id})")
+    mute_str = "MUTED" if spk.get("b_mute") else "Unmuted"
+    sub_conn = "Connected" if cal.get("b_woofer_connected") else "Disconnected"
+
+    print(f"Name          : {spk.get('s_user_name') or sett.get('s_user_name', 'LG SC9S')}")
+    print(f"IP Address    : {sett.get('s_ipv4_addr', ip)}:{port} (Wi-Fi Ch {sett.get('i_wifi_ch', '?')})")
+    print(f"Firmware      : {fw_str}")
+    print(f"Active Source : {spk.get('s_audio_source', 'UNKNOWN')} ({func_label})")
+    print(f"Volume / Mute : {spk.get('i_vol', '?')} / {spk.get('i_vol_max', 100)} ({mute_str})")
+    print(f"Active EQ     : {curr_eq_name} (ID: {curr_eq_id})")
+    print(
+        f"DSP Flags     : DRC={'ON' if sett.get('b_drc') else 'OFF'} | "
+        f"Night={'ON' if sett.get('b_night_time') else 'OFF'} | "
+        f"Surround={'ON' if sett.get('b_rear') else 'OFF'} | "
+        f"Neural:X={'ON' if sett.get('b_neuralx') else 'OFF'} | "
+        f"IMAX={'ON' if sett.get('b_enable_imax') else 'OFF'} | "
+        f"AVSync={sett.get('i_av_sync', 0)}ms"
+    )
+    print(
+        f"Channel Trims : Woofer {format_db(trims_db['woofer_db'])} ({sub_conn}) | "
+        f"Center {format_db(trims_db['center_db'])} | "
+        f"Top/Atmos {format_db(trims_db['top_db'])} | "
+        f"Rear {format_db(trims_db['rear_db'])} | "
+        f"Dialog {trims_db['dialog_level']}/6"
+    )
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="lg-soundbar",
+        description="LG SC9S Soundbar CLI controller over local AES-256-CBC TCP 9741",
+    )
+    parser.add_argument("--ip", default=DEFAULT_IP, help=f"Soundbar IP (default: {DEFAULT_IP})")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Soundbar TCP port (default: {DEFAULT_PORT})")
+    parser.add_argument("--json", action="store_true", help="Output status in JSON format")
+
+    sub = parser.add_subparsers(dest="subcommand")
+
+    st = sub.add_parser("status", help="Show soundbar status summary")
+    st.add_argument("--json", action="store_true", help="Output status in JSON format")
+
+    eq_p = sub.add_parser("eq", help="Set soundbar EQ mode")
+    eq_p.add_argument("mode", choices=sorted(EQ_MODES.keys()), help="EQ preset name")
+
+    vol_p = sub.add_parser("vol", help="Set master volume (0-100)")
+    vol_p.add_argument("level", type=int, help="Volume level (0-100)")
+
+    mute_p = sub.add_parser("mute", help="Set mute state (on|off)")
+    mute_p.add_argument("state", type=parse_bool, help="on or off")
+
+    for name, desc in [
+        ("drc", "Dynamic Range Control (on|off)"),
+        ("night", "Night Time mode (on|off)"),
+        ("surround", "Surround / Rear processing (on|off)"),
+        ("neuralx", "DTS Neural:X processing (on|off)"),
+    ]:
+        p = sub.add_parser(name, help=f"Set {desc}")
+        p.add_argument("state", type=parse_bool, help="on or off")
+
+    av_p = sub.add_parser("avsync", help="Set AV sync delay (0-300 ms)")
+    av_p.add_argument("ms", type=int, help="Delay in ms (0-300)")
+
+    tr_p = sub.add_parser("trim", help="Set channel trim in dB")
+    tr_p.add_argument(
+        "channel",
+        choices=["woofer", "center", "top", "rear", "dialog"],
+        help="Target channel",
+    )
+    tr_p.add_argument("db_value", type=int, help="dB value (woofer -15..6, center/top/rear -6..6, dialog 0..6)")
+
+    pr_p = sub.add_parser("preset", help="Apply composite audio preset")
+    pr_p.add_argument("name", choices=sorted(PRESETS.keys()), help="Preset name (atmos|reference|night)")
+
+    return parser
+
+
+def main() -> int:
+    # Allow negative numbers as positional arguments for `trim` (e.g., `trim woofer -5`)
+    parser = build_parser()
+    args = parser.parse_args()
+
+    cmd = args.subcommand or "status"
+    ip = args.ip
+    port = args.port
+
+    try:
+        if cmd == "status":
+            return cmd_status(ip, port, getattr(args, "json", False))
+
+        if cmd == "eq":
+            eq_id = EQ_MODES[args.mode]
+            exchange_packets(ip, port, [{"cmd": "set", "msg": "EQ_VIEW_INFO", "data": {"i_curr_eq": eq_id}}])
+            print(f"OK: EQ set to {args.mode} (ID {eq_id})")
+            return 0
+
+        if cmd == "vol":
+            if not (0 <= args.level <= 100):
+                print("Error: volume must be between 0 and 100", file=sys.stderr)
+                return 2
+            exchange_packets(ip, port, [{"cmd": "set", "msg": "SPK_LIST_VIEW_INFO", "data": {"i_vol": args.level}}])
+            print(f"OK: Volume set to {args.level}")
+            return 0
+
+        if cmd == "mute":
+            exchange_packets(ip, port, [{"cmd": "set", "msg": "SPK_LIST_VIEW_INFO", "data": {"b_mute": args.state}}])
+            print(f"OK: Mute set to {'ON' if args.state else 'OFF'}")
+            return 0
+
+        if cmd in ("drc", "night", "surround", "neuralx"):
+            field_map = {
+                "drc": "b_drc",
+                "night": "b_night_time",
+                "surround": "b_rear",
+                "neuralx": "b_neuralx",
+            }
+            field = field_map[cmd]
+            exchange_packets(ip, port, [{"cmd": "set", "msg": "SETTING_VIEW_INFO", "data": {field: args.state}}])
+            print(f"OK: {cmd} ({field}) set to {'ON' if args.state else 'OFF'}")
+            return 0
+
+        if cmd == "avsync":
+            if not (0 <= args.ms <= 300):
+                print("Error: avsync must be between 0 and 300 ms", file=sys.stderr)
+                return 2
+            exchange_packets(ip, port, [{"cmd": "set", "msg": "SETTING_VIEW_INFO", "data": {"i_av_sync": args.ms}}])
+            print(f"OK: AV Sync set to {args.ms} ms")
+            return 0
+
+        if cmd == "trim":
+            ch = args.channel
+            db = args.db_value
+            spec = {
+                "woofer": ("i_woofer_level", -15, 6, 15),
+                "center": ("i_center_level", -6, 6, 6),
+                "top": ("i_top_level", -6, 6, 6),
+                "rear": ("i_rear_level", -6, 6, 6),
+                "dialog": ("i_dialog_level", 0, 6, 0),
+            }
+            field, lo, hi, offset = spec[ch]
+            if not (lo <= db <= hi):
+                print(f"Error: {ch} value must be between {lo} and {hi}", file=sys.stderr)
+                return 2
+            raw_val = db + offset
+            exchange_packets(ip, port, [{"cmd": "set", "msg": "SETTING_VIEW_INFO", "data": {field: raw_val}}])
+            label = f"{db}/6" if ch == "dialog" else format_db(db)
+            print(f"OK: {ch} trim set to {label} (raw={raw_val})")
+            return 0
+
+        if cmd == "preset":
+            preset = PRESETS[args.name]
+            reqs = [
+                {"cmd": "set", "msg": "EQ_VIEW_INFO", "data": {"i_curr_eq": preset["eq"]}},
+                {"cmd": "set", "msg": "SETTING_VIEW_INFO", "data": preset["settings"]},
+            ]
+            exchange_packets(ip, port, reqs)
+            eq_name = EQ_NAMES.get(preset["eq"], str(preset["eq"]))
+            print(f"OK: Applied preset '{args.name}' (EQ={eq_name}, settings={json.dumps(preset['settings'])})")
+            return 0
+
+    except Exception as exc:
+        print(f"Error communicating with LG soundbar at {ip}:{port}: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

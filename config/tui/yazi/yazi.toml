@@ -1,0 +1,39 @@
+[mgr]
+ratio = [1, 3, 4]
+show_hidden = true
+show_symlink = true
+sort_by = "natural"
+sort_dir_first = true
+linemode = "size"
+mouse_events = ["click", "scroll"]
+
+[opener]
+edit = [
+	{ run = 'micro "$@"', block = true, desc = "Edit in micro" },
+	{ run = 'code "$@"', orphan = true, desc = "Open in VS Code" },
+]
+pdf = [
+	{ run = 'okular "$@"', orphan = true, desc = "Open in Okular" },
+]
+image = [
+	{ run = 'gwenview "$@"', orphan = true, desc = "Open in Gwenview" },
+]
+media = [
+	{ run = 'mpv "$@"', orphan = true, desc = "Play in MPV" },
+]
+archive = [
+	{ run = 'ark "$@"', orphan = true, desc = "Open in Ark" },
+]
+reveal = [
+	{ run = 'dolphin --select "$1"', orphan = true, desc = "Reveal in Dolphin" },
+]
+
+[open]
+prepend_rules = [
+	{ mime = "application/pdf", use = ["pdf", "reveal"] },
+	{ mime = "image/*", use = ["image", "reveal"] },
+	{ mime = "{audio,video}/*", use = ["media", "reveal"] },
+	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*}", use = ["archive", "reveal"] },
+	{ mime = "text/*", use = ["edit", "reveal"] },
+	{ mime = "application/{json,javascript,typescript,x-sh,toml,yaml}", use = ["edit", "reveal"] },
+]

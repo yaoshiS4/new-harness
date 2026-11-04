@@ -1,0 +1,51 @@
+{
+    "formatOnSave": false,
+    "markdown": {
+        "name": "prettier",
+        "command": ["prettier", "--stdin-filepath", "%S"]
+    },
+    "typescript": {
+        "name": "prettier",
+        "command": ["prettier", "--stdin-filepath", "%S"]
+    },
+    "javascript": {
+        "name": "prettier",
+        "command": ["prettier", "--stdin-filepath", "%S"]
+    },
+    "json": {
+        "name": "jq",
+        "command": ["jq", "."]
+    },
+    "yaml": {
+        "name": "prettier",
+        "command": ["prettier", "--stdin-filepath", "%S"]
+    },
+    "html": {
+        "name": "prettier",
+        "command": ["prettier", "--stdin-filepath", "%S"]
+    },
+    "css": {
+        "name": "prettier",
+        "command": ["prettier", "--stdin-filepath", "%S"]
+    },
+    "python": {
+        "name": "ruff",
+        "command": ["ruff", "format", "--stdin-filename", "%S", "-"]
+    },
+    "bash": {
+        "name": "shfmt",
+        "command": ["shfmt", "-i", "2", "-ci"]
+    },
+    "rust": {
+        "name": "rustfmt",
+        "command": ["rustfmt", "--edition=2021"]
+    },
+    "go": {
+        "name": "gofmt",
+        "command": ["gofmt"]
+    },
+    "c": {
+        "name": "clang-format",
+        "command": ["clang-format", "--assume-filename=%S"]
+    }
+}

@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "codegraph": {
+      "command": "/home/heocop/.gemini/antigravity/mcp_servers/codegraph/.venv/bin/python3",
+      "args": [
+        "-m",
+        "codegraph.server"
+      ],
+      "cwd": "/home/heocop/.gemini/antigravity/mcp_servers/codegraph"
+    },
+    "codex_knowledge": {
+      "command": "/home/heocop/.gemini/antigravity/mcp_servers/codex_knowledge/.venv/bin/python3",
+      "args": [
+        "-m",
+        "codex_knowledge.server"
+      ],
+      "cwd": "/home/heocop/.gemini/antigravity/mcp_servers/codex_knowledge"
+    },
+    "context_health": {
+      "command": "/home/heocop/.gemini/antigravity/mcp_servers/context_health/.venv/bin/python3",
+      "args": [
+        "-m",
+        "context_health.server"
+      ],
+      "cwd": "/home/heocop/.gemini/antigravity/mcp_servers/context_health"
+    }
+  }
+}

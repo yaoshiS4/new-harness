@@ -1,0 +1,688 @@
+#!/usr/bin/env python3
+"""
+agy-axi - Token-efficient Antigravity workspace and telemetry inspector.
+Follows the 10 AXI Principles (TOON output, 3-4 fields, aggregates, disclosure).
+"""
+
+import os
+import sys
+import json
+import sqlite3
+import subprocess
+import re
+from pathlib import Path
+
+VERSION = "0.1.0"
+APP_DATA_DIR = Path(os.path.expanduser("~/.gemini/antigravity-cli"))
+DB_PATH = APP_DATA_DIR / "conversation_summaries.db"
+QUOTA_PATH = APP_DATA_DIR / "quota_cache.json"
+LIVE_STATE_PATH = Path(os.path.expanduser("~/.cache/antigravity_live_state.json"))
+QUOTA_CACHE_PATHS = [
+    APP_DATA_DIR / "quota_cache.json",
+    Path(os.path.expanduser("~/.cache/antigravity_quota.json")),
+]
+VALID_TOP_FLAGS = {"--help", "-h", "--version", "-v", "-V", "--full"}
+
+
+def toon_value(val):
+    if val is None:
+        return ""
+    s = str(val).strip()
+    if any(c in s for c in (',', '"', '\n')):
+        return '"' + s.replace('"', '""') + '"'
+    return s
+
+
+def emit_list(name, rows, fields, total=None):
+    count_str = f"{len(rows)} of {total} total" if total is not None and total != len(rows) else str(len(rows))
+    header = f"{name}[{count_str}]{{{','.join(fields)}}}:"
+    lines = [header]
+    for r in rows:
+        lines.append("  " + ",".join(toon_value(r.get(f, "")) for f in fields))
+    return "\n".join(lines)
+
+
+def emit_block(name, lines):
+    return f"{name}[{len(lines)}]:\n" + "\n".join("  " + l for l in lines)
+
+
+def truncate_str(s, limit=500):
+    if len(s) <= limit:
+        return s
+    return s[:limit] + "..."
+
+
+def get_git_info(full=False):
+    def run_git(args):
+        try:
+            r = subprocess.run(["git"] + args, capture_output=True, text=True, timeout=5)
+            return r.stdout.strip() if r.returncode == 0 else ""
+        except Exception:
+            return ""
+
+    is_repo = run_git(["rev-parse", "--is-inside-work-tree"])
+    if is_repo != "true":
+        return None
+
+    repo_root = run_git(["rev-parse", "--show-toplevel"])
+    branch = run_git(["branch", "--show-current"])
+    if not branch:
+        branch = run_git(["rev-parse", "--short", "HEAD"])
+
+    wt_lines = run_git(["worktree", "list"]).splitlines()
+    worktrees = len(wt_lines) if wt_lines else 1
+
+    status_out = run_git(["status", "--porcelain=v1"]).splitlines()
+    modified = len([l for l in status_out if l.strip()])
+
+    ins, dels = 0, 0
+    for diff_cmd in [["diff", "--numstat"], ["diff", "--cached", "--numstat"]]:
+        for line in run_git(diff_cmd).splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                if parts[0].isdigit():
+                    ins += int(parts[0])
+                if parts[1].isdigit():
+                    dels += int(parts[1])
+
+    commit_count = 20 if full else 5
+    raw_commits = run_git(["log", f"-n{commit_count}", "--format=%h%x1f%an%x1f%cr%x1f%s"]).splitlines()
+    commits = []
+    for line in raw_commits:
+        parts = line.split("\x1f")
+        if len(parts) == 4:
+            commits.append({
+                "hash": parts[0],
+                "author": parts[1],
+                "age": parts[2],
+                "message": parts[3]
+            })
+
+    return {
+        "repo": repo_root,
+        "branch": branch,
+        "worktrees": worktrees,
+        "modified": modified,
+        "insertions": ins,
+        "deletions": dels,
+        "commits": commits
+    }
+
+
+def read_live_state():
+    if not LIVE_STATE_PATH.exists():
+        return {}
+    try:
+        with open(LIVE_STATE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def get_current_session():
+    live_st = read_live_state()
+    live_conv_id = live_st.get("conversation_id")
+    live_ctx = live_st.get("context_window") or {}
+
+    session = None
+    subagents = []
+
+    if DB_PATH.exists():
+        con = None
+        try:
+            con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+            cur = con.cursor()
+
+            row = None
+            if live_conv_id:
+                cur.execute(
+                    "SELECT conversation_id, title, step_count, last_modified_time, status, parent_conversation_id "
+                    "FROM conversation_summaries WHERE conversation_id = ?",
+                    (live_conv_id,)
+                )
+                row = cur.fetchone()
+
+            if not row:
+                cur.execute(
+                    "SELECT conversation_id, title, step_count, last_modified_time, status, parent_conversation_id "
+                    "FROM conversation_summaries WHERE (parent_conversation_id IS NULL OR parent_conversation_id = '') "
+                    "ORDER BY last_modified_time DESC LIMIT 1"
+                )
+                row = cur.fetchone()
+
+            if row:
+                session = {
+                    "conversation_id": row[0],
+                    "title": row[1] if row[1] else "(untitled)",
+                    "step_count": row[2],
+                    "last_modified": row[3],
+                    "status": row[4],
+                    "parent_id": row[5]
+                }
+            elif live_conv_id:
+                session = {
+                    "conversation_id": live_conv_id,
+                    "title": "(active session)",
+                    "step_count": 0,
+                    "last_modified": live_st.get("ts"),
+                    "status": "running",
+                    "parent_id": None
+                }
+
+            if session:
+                root_id = session["parent_id"] if session["parent_id"] else session["conversation_id"]
+                cur.execute(
+                    "SELECT conversation_id, status, step_count, title "
+                    "FROM conversation_summaries WHERE parent_conversation_id = ? "
+                    "ORDER BY last_modified_time DESC",
+                    (root_id,)
+                )
+                sub_rows = cur.fetchall()
+                subagents = [
+                    {
+                        "conversation_id": r[0],
+                        "status": r[1],
+                        "step_count": r[2],
+                        "title": r[3] if r[3] else "(subagent)"
+                    }
+                    for r in sub_rows
+                ]
+        except Exception:
+            pass
+        finally:
+            if con is not None:
+                try:
+                    con.close()
+                except Exception:
+                    pass
+
+    if not session and live_conv_id:
+        session = {
+            "conversation_id": live_conv_id,
+            "title": "(active session)",
+            "step_count": 0,
+            "last_modified": live_st.get("ts"),
+            "status": "running",
+            "parent_id": None
+        }
+
+    return session, subagents, live_ctx
+
+
+def get_active_session_and_subagents():
+    sess, subs, _ = get_current_session()
+    return sess, subs
+
+
+def get_context_tokens(conv_id):
+    if not conv_id:
+        return 0, 0, 0
+    transcript_path = APP_DATA_DIR / "brain" / conv_id / ".system_generated" / "logs" / "transcript.jsonl"
+    if not transcript_path.exists():
+        return 0, 0, 0
+
+    inp, out, cache = 0, 0, 0
+    try:
+        with open(transcript_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if '"PLANNER_RESPONSE"' in line:
+                    try:
+                        data = json.loads(line)
+                        if data.get("type") == "PLANNER_RESPONSE":
+                            inp = data.get("input_tokens", inp)
+                            out = data.get("output_tokens", out)
+                            cache = data.get("cache_read_tokens", cache)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return inp, out, cache
+
+
+def get_quota_rows():
+    best_data = None
+    best_ts = -1.0
+    for qpath in QUOTA_CACHE_PATHS:
+        if qpath.exists():
+            try:
+                mtime = qpath.stat().st_mtime
+                with open(qpath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                ts = float(data.get("ts") or mtime)
+                if ts > best_ts:
+                    best_ts = ts
+                    best_data = data
+            except Exception:
+                pass
+    if not best_data:
+        return []
+    quota_dict = best_data.get("quota", {})
+    rows = []
+    for k in ["gemini-5h", "gemini-weekly", "3p-5h", "3p-weekly"]:
+        w = quota_dict.get(k)
+        if w:
+            frac = w.get("remaining_fraction")
+            pct_str = f"{round(frac * 100, 1)}%" if frac is not None else "100%"
+            reset_time = w.get("reset_time", "n/a")
+            rows.append({
+                "window": k,
+                "remaining": pct_str,
+                "resets_at": reset_time
+            })
+    return rows
+
+
+def handle_home():
+    lines = [
+        "bin: ~/.local/bin/agy-axi",
+        "description: Antigravity session, quota, git aggregates, and telemetry inspector"
+    ]
+
+    session, subagents, live_ctx = get_current_session()
+    if session:
+        lines.append(f"session: {session['conversation_id']}")
+        lines.append(f"title: {toon_value(session['title'])}")
+        lines.append(f"status: {session['status']}")
+        lines.append(f"step_count: {session['step_count']}")
+
+        inp = live_ctx.get("total_input_tokens")
+        out = live_ctx.get("total_output_tokens")
+        limit = live_ctx.get("context_window_size") or 1048576
+        used_pct = live_ctx.get("used_percentage")
+        curr_u = live_ctx.get("current_usage") or {}
+        cache = curr_u.get("cache_read_input_tokens")
+        if cache is None:
+            cache = live_ctx.get("cache_read_tokens")
+
+        if inp is None and out is None:
+            inp, out, cache = get_context_tokens(session["conversation_id"])
+
+        inp = inp or 0
+        out = out or 0
+        cache = cache or 0
+        total_tokens = inp + out + cache
+
+        curr_in = curr_u.get("input_tokens") or 0
+        curr_out = curr_u.get("output_tokens") or 0
+        curr_cache = curr_u.get("cache_read_input_tokens") or 0
+        if curr_u:
+            active_ctx = curr_in + curr_out + curr_cache
+        elif used_pct is not None:
+            active_ctx = int(round(limit * (float(used_pct) / 100.0)))
+        else:
+            active_ctx = total_tokens
+
+        pct = round(active_ctx / max(1, limit) * 100, 1)
+
+        lines.append(f"context: {active_ctx}/{limit} ({pct}%)")
+        lines.append(f"session_tokens: {total_tokens}")
+        token_rows = [
+            {"type": "input", "tokens": inp},
+            {"type": "cache_read", "tokens": cache},
+            {"type": "output", "tokens": out}
+        ]
+        lines.append(emit_list("tokens", token_rows, ["type", "tokens"]))
+    else:
+        lines.append("session: 0 active sessions")
+
+    quota_rows = get_quota_rows()
+    if quota_rows:
+        lines.append(emit_list("quota", quota_rows, ["window", "remaining", "resets_at"]))
+
+    git_info = get_git_info()
+    if git_info:
+        lines.append(f"git_branch: {git_info['branch']}")
+        lines.append(f"git_worktrees: {git_info['worktrees']}")
+        lines.append(f"git_diff: {git_info['modified']} files, +{git_info['insertions']}/-{git_info['deletions']}")
+    else:
+        lines.append("git: not a git repository")
+
+    if subagents:
+        lines.append(emit_list("subagents", subagents, ["conversation_id", "status", "step_count", "title"]))
+    else:
+        lines.append("subagents: 0 active subagents")
+
+    help_cmds = [
+        "agy-axi db <sqlite-path> [sql]",
+        "agy-axi git",
+        "agy-axi logs [conv-id]"
+    ]
+    lines.append(emit_block("help", help_cmds))
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+cmd_summary = handle_home
+
+
+def handle_db(args):
+    flags = [a for a in args if a.startswith("-")]
+    params = [a for a in args if not a.startswith("-")]
+
+    for f in flags:
+        if f in ("--help", "-h"):
+            print("command: agy-axi db\n"
+                  "summary: Inspect SQLite databases read-only with compact TOON output\n"
+                  "flags[2]{flag,default,description}:\n"
+                  "  --full,false,lift row and column truncation caps\n"
+                  "  --help,false,show this help\n"
+                  "examples[2]:\n"
+                  "  agy-axi db ~/.gemini/antigravity-cli/conversation_summaries.db\n"
+                  "  agy-axi db ~/.gemini/antigravity-cli/conversation_summaries.db \"SELECT * FROM conversation_summaries LIMIT 5\"")
+            sys.exit(0)
+        elif f != "--full":
+            print(f"error: unknown flag {f} for 'db'\n"
+                  f"suggestion: valid flags for 'db': --full, --help")
+            sys.exit(2)
+
+    full = "--full" in flags
+    if not params:
+        print("error: missing sqlite database path\n"
+              "suggestion: agy-axi db <sqlite-path> [sql]")
+        sys.exit(2)
+
+    db_path_str = os.path.expanduser(params[0])
+    if not os.path.exists(db_path_str):
+        print(f"error: database file not found: {db_path_str}\n"
+              f"suggestion: confirm path exists and retry")
+        sys.exit(1)
+
+    sql = params[1].strip() if len(params) > 1 else None
+
+    try:
+        con = sqlite3.connect(f"file:{os.path.abspath(db_path_str)}?mode=ro", uri=True)
+        cur = con.cursor()
+    except Exception as e:
+        print(f"error: cannot open sqlite database: {e}\n"
+              f"suggestion: confirm file is a valid SQLite database")
+        sys.exit(1)
+
+    try:
+        if not sql:
+            cur.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            tables = [r[0] for r in cur.fetchall()]
+            table_rows = []
+            for t in tables:
+                try:
+                    c_cnt = cur.execute(f'SELECT count(*) FROM "{t}"').fetchone()[0]
+                except Exception:
+                    c_cnt = 0
+                cols = len(cur.execute(f'PRAGMA table_info("{t}")').fetchall())
+                table_rows.append({
+                    "table": t,
+                    "rows": c_cnt,
+                    "columns": cols
+                })
+
+            disp_rows = table_rows if full else table_rows[:20]
+            lines = [
+                f"database: {db_path_str}",
+                f"count: {len(table_rows)} tables",
+                emit_list("tables", disp_rows, ["table", "rows", "columns"], total=len(table_rows)),
+                emit_block("help", [
+                    f'agy-axi db {params[0]} "SELECT * FROM {tables[0] if tables else "table"} LIMIT 10"',
+                    f'agy-axi db {params[0]} --full'
+                ])
+            ]
+            print("\n".join(lines))
+            sys.exit(0)
+        else:
+            # Read-only validation
+            clean_sql = re.sub(r"--[^\n]*", "", sql)
+            clean_sql = re.sub(r"/\*.*?\*/", "", clean_sql, flags=re.DOTALL).strip()
+            norm = re.sub(r"\s+", " ", clean_sql).upper()
+
+            if ";" in clean_sql.rstrip(";"):
+                print("error: multiple statements are not allowed\n"
+                      "suggestion: execute a single read-only SELECT query")
+                sys.exit(1)
+
+            if not (norm.startswith("SELECT ") or norm == "SELECT" or norm.startswith("EXPLAIN ")):
+                print("error: only read-only SELECT queries are allowed\n"
+                      "suggestion: try 'SELECT * FROM ... LIMIT 10'")
+                sys.exit(1)
+
+            cur.execute(sql)
+            col_names = [d[0] for d in cur.description] if cur.description else []
+            raw_rows = cur.fetchall()
+
+            row_limit = len(raw_rows) if full else min(10, len(raw_rows))
+            formatted_rows = []
+            for r in raw_rows[:row_limit]:
+                row_dict = {}
+                for idx, c in enumerate(col_names):
+                    val = str(r[idx]) if r[idx] is not None else ""
+                    if not full:
+                        val = truncate_str(val, 300)
+                    row_dict[c] = val
+                formatted_rows.append(row_dict)
+
+            lines = [
+                f"database: {db_path_str}",
+                emit_list("rows", formatted_rows, col_names, total=len(raw_rows)),
+                emit_block("help", [
+                    f'agy-axi db {params[0]} "{sql}" --full'
+                ])
+            ]
+            print("\n".join(lines))
+            sys.exit(0)
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"error: query failed: {e}\n"
+              f"suggestion: check SQL syntax and table names")
+        sys.exit(1)
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
+def handle_git(args):
+    flags = [a for a in args if a.startswith("-")]
+    for f in flags:
+        if f in ("--help", "-h"):
+            print("command: agy-axi git\n"
+                  "summary: Pre-computed git branch, worktrees, dirty files, diff aggregates and commits\n"
+                  "flags[2]{flag,default,description}:\n"
+                  "  --full,false,show up to 20 recent commits and full diff\n"
+                  "  --help,false,show this help\n"
+                  "examples[2]:\n"
+                  "  agy-axi git\n"
+                  "  agy-axi git --full")
+            sys.exit(0)
+        elif f != "--full":
+            print(f"error: unknown flag {f} for 'git'\n"
+                  f"suggestion: valid flags for 'git': --full, --help")
+            sys.exit(2)
+
+    full = "--full" in flags
+    git_info = get_git_info(full=full)
+    if not git_info:
+        print("git: not inside a git repository\n"
+              "error: 0 git repositories found in current working directory\n"
+              "suggestion: navigate to a git repository and run 'agy-axi git'")
+        sys.exit(0)
+
+    lines = [
+        f"git: {git_info['repo']}",
+        f"branch: {git_info['branch']}",
+        f"worktrees: {git_info['worktrees']}",
+        f"modified_files: {git_info['modified']}",
+        f"diff_aggregates: +{git_info['insertions']}/-{git_info['deletions']}",
+        emit_list("commits", git_info["commits"], ["hash", "author", "age", "message"]),
+        emit_block("help", [
+            "git status",
+            "agy-axi git --full"
+        ])
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_logs(args):
+    flags = [a for a in args if a.startswith("-")]
+    params = [a for a in args if not a.startswith("-")]
+
+    for f in flags:
+        if f in ("--help", "-h"):
+            print("command: agy-axi logs\n"
+                  "summary: Compact TOON summary of recent conversation steps, tool calls, and errors\n"
+                  "flags[2]{flag,default,description}:\n"
+                  "  --full,false,show all recent steps and untruncated messages\n"
+                  "  --help,false,show this help\n"
+                  "examples[2]:\n"
+                  "  agy-axi logs\n"
+                  "  agy-axi logs <conv-id> --full")
+            sys.exit(0)
+        elif f != "--full":
+            print(f"error: unknown flag {f} for 'logs'\n"
+                  f"suggestion: valid flags for 'logs': --full, --help")
+            sys.exit(2)
+
+    full = "--full" in flags
+    conv_id = params[0] if params else None
+    if not conv_id:
+        session, _ = get_active_session_and_subagents()
+        if session:
+            conv_id = session["conversation_id"]
+
+    if not conv_id:
+        print("error: no active conversation found\n"
+              "suggestion: specify conversation id: agy-axi logs <conv-id>")
+        sys.exit(1)
+
+    transcript_path = APP_DATA_DIR / "brain" / conv_id / ".system_generated" / "logs" / "transcript.jsonl"
+    if not transcript_path.exists():
+        print(f"error: transcript not found for conversation {conv_id}\n"
+              f"suggestion: verify conversation id or inspect ~/.gemini/antigravity-cli/brain/")
+        sys.exit(1)
+
+    steps = []
+    errors = []
+    total_steps = 0
+
+    try:
+        with open(transcript_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                total_steps += 1
+                try:
+                    data = json.loads(line)
+                    idx = data.get("step_index", total_steps)
+                    stype = data.get("type", "UNKNOWN")
+                    status = data.get("status", "DONE")
+                    summary = ""
+
+                    if stype == "PLANNER_RESPONSE":
+                        tc = data.get("tool_calls", [])
+                        if tc:
+                            t_names = [call.get("name", "") for call in tc]
+                            summary = f"tools: {','.join(t_names)}"
+                        else:
+                            summary = "planner turn"
+                    elif stype == "USER_INPUT":
+                        content = data.get("content", "")
+                        summary = truncate_str(content.replace("\n", " "), 60)
+                    else:
+                        summary = stype
+
+                    step_entry = {
+                        "step": idx,
+                        "type": stype,
+                        "status": status,
+                        "summary": summary
+                    }
+                    steps.append(step_entry)
+
+                    if status == "ERROR":
+                        errors.append({
+                            "step": idx,
+                            "type": stype,
+                            "message": summary
+                        })
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"error: failed to read transcript: {e}\n"
+              f"suggestion: check transcript permissions")
+        sys.exit(1)
+
+    disp_steps = steps if full else steps[-5:]
+    lines = [
+        f"conversation: {conv_id}",
+        f"total_steps: {total_steps}",
+        f"errors_count: {len(errors)}",
+        emit_list("steps", disp_steps, ["step", "type", "status", "summary"], total=total_steps)
+    ]
+    if errors:
+        lines.append(emit_list("errors", errors[:5], ["step", "type", "message"]))
+
+    lines.append(emit_block("help", [
+        f"agy-axi logs {conv_id} --full",
+        "agy-axi"
+    ]))
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def print_top_help():
+    print("bin: ~/.local/bin/agy-axi\n"
+          "description: Token-efficient Antigravity workspace and telemetry inspector\n\n"
+          "Usage: agy-axi [command] [flags]\n\n"
+          "Commands:\n"
+          "  (no args)                     Live summary of session, context, quota, git & subagents\n"
+          "  db <path> [sql] [--full]      Inspect SQLite tables or run read-only queries in TOON\n"
+          "  git [--full]                  Pre-computed git branch, worktrees, dirty files & commits\n"
+          "  logs [conv-id] [--full]       Recent conversation steps, tool calls, and error traces\n\n"
+          "Flags:\n"
+          "  --help, -h                    Show this help reference\n"
+          "  --version, -v                 Show version\n"
+          "  --full                        Lift row and length truncation caps\n\n"
+          "Examples:\n"
+          "  agy-axi\n"
+          "  agy-axi git\n"
+          "  agy-axi db ~/.gemini/antigravity-cli/conversation_summaries.db\n"
+          "  agy-axi logs")
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        handle_home()
+
+    first = args[0]
+    if first in ("--help", "-h"):
+        print_top_help()
+        sys.exit(0)
+
+    if first in ("--version", "-v", "-V"):
+        print(f"agy-axi: {VERSION} (spec axi/1.0-2026-07)")
+        sys.exit(0)
+
+    if first in ("status", "summary", "home"):
+        handle_home()
+        sys.exit(0)
+    elif first == "db":
+        handle_db(args[1:])
+    elif first == "git":
+        handle_git(args[1:])
+    elif first == "logs":
+        handle_logs(args[1:])
+    elif first.startswith("-"):
+        print(f"error: unknown flag {first}\n"
+              f"suggestion: valid flags: --full, --help, --version")
+        sys.exit(2)
+    else:
+        print(f"error: unknown command '{first}'\n"
+              f"suggestion: valid commands: db, git, logs (or run 'agy-axi' with no arguments)")
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()

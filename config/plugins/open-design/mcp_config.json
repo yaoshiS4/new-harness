@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "open-design": {
+      "command": "/home/heocop/.gemini/config/scripts/launch-open-design-mcp.sh",
+      "env": {
+        "OD_DATA_DIR": "/home/heocop/Projects/open-design/.od"
+      }
+    }
+  }
+}

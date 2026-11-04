@@ -1,0 +1,9 @@
+{
+  "display_name": "Harmony Self-Healer",
+  "description": "Background Pareto-gated self-healing sidecar for Antigravity harness drift and failure lessons.",
+  "command": "python3",
+  "args": [
+    "/home/heocop/.gemini/antigravity/scripts/auto-harness-healer.py"
+  ],
+  "restart_policy": "on-failure"
+}

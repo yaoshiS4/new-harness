@@ -1,0 +1,1 @@
+"""CodeGraph facade MCP package."""

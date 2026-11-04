@@ -1,0 +1,257 @@
+[General]
+Allow Tab Scrolling=true
+Auto Hide Tabs=false
+Close After Last=false
+Close documents with window=true
+Cycle To First Tab=true
+Days Meta Infos=30
+Diagnostics Limit=12000
+Diff Show Style=0
+Elide Tab Text=false
+Enable Context ToolView=false
+Expand Tabs=false
+Icon size for left and right sidebar buttons=32
+Modified Notification=false
+Mouse back button action=0
+Mouse forward button action=0
+Open New Tab To The Right Of Current=true
+Output History Limit=100
+Output With Date=false
+PinnedDocuments=
+Recent File List Entry Count=20
+Restore Window Configuration=true
+SDI Mode=false
+Save Meta Infos=true
+Show Full Path in Title=true
+Show Menu Bar=true
+Show Status Bar=true
+Show Symbol In Navigation Bar=true
+Show Tab Bar=true
+Show Tabs Close Button=true
+Show Url Nav Bar=true
+Show output view for message type=1
+Show text for left and right sidebar=false
+Show welcome view for new window=false
+Startup Session=last
+Stash new unsaved files=true
+Stash unsaved file changes=true
+Sync section size with tab positions=false
+Tab Double Click New Document=true
+Tab Middle Click Close Document=true
+Tabbar Tab Limit=0
+
+[KTextEditor Document]
+Allow End of Line Detection=true
+Auto Detect Indent=true
+Auto Reload If State Is In Version Control=true
+Auto Save=true
+Auto Save Interval=30
+Auto Save On Focus Out=true
+BOM=false
+Backup Local=false
+Backup Prefix=
+Backup Remote=false
+Backup Suffix=~
+Camel Cursor=true
+Encoding=UTF-8
+End of Line=0
+Indent On Backspace=true
+Indent On Tab=true
+Indent On Text Paste=true
+Indentation Mode=normal
+Indentation Width=2
+Keep Extra Spaces=false
+Line Length Limit=10000
+Newline at End of File=true
+On-The-Fly Spellcheck=false
+Overwrite Mode=false
+PageUp/PageDown Moves Cursor=true
+Remove Spaces=1
+ReplaceTabsDyn=true
+Show Spaces=0
+Show Tabs=true
+Smart Home=true
+Swap Directory=
+Swap File Mode=1
+Swap Sync Interval=15
+Tab Handling=2
+Tab Width=2
+Trailing Marker Size=1
+Use EditorConfig=true
+Word Wrap=false
+Word Wrap Column=100
+
+[KTextEditor Editor]
+Encoding Prober Type=1
+Fallback Encoding=ISO 8859-15
+
+[KTextEditor Renderer]
+Animate Bracket Matching=true
+Auto Color Theme Selection=false
+Color Theme=CachyOS Dark
+Line Height Multiplier=1.15
+Show Indentation Lines=true
+Show Whole Bracket Expression=true
+Text Font=MesloLGS NF,11,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+Word Wrap Marker=false
+
+[KTextEditor View]
+Allow Mark Menu=true
+Auto Brackets=true
+Auto Center Lines=3
+Auto Completion=true
+Auto Completion Preselect First Entry=true
+Backspace Remove Composed Characters=false
+Bookmark Menu Sorting=0
+Bracket Match Preview=true
+Chars To Enclose Selection=<>(){}[]'"`*_~
+Default Mark Type=1
+Dynamic Word Wrap=true
+Dynamic Word Wrap Align Indent=80
+Dynamic Word Wrap At Static Marker=false
+Dynamic Word Wrap Indicators=1
+Dynamic Wrap not at word boundaries=false
+Enable Accessibility=false
+Enable Tab completion=true
+Enter To Insert Completion=true
+Fold First Line=false
+Folding Bar=true
+Folding Preview=true
+Icon Bar=false
+Input Mode=0
+Keyword Completion=true
+Line Modification=true
+Line Numbers=true
+Max Clipboard History Entries=20
+Maximum Search History Size=100
+Mouse Paste At Cursor Position=false
+Multiple Cursor Modifier=134217728
+Persistent Selection=false
+Scroll Bar Marks=true
+Scroll Bar Mini Map=true
+Scroll Bar Mini Map All=true
+Scroll Bar Mini Map Width=48
+Scroll Bar Preview=true
+Scroll Past End=true
+Search/Replace Flags=140
+Shoe Line Ending Type in Statusbar=false
+Show Documentation With Completion=true
+Show File Encoding=true
+Show Focus Frame Around Editor=false
+Show Folding Icons On Hover Only=true
+Show Line Count=true
+Show Scrollbars=0
+Show Statusbar Dictionary=false
+Show Statusbar Highlighting Mode=true
+Show Statusbar Input Mode=false
+Show Statusbar Line Column=true
+Show Statusbar Tab Settings=true
+Show Word Count=true
+Smart Copy Cut=true
+Statusbar Line Column Compact Mode=true
+Text Drag And Drop=true
+User Sets Of Chars To Enclose Selection=
+Vi Input Mode Steal Keys=false
+Vi Relative Line Numbers=false
+Word Completion=true
+Word Completion Minimal Word Length=3
+Word Completion Remove Tail=true
+
+[Kate Plugins]
+bookmarksplugin=true
+cmaketoolsplugin=false
+compilerexplorer=false
+eslintplugin=false
+externaltoolsplugin=true
+formatplugin=true
+katebacktracebrowserplugin=false
+katebuildplugin=false
+katecloseexceptplugin=false
+katecolorpickerplugin=true
+katectagsplugin=false
+katefilebrowserplugin=false
+katefiletreeplugin=true
+kategdbplugin=false
+kategitblameplugin=true
+katekonsoleplugin=true
+kateprojectplugin=true
+katereplicodeplugin=false
+katesearchplugin=true
+katesnippetsplugin=true
+katesqlplugin=false
+katesymbolviewerplugin=true
+katexmlcheckplugin=false
+katexmltoolsplugin=false
+keyboardmacrosplugin=false
+ktexteditorpreviewplugin=true
+latexcompletionplugin=false
+lspclientplugin=true
+openlinkplugin=true
+rainbowparens=true
+rbqlplugin=false
+tabswitcherplugin=true
+textfilterplugin=true
+
+[Konsole]
+AutoSyncronizeMode=1
+KonsoleEscKeyBehaviour=true
+KonsoleEscKeyExceptions=vi,vim,nvim,git,lazygit,yazi,btop,micro
+RemoveExtension=false
+RunPrefix=
+SetEditor=true
+
+[MainWindow]
+1920x1200 screen: Height=1143
+1920x1200 screen: Width=1280
+1920x1200 screen: Window-Maximized=true
+
+[filetree]
+editShade=66,92,100
+listMode=false
+middleClickToClose=true
+shadingEnabled=true
+showCloseButton=true
+showFullPathOnRoots=false
+showToolbar=true
+sortRole=0
+viewShade=61,89,121
+
+[Plugin:ktexteditorpreviewplugin:MainWindow:0]
+automaticUpdate=true
+documentLocked=false
+
+[lspclient]
+AllowedServerCommandLines[$e]=$HOME/.local/bin/marksman server,$HOME/.local/bin/typescript-language-server --stdio,$HOME/.local/bin/pyright-langserver --stdio,$HOME/.local/bin/bash-language-server start,$HOME/.local/bin/vscode-markdown-language-server --stdio,$HOME/.local/bin/vscode-json-language-server --stdio,$HOME/.local/bin/yaml-language-server --stdio,$HOME/.local/bin/vscode-html-language-server --stdio,$HOME/.local/bin/vscode-css-language-server --stdio,$HOME/.cargo/bin/rust-analyzer,$HOME/go/bin/gopls,/usr/bin/clangd -log=error --background-index
+AutoHover=true
+AutoImport=true
+BlockedServerCommandLines=
+CompletionDocumentation=true
+CompletionParens=true
+Diagnostics=true
+FormatOnSave=false
+HighlightGoto=true
+HighlightSymbol=true
+IncrementalSync=true
+InlayHints=true
+Messages=true
+ReferencesDeclaration=true
+SemanticHighlighting=true
+ServerConfiguration[$e]=$HOME/.config/kate/lspclient/settings.json
+ShowCompletions=true
+SignatureHelp=true
+SymbolDetails=true
+SymbolExpand=true
+SymbolSort=false
+SymbolTree=true
+TypeFormatting=false
+
+[project]
+autoGit=true
+autoMercurial=false
+autoSubversion=false
+gitStatusShowIgnored=false
+index=true
+indexDirectory=
+multiProjectCompletion=true
+multiProjectGoto=true
+singleClickAction=0

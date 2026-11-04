@@ -1,0 +1,5 @@
+#!/bin/bash
+# clipboard-toast-daemon - Wayland Clipboard Toast Monitor Daemon
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH"
+rm -f "/tmp/clipboard_toast_last_hash_${UID}"
+exec "$HOME/.local/bin/wl-paste" --type text --watch "$HOME/.local/bin/clipboard-toast"

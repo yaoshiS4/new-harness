@@ -1,0 +1,10 @@
+# Handoff between agents. Consumer: AGENTS.md "Every handoff must name
+# owner, files, risks, and next action."
+contract_type: agent_handoff
+from_agent: ""
+to_agent: ""
+owner: ""            # agent holding write authority for this handoff
+files: []            # paths touched or delivered
+risks: []            # unresolved risks the receiver must check
+next_action: ""      # single concrete action the receiver performs
+oracle_review_required: true

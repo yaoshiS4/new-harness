@@ -1,0 +1,28 @@
+# LLM Delegate Protocol (LDP) Contract
+# Lightweight progressive payload schema for subagent delegation.
+
+delegation_id: "<unique-task-id>"
+parent_role: "pm"
+assignee_role: "dev-be" # dev-fe | dev-be | debugger | designer | meta-evolution
+typename: "self"
+model: "inherit"
+trust_domain: "L1_READ_ONLY" # L1_READ_ONLY | L2_MUTATION_ISOLATED
+
+scope:
+  intent: "<single clear objective>"
+  allowed_files:
+    - "src/path/to/target.ts"
+  denied_patterns:
+    - ".env*"
+    - "auth/**"
+    - "secrets/**"
+
+payload:
+  minimal_context_slice: "<compact summary or specific function signature>"
+  task_dependencies: []
+  max_token_budget: 25000
+
+verification:
+  test_command: "npm test -- path/to/test.ts"
+  expected_exit_code: 0
+  timeout_seconds: 120

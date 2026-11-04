@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""
+mermaid-ascii - Standalone, zero-dependency Python 3 CLI utility to convert
+Mermaid diagram syntax into crisp Unicode box-drawing diagrams for terminal TUIs.
+
+Delegates canonical parsing and rendering to agy_tui_core.
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+# Ensure local lib directory is on sys.path
+_REPO_LIB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
+_LOCAL_LIB = os.path.expanduser("~/.local/lib")
+for p in (_REPO_LIB, _LOCAL_LIB):
+    if p not in sys.path and os.path.isdir(p):
+        sys.path.insert(0, p)
+
+from agy_tui_core import preprocess_mermaid_blocks, render_mermaid_ascii
+
+
+def convert_mermaid_to_ascii(content: str) -> str:
+    """Convert Mermaid diagram source to ASCII/Unicode box-drawing diagram."""
+    return render_mermaid_ascii(content)
+
+
+def process_markdown(text: str) -> str:
+    """Replaces ```mermaid ... ``` blocks with ```text ... ``` rendered diagrams."""
+    return preprocess_mermaid_blocks(text)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert Mermaid diagrams to crisp Unicode box-drawing diagrams.")
+    parser.add_argument("file", nargs="?", default=None, help="File to read from (default: stdin)")
+    parser.add_argument("-m", "--markdown", action="store_true", help="Process markdown content and replace ```mermaid blocks")
+    parser.add_argument("-w", "--width", type=int, default=76, help="Maximum diagram width (default: 76)")
+    args = parser.parse_args()
+
+    if args.file and os.path.isfile(args.file):
+        with open(args.file, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    else:
+        content = sys.stdin.read()
+
+    if not content:
+        sys.exit(0)
+
+    if args.markdown:
+        sys.stdout.write(preprocess_mermaid_blocks(content, max_width=args.width))
+    else:
+        sys.stdout.write(render_mermaid_ascii(content, max_width=args.width) + "\n")
+
+
+if __name__ == "__main__":
+    main()

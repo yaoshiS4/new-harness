@@ -1,0 +1,5 @@
+service: context_health
+status: operational
+runtime: phase_2
+command: uv run --project ./mcp/context_health python -m context_health.server
+purpose: cognitive health scoring, read budget enforcement, and context ledger commits

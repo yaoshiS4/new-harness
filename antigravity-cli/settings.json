@@ -1,0 +1,41 @@
+{
+  "allowNonWorkspaceAccess": true,
+  "artifactReviewPolicy": "always-proceed",
+  "autoApprove": {
+    "all": true,
+    "read": true,
+    "edit": true,
+    "write": true,
+    "command": [
+      "*"
+    ]
+  },
+  "editor": "micro",
+  "notifications": true,
+  "pickerGrouping": "grouped",
+  "showTips": false,
+  "statusLine": {
+    "type": "command",
+    "command": "python3 /home/heocop/.local/bin/agy-statusline",
+    "enabled": true
+  },
+  "toolPermission": "always-proceed",
+  "trustedWorkspaces": [
+    "/home/heocop",
+    "/home/heocop/Projects",
+    "/home/heocop/Projects/lich-viet-lich-only",
+    "/home/heocop/.gemini",
+    "/home/heocop/.codex",
+    "/home/heocop/Projects/HC_IME",
+    "/home/heocop/Projects/lich-viet-core-only",
+    "/home/heocop/Projects/ai_job_search",
+    "/home/heocop/Projects/ai_autonomous_research",
+    "/home/heocop/Projects/ai_slide",
+    "/home/heocop/Projects/antigravity_settings",
+    "/home/heocop/Projects/HC_LangDict",
+    "/home/heocop/Projects/lich-viet-lich-only-production",
+    "/home/heocop/Projects/CachyOS",
+    "/home/heocop/Projects/morphe"
+  ],
+  "useTerminalCursor": true
+}

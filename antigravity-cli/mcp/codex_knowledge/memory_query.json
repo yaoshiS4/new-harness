@@ -1,0 +1,1 @@
+{"name":"memory_query","description":"","parameters":{"properties":{"limit":{"default":20,"title":"Limit","type":"integer"},"project":{"default":"","title":"Project","type":"string"},"query":{"default":"","title":"Query","type":"string"},"slug":{"default":"","title":"Slug","type":"string"}},"title":"memory_queryArguments","type":"object"}}

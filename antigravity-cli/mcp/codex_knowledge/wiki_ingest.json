@@ -1,0 +1,1 @@
+{"name":"wiki_ingest","description":"Ingest docs and run wiki rebuild in LangGraph-backed workflow path.","parameters":{"properties":{"slug":{"title":"Slug","type":"string"},"source_path":{"title":"Source Path","type":"string"}},"required":["slug","source_path"],"title":"wiki_ingestArguments","type":"object"}}

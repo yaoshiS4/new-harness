@@ -1,0 +1,488 @@
+#!/usr/bin/env python3
+"""
+kate-md-preview - Live-reloading Markdown + Mermaid.js v11 Viewer for Kate & CachyOS.
+Renders markdown and raw Mermaid charts in a crisp CachyOS Dark HTML5 page with
+real-time file watching and standalone application window preview.
+"""
+from __future__ import annotations
+
+import argparse
+import html
+import http.server
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+from typing import Optional
+
+try:
+    from markdown_it import MarkdownIt
+except ImportError:
+    MarkdownIt = None
+
+
+CACHYOS_CSS = """
+:root {
+  --bg-primary: #12151a;
+  --bg-surface: #20252d;
+  --bg-card: #1a1e26;
+  --text-primary: #ecf0f4;
+  --text-muted: #949ca6;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-green: #27ae60;
+  --accent-yellow: #f7eb95;
+  --accent-red: #eb606b;
+  --border-color: #2d3440;
+  --code-bg: #161a21;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  font-size: 13px;
+}
+
+.top-bar .title {
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-bar .status {
+  color: var(--accent-green);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 80px 24px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+h1 {
+  font-size: 2em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.3em;
+  color: var(--accent-light);
+}
+
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.2em;
+}
+
+a {
+  color: var(--accent-light);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+p, ul, ol {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+li {
+  margin-bottom: 0.25em;
+}
+
+code {
+  background-color: var(--code-bg);
+  color: var(--accent-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", "MesloLGS NF", "Fira Code", monospace;
+  font-size: 0.9em;
+  border: 1px solid var(--border-color);
+}
+
+pre {
+  background-color: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: "JetBrains Mono", "MesloLGS NF", "Fira Code", monospace;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+blockquote {
+  margin: 1em 0;
+  padding: 8px 16px;
+  border-left: 4px solid var(--accent);
+  background-color: var(--bg-surface);
+  border-radius: 0 6px 6px 0;
+}
+
+/* GitHub Alert Callouts */
+.alert-callout {
+  margin: 1.2em 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--accent);
+  background-color: var(--bg-surface);
+  border-radius: 0 6px 6px 0;
+}
+.alert-callout.note { border-left-color: var(--accent); }
+.alert-callout.tip { border-left-color: var(--accent-green); }
+.alert-callout.important { border-left-color: var(--accent-light); }
+.alert-callout.warning { border-left-color: var(--accent-yellow); }
+.alert-callout.caution { border-left-color: var(--accent-red); }
+
+.alert-header {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.alert-callout.note .alert-header { color: var(--accent); }
+.alert-callout.tip .alert-header { color: var(--accent-green); }
+.alert-callout.important .alert-header { color: var(--accent-light); }
+.alert-callout.warning .alert-header { color: var(--accent-yellow); }
+.alert-callout.caution .alert-header { color: var(--accent-red); }
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5em 0;
+  background-color: var(--bg-surface);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+th {
+  background-color: var(--bg-card);
+  font-weight: 600;
+  color: var(--accent-light);
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background-color: rgba(59, 130, 246, 0.05); }
+
+/* Mermaid Diagrams Container */
+.mermaid-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 1.8em 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+}
+.mermaid {
+  text-align: center;
+  width: 100%;
+}
+"""
+
+
+def render_markdown_to_html(md_text: str, filename: str = "Document") -> str:
+    """Parses markdown text and outputs clean CachyOS Dark HTML5."""
+    if MarkdownIt:
+        md = MarkdownIt("commonmark", {"html": True, "breaks": True}).enable("table").enable("strikethrough")
+        rendered_body = md.render(md_text)
+    else:
+        # Fallback simple converter
+        rendered_body = f"<pre>{html.escape(md_text)}</pre>"
+
+    # Convert ```mermaid code blocks into <div class="mermaid-card"><pre class="mermaid">...</pre></div>
+    def mermaid_replacer(match: re.Match) -> str:
+        code = match.group(1).strip()
+        # Decode HTML entities if any
+        code = html.unescape(code)
+        return f'<div class="mermaid-card"><pre class="mermaid">{html.escape(code)}</pre></div>'
+
+    rendered_body = re.sub(r'<pre><code class="language-mermaid">(.*?)</code></pre>', mermaid_replacer, rendered_body, flags=re.DOTALL)
+
+    # Convert GitHub alert callouts: > [!NOTE], > [!TIP], etc.
+    alert_pattern = re.compile(
+        r'<blockquote>\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](.*?)</p>\s*</blockquote>',
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    def alert_replacer(match: re.Match) -> str:
+        atype = match.group(1).upper()
+        abody = match.group(2).strip()
+        icons = {
+            "NOTE": "ℹ️ Note",
+            "TIP": "💡 Tip",
+            "IMPORTANT": "📌 Important",
+            "WARNING": "⚠️ Warning",
+            "CAUTION": "🛑 Caution",
+        }
+        icon_label = icons.get(atype, atype)
+        return (
+            f'<div class="alert-callout {atype.lower()}">'
+            f'<div class="alert-header">{icon_label}</div>'
+            f'<div class="alert-body">{abody}</div>'
+            f'</div>'
+        )
+
+    rendered_body = alert_pattern.sub(alert_replacer, rendered_body)
+
+    html_doc = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{html.escape(filename)} - Kate Markdown Preview</title>
+  <style>{CACHYOS_CSS}</style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({{
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {{
+        darkMode: true,
+        background: '#12151a',
+        primaryColor: '#20252d',
+        primaryTextColor: '#ecf0f4',
+        primaryBorderColor: '#3b82f6',
+        lineColor: '#60a5fa',
+        secondaryColor: '#20252d',
+        tertiaryColor: '#12151a'
+      }}
+    }});
+    window.mermaid = mermaid;
+  </script>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="title">
+      <span>📄</span>
+      <span>{html.escape(filename)}</span>
+    </div>
+    <div class="status" id="live-indicator">
+      <span>●</span>
+      <span>Live Updating</span>
+    </div>
+  </div>
+  <div class="container" id="content">
+    {rendered_body}
+  </div>
+
+  <script>
+    let lastMtime = 0;
+    async function checkUpdate() {{
+      try {{
+        const res = await fetch('/_mtime');
+        if (res.ok) {{
+          const data = await res.json();
+          if (lastMtime && data.mtime > lastMtime) {{
+            const cRes = await fetch('/_content');
+            if (cRes.ok) {{
+              const html = await cRes.text();
+              const container = document.getElementById('content');
+              const scrollPos = window.scrollY;
+              container.innerHTML = html;
+              if (window.mermaid) {{
+                window.mermaid.run();
+              }}
+              window.scrollTo(0, scrollPos);
+            }}
+          }}
+          lastMtime = data.mtime;
+        }}
+      }} catch (e) {{}}
+    }}
+    setInterval(checkUpdate, 500);
+  </script>
+</body>
+</html>"""
+    return html_doc
+
+
+# ==============================================================================
+# Live HTTP Server & File Watcher
+# ==============================================================================
+def find_free_port(start: int = 8765) -> int:
+    for port in range(start, start + 50):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("127.0.0.1", port))
+                return port
+        except OSError:
+            continue
+    return 0
+
+
+class LivePreviewServer:
+    def __init__(self, file_path: str, port: int):
+        self.file_path = os.path.abspath(file_path)
+        self.filename = os.path.basename(self.file_path)
+        self.port = port
+        self.last_mtime = self.get_mtime()
+
+    def get_mtime(self) -> float:
+        try:
+            return os.path.getmtime(self.file_path)
+        except OSError:
+            return 0.0
+
+    def get_content(self) -> str:
+        try:
+            with open(self.file_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except OSError:
+            return ""
+
+    def run(self):
+        parent = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                pass  # Quiet
+
+            def do_GET(self):
+                if self.path == "/_mtime":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"mtime": parent.get_mtime()}).encode("utf-8"))
+                elif self.path == "/_content":
+                    md_text = parent.get_content()
+                    if MarkdownIt:
+                        md = MarkdownIt("commonmark", {"html": True, "breaks": True}).enable("table").enable("strikethrough")
+                        body = md.render(md_text)
+                    else:
+                        body = f"<pre>{html.escape(md_text)}</pre>"
+
+                    def mermaid_replacer(match: re.Match) -> str:
+                        code = html.unescape(match.group(1).strip())
+                        return f'<div class="mermaid-card"><pre class="mermaid">{html.escape(code)}</pre></div>'
+
+                    body = re.sub(r'<pre><code class="language-mermaid">(.*?)</code></pre>', mermaid_replacer, body, flags=re.DOTALL)
+
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(body.encode("utf-8"))
+                else:
+                    md_text = parent.get_content()
+                    full_html = render_markdown_to_html(md_text, filename=parent.filename)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(full_html.encode("utf-8"))
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Live Markdown & Mermaid Preview for Kate & CachyOS.")
+    parser.add_argument("file", nargs="?", default=None, help="Markdown file to preview")
+    parser.add_argument("--html", default=None, help="Output static HTML file and exit without starting server")
+    parser.add_argument("--port", type=int, default=0, help="Port to run server on")
+    parser.add_argument("--no-browser", action="store_true", help="Do not launch browser window automatically")
+    args = parser.parse_args()
+
+    if not args.file or not os.path.isfile(args.file):
+        # Check stdin
+        if not sys.stdin.isatty():
+            content = sys.stdin.read()
+            out = render_markdown_to_html(content, "Standard Input")
+            if args.html:
+                with open(args.html, "w", encoding="utf-8") as f:
+                    f.write(out)
+                sys.exit(0)
+            sys.stdout.write(out)
+            sys.exit(0)
+        else:
+            parser.print_help()
+            sys.exit(1)
+
+    # Static HTML mode
+    if args.html:
+        with open(args.file, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        out = render_markdown_to_html(content, os.path.basename(args.file))
+        with open(args.html, "w", encoding="utf-8") as f:
+            f.write(out)
+        print(f"Exported preview to {args.html}")
+        sys.exit(0)
+
+    # Live server mode
+    port = args.port or find_free_port(8765)
+    server = LivePreviewServer(args.file, port)
+    server.run()
+    url = f"http://127.0.0.1:{port}"
+    print(f"Kate Markdown & Mermaid Live Preview running at: {url}")
+
+    if not args.no_browser:
+        # Launch browser in standalone app mode if supported
+        helium = shutil.which("helium-browser") or os.path.expanduser("~/.local/bin/helium-browser")
+        if os.path.isfile(helium) and os.access(helium, os.X_OK):
+            subprocess.Popen([helium, f"--app={url}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Keep alive while watched file exists
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

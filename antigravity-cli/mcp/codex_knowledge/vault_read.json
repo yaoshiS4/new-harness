@@ -1,0 +1,1 @@
+{"name":"vault_read","description":"","parameters":{"properties":{"relative_path":{"title":"Relative Path","type":"string"},"slug":{"title":"Slug","type":"string"}},"required":["slug","relative_path"],"title":"vault_readArguments","type":"object"}}

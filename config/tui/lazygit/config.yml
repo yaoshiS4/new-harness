@@ -1,0 +1,36 @@
+gui:
+  nerdFontsVersion: "3"
+  border: "rounded"
+  showFileTree: true
+  showRandomTip: false
+  showCommandLog: false
+  mouseEvents: true
+  theme:
+    activeBorderColor:
+      - '#3b82f6'
+      - bold
+    inactiveBorderColor:
+      - '#2d3440'
+    optionsTextColor:
+      - '#60a5fa'
+    selectedLineBgColor:
+      - '#20252d'
+    cherryPickedCommitBgColor:
+      - '#2d3440'
+    cherryPickedCommitFgColor:
+      - '#3b82f6'
+    unstagedChangesColor:
+      - '#eb606b'
+    defaultFgColor:
+      - '#ecf0f4'
+    searchingActiveBorderColor:
+      - '#f7eb95'
+      - bold
+git:
+  paging:
+    colorArg: always
+    pager: delta --dark --paging=never --line-numbers
+os:
+  editPreset: ""
+notARepository: "skip"
+promptToReturnFromSubprocess: false

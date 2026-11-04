@@ -1,0 +1,2166 @@
+#!/usr/bin/env python3
+import fcntl
+import glob
+import json
+import os
+import pty
+import re
+import select
+import shutil
+import signal
+import subprocess
+import sys
+import termios
+import time
+import tty
+from typing import Optional
+
+if hasattr(signal, "SIGPIPE"):
+    try:
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except Exception:
+        pass
+
+_REPO_LIB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
+_LOCAL_LIB = os.path.expanduser("~/.local/lib")
+for p in (_REPO_LIB, _LOCAL_LIB):
+    if p not in sys.path and os.path.isdir(p):
+        sys.path.insert(0, p)
+from agy_tui_core import (
+    BRAIN_DIR,
+    CACHE_PATH,
+    CACHE_PATHS,
+    C_BOLD,
+    C_COMMENT,
+    C_CYAN,
+    C_DIM,
+    C_GREEN,
+    C_ORANGE,
+    C_PINK,
+    C_PURPLE,
+    C_RED,
+    C_RESET,
+    C_ROSEWATER,
+    C_WHITE,
+    C_YELLOW,
+    DB_PATH,
+    LIVE_STATE_LOCK_PATH,
+    LIVE_STATE_PATH,
+    PERSISTENT_CACHE_PATH,
+    PRESENCE_DIR,
+    SIDEBAR_BIN,
+    SIDEBAR_MODE_PATH,
+    SQUAD_BIN,
+    STATUSLINE_BIN,
+    STATE_PRIORITY,
+    classify_agent_state,
+    extract_step_tool_summaries,
+    connect_db_ro,
+    format_countdown,
+    format_countdown_short,
+    format_line,
+    format_state_badge,
+    get_current_session_key,
+    get_git_diff_stat,
+    get_git_worktrees,
+    get_locked_conversation_ids,
+    get_sidebar_mode,
+    InotifyWatcher,
+    preprocess_mermaid_blocks,
+    read_live_state,
+    render_braille_sparkline,
+    render_gradient_gauge,
+    render_smooth_gauge,
+    resolve_quota_pair,
+    resolve_workspace_cwd,
+    set_sidebar_mode,
+    strip_ansi,
+    update_live_state_atomic,
+    visible_len,
+)
+
+if not hasattr(InotifyWatcher, "wait"):
+    def _watcher_wait(self, timeout_ms: int = 500) -> bool:
+        if getattr(self, "_fd", -1) < 0:
+            time.sleep(timeout_ms / 1000.0)
+            return False
+        poller = select.poll()
+        poller.register(self._fd, select.POLLIN)
+        events = poller.poll(timeout_ms)
+        self.drain()
+        return bool(events)
+    InotifyWatcher.wait = _watcher_wait
+
+
+def parse_mtime_ts(mtime_val) -> float:
+    if isinstance(mtime_val, (int, float)):
+        return float(mtime_val)
+    if isinstance(mtime_val, str):
+        try:
+            from datetime import datetime
+            clean_s = mtime_val.strip()
+            if clean_s.endswith("Z"):
+                clean_s = clean_s[:-1] + "+00:00"
+            clean_s = re.sub(r"(\.\d{6})\d+", r"\1", clean_s)
+            return datetime.fromisoformat(clean_s).timestamp()
+        except Exception:
+            pass
+    return 0.0
+
+
+def get_session_info(cid: str, locked_ids: set[str], db_status: str = "", mtime: float = 0.0) -> dict:
+    brain_dir = os.path.join(BRAIN_DIR, cid)
+    tr_p = os.path.join(brain_dir, ".system_generated", "logs", "transcript.jsonl")
+    is_locked = cid in locked_ids
+    raw_status = db_status or ""
+    state_detail = ""
+    is_healing = False
+    last_step = {}
+
+    if os.path.isfile(tr_p):
+        try:
+            with open(tr_p, "rb") as f:
+                size = os.fstat(f.fileno()).st_size
+                read_size = min(size, 16384)
+                if size > read_size:
+                    f.seek(size - read_size)
+                chunk = f.read().decode("utf-8", errors="replace")
+                lines = [l.strip() for l in chunk.splitlines() if l.strip()]
+                if lines:
+                    try:
+                        last_step = json.loads(lines[-1])
+                    except Exception:
+                        pass
+                    for l in reversed(lines):
+                        try:
+                            s = json.loads(l)
+                            st_type = s.get("type", "")
+                            st_status = s.get("status", "")
+                            if st_type == "WAITING_FOR_USER_INPUT" or st_status in ("WAITING_FOR_USER_INPUT", "WAITING_FOR_INPUT"):
+                                raw_status = "blocked"
+                                break
+                            if st_status == "ERROR":
+                                raw_status = "errored"
+                                break
+                            tcs = s.get("tool_calls") or []
+                            for tc in tcs:
+                                name = tc.get("name", "")
+                                args = tc.get("args") or {}
+                                action = args.get("toolAction") or args.get("toolSummary") or ""
+                                if "loop" in name or "heal" in name or "test-3-round" in str(args):
+                                    is_healing = True
+                                if action and not state_detail:
+                                    state_detail = str(action).strip('"\'')
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+    state = classify_agent_state(raw_status, state_detail=state_detail, is_locked=is_locked, is_healing=is_healing)
+    return {
+        "state": state,
+        "detail": state_detail,
+        "is_locked": is_locked,
+        "last_step": last_step,
+    }
+
+
+def set_sidebar_hidden_state(hidden: bool) -> None:
+    now = time.time()
+    def _updater(data: dict) -> dict:
+        data["sidebar_hidden"] = hidden
+        data["sidebar_running"] = not hidden
+        data["sidebar_check_ts"] = now
+        data["sidebar_toggle_ts"] = now
+        return data
+    update_live_state_atomic(_updater)
+
+
+def toggle_sidebar(ensure_only: bool = False, session: Optional[str] = None) -> None:
+    sidebar_bin = SIDEBAR_BIN
+    is_herdr = os.environ.get("HERDR_ENV") == "1" or bool(os.environ.get("HERDR_SOCKET_PATH"))
+    is_rail = False
+    try:
+        if os.path.exists(LIVE_STATE_PATH):
+            with open(LIVE_STATE_PATH, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                if isinstance(d, dict) and d.get("sidebar_mode") == "rail":
+                    is_rail = True
+    except Exception:
+        pass
+
+    if is_herdr:
+        try:
+            target_tab = os.environ.get("HERDR_TAB_ID") or os.environ.get("HERDR_ACTIVE_TAB_ID")
+            target_pane = os.environ.get("HERDR_PANE_ID") or os.environ.get("HERDR_ACTIVE_PANE_ID")
+            res = subprocess.run(
+                ["herdr", "pane", "list"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            found_pane_id = None
+            if res.returncode == 0:
+                try:
+                    data = json.loads(res.stdout)
+                    panes = data.get("result", {}).get("panes", [])
+                    for p in panes:
+                        if not target_tab or p.get("tab_id") == target_tab:
+                            label = (p.get("label") or p.get("title") or "").strip()
+                            cmd = (p.get("command") or "").strip()
+                            if label == "agy-sidebar" or "agy-sidebar" in cmd:
+                                found_pane_id = p.get("pane_id")
+                                break
+                except Exception:
+                    for line in res.stdout.splitlines():
+                        if "agy-sidebar" in line:
+                            m = re.search(r"\b([0-9a-f\-]+|%?\d+)\b", line)
+                            if m:
+                                found_pane_id = m.group(1)
+                                break
+            if found_pane_id:
+                if not ensure_only:
+                    subprocess.run(["herdr", "pane", "close", str(found_pane_id)], check=False)
+                    set_sidebar_hidden_state(True)
+                return
+
+            # Sidebar is not currently open, split and launch
+            split_cmd = ["herdr", "pane", "split"]
+            if target_pane:
+                split_cmd.extend(["--pane", target_pane])
+            else:
+                split_cmd.append("--current")
+            ratio = "0.08" if is_rail else "0.20"
+            split_cmd.extend(["--direction", "right", "--ratio", ratio, "--no-focus"])
+
+            split_res = subprocess.run(
+                split_cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            pane_id = None
+            if split_res.returncode == 0:
+                try:
+                    s_data = json.loads(split_res.stdout)
+                    pane_id = (
+                        s_data.get("result", {}).get("pane", {}).get("pane_id")
+                        or s_data.get("result", {}).get("pane_id")
+                    )
+                except Exception:
+                    pass
+            if pane_id:
+                subprocess.run(["herdr", "pane", "rename", str(pane_id), "agy-sidebar"], check=False)
+                subprocess.run(["herdr", "pane", "run", str(pane_id), f"exec {sidebar_bin}"], check=False)
+                set_sidebar_hidden_state(False)
+        except Exception as e:
+            sys.stderr.write(f"Error toggling Herdr sidebar: {e}\n")
+        return
+
+    # TMUX path
+    try:
+        lp_cmd = ["tmux", "list-panes"]
+        if session:
+            lp_cmd.extend(["-t", session])
+        lp_cmd.extend(["-F", "#{pane_id} #{pane_current_command} #{pane_start_command}"])
+        res = subprocess.run(
+            lp_cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0:
+            lines = res.stdout.strip().splitlines()
+            for line in lines:
+                if "agy-sidebar" in line:
+                    if ensure_only:
+                        return
+                    tokens = line.split()
+                    if tokens:
+                        pane_id = tokens[0]
+                        subprocess.run(["tmux", "kill-pane", "-t", pane_id], check=False)
+                        set_sidebar_hidden_state(True)
+                        return
+
+        # Sidebar is not currently open, split and launch
+        win_cmd = ["tmux", "display-message"]
+        if session:
+            win_cmd.extend(["-t", session])
+        win_cmd.extend(["-p", "#{window_width}"])
+        win_res = subprocess.run(
+            win_cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        raw_w = win_res.stdout.strip()
+        win_width = int(raw_w) if raw_w.isdigit() else 120
+        side_cols = 8 if is_rail else min(34, max(30, int(win_width * 0.16)))
+
+        split_cmd = ["tmux", "split-window", "-h"]
+        if session:
+            split_cmd.extend(["-t", session])
+        split_cmd.extend(["-l", str(side_cols), sidebar_bin])
+        subprocess.run(
+            split_cmd,
+            check=False,
+        )
+        sel_cmd = ["tmux", "select-pane"]
+        if session:
+            sel_cmd.extend(["-t", session])
+        sel_cmd.append("-L")
+        subprocess.run(sel_cmd, check=False)
+        set_sidebar_hidden_state(False)
+    except Exception as e:
+        sys.stderr.write(f"Error toggling sidebar: {e}\n")
+
+
+
+
+
+def equalize_splits(session: Optional[str] = None, bounce: bool = False) -> None:
+    is_rail = get_sidebar_mode() == "rail"
+    target_cols = 8 if is_rail else 32
+    is_herdr = os.environ.get("HERDR_ENV") == "1" or bool(os.environ.get("HERDR_SOCKET_PATH"))
+
+    if is_herdr:
+        try:
+            target_tab = os.environ.get("HERDR_TAB_ID") or os.environ.get("HERDR_ACTIVE_TAB_ID")
+            res = subprocess.run(["herdr", "pane", "list"], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                try:
+                    data = json.loads(res.stdout)
+                    panes = data.get("result", {}).get("panes", [])
+                    for p in panes:
+                        if not target_tab or p.get("tab_id") == target_tab:
+                            label = (p.get("label") or p.get("title") or "").strip()
+                            cmd = (p.get("command") or "").strip()
+                            if label == "agy-sidebar" or "agy-sidebar" in cmd:
+                                pid = p.get("pane_id")
+                                amt = "0.08" if is_rail else "0.16"
+                                subprocess.run(["herdr", "pane", "resize", "--pane", str(pid), "--direction", "right", "--amount", amt], check=False)
+                                print(f"Equalized Herdr sidebar split (pane {pid})")
+                                return
+                except Exception:
+                    pass
+        except Exception as e:
+            sys.stderr.write(f"Error equalizing Herdr splits: {e}\n")
+        return
+
+    # TMUX path
+    try:
+        lp_cmd = ["tmux", "list-panes"]
+        if session:
+            lp_cmd.extend(["-t", session])
+        lp_cmd.extend(["-F", "#{pane_id} #{pane_current_command} #{pane_start_command}"])
+        res = subprocess.run(
+            lp_cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0:
+            lines = res.stdout.strip().splitlines()
+            sidebar_pane_id = None
+            for line in lines:
+                if "agy-sidebar" in line:
+                    tokens = line.split()
+                    if tokens:
+                        sidebar_pane_id = tokens[0]
+                        break
+
+            if sidebar_pane_id:
+                disp_cmd = ["tmux", "display-message"]
+                if session:
+                    disp_cmd.extend(["-t", session])
+                disp_cmd.extend(["-p", "#{window_width}"])
+                win_res = subprocess.run(
+                    disp_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                raw_w = win_res.stdout.strip()
+                win_width = int(raw_w) if raw_w.isdigit() else 120
+                if not is_rail:
+                    target_cols = min(34, max(30, int(win_width * 0.16)))
+                else:
+                    target_cols = 8
+
+                if bounce:
+                    # 1-column bounce to force real SIGWINCH/WindowSizeEvent to agy
+                    subprocess.run(["tmux", "resize-pane", "-t", sidebar_pane_id, "-x", str(target_cols + 1)], check=False)
+                    time.sleep(0.06)
+                    subprocess.run(["tmux", "resize-pane", "-t", sidebar_pane_id, "-x", str(target_cols)], check=False)
+                    if session:
+                        res_c = subprocess.run(["tmux", "list-clients", "-t", session, "-F", "#{client_name}"], capture_output=True, text=True, check=False)
+                        for c in res_c.stdout.strip().splitlines():
+                            if c.strip():
+                                subprocess.run(["tmux", "refresh-client", "-t", c.strip(), "-S"], check=False)
+                    else:
+                        subprocess.run(["tmux", "refresh-client", "-S"], check=False)
+                else:
+                    subprocess.run(["tmux", "resize-pane", "-t", sidebar_pane_id, "-x", str(target_cols)], check=False)
+                print(f"Equalized sidebar to {target_cols} cols (pane {sidebar_pane_id})")
+            else:
+                print("Sidebar pane not found in current tmux window.")
+    except Exception as e:
+        sys.stderr.write(f"Error equalizing tmux splits: {e}\n")
+
+
+def toggle_rail_sidebar() -> None:
+    cur_mode = get_sidebar_mode()
+    new_mode = "rail" if cur_mode == "full" else "full"
+    set_sidebar_mode(new_mode)
+    print(f"Sidebar mode set to: {new_mode}")
+    equalize_splits()
+
+
+def get_git_repo_root(cwd: str | None = None) -> str:
+    target_dir = cwd or resolve_workspace_cwd()
+    try:
+        res = subprocess.run(
+            ["git", "-C", target_dir, "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return target_dir
+
+
+def get_popup_lock_file() -> str:
+    sk = re.sub(r"[^a-zA-Z0-9_\-]", "_", get_current_session_key() or "global")
+    return f"/tmp/antigravity_popup_active_{os.getuid()}_{sk}.lock"
+
+
+POPUP_LOCK_FILE = get_popup_lock_file()
+
+POPUP_COMMANDS = {
+    "g": ["lazygit"],
+    "y": ["yazi"],
+    "t": [SQUAD_BIN, "--tree-popup"],
+    "d": [SQUAD_BIN, "--diff-popup"],
+    "o": [SQUAD_BIN, "--jump-attention"],
+    "p": [SQUAD_BIN, "--command-palette"],
+    "i": [SQUAD_BIN, "--inspect-session"],
+}
+
+POPUP_CHORDS = {
+    b"\x1bg": "g", b"\x1bG": "g",
+    b"\x1by": "y", b"\x1bY": "y",
+    b"\x1bt": "t", b"\x1bT": "t",
+    b"\x1bd": "d", b"\x1bD": "d",
+    b"\x1bo": "o", b"\x1bO": "o",
+    b"\x1bp": "p", b"\x1bP": "p",
+    b"\x1bi": "i", b"\x1bI": "i",
+}
+
+
+def run_popup(key_char: str, cmd_args: list[str]) -> None:
+    if not cmd_args and key_char.lower() not in POPUP_COMMANDS:
+        return
+
+    target_cwd = resolve_workspace_cwd()
+    try:
+        os.chdir(target_cwd)
+    except Exception:
+        pass
+
+    lock_file = get_popup_lock_file()
+    lock_fd = None
+    try:
+        lock_fd = open(lock_file, "w")
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except Exception:
+        pass
+
+    is_tty = sys.stdin.isatty()
+    orig_attr = None
+    if is_tty:
+        try:
+            orig_attr = termios.tcgetattr(sys.stdin.fileno())
+        except Exception:
+            pass
+
+    cur_key = key_char.lower()
+    cur_cmd = list(cmd_args) if cmd_args else POPUP_COMMANDS.get(cur_key, [])
+
+    try:
+        while cur_cmd:
+            if lock_fd:
+                try:
+                    lock_fd.seek(0)
+                    lock_fd.truncate()
+                    lock_fd.write(f"{cur_key}:{os.getpid()}:{json.dumps(cur_cmd)}")
+                    lock_fd.flush()
+                except Exception:
+                    pass
+
+            pid, master_fd = pty.fork()
+            if pid == 0:
+                try:
+                    os.execvp(cur_cmd[0], cur_cmd)
+                except Exception as e:
+                    sys.stderr.write(f"Failed to execute {cur_cmd[0]}: {e}\n")
+                    os._exit(1)
+
+            def sync_window_size(*_):
+                try:
+                    ws = fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, b"\x00" * 8)
+                    fcntl.ioctl(master_fd, termios.TIOCSWINSZ, ws)
+                except Exception:
+                    pass
+
+            if is_tty:
+                signal.signal(signal.SIGWINCH, sync_window_size)
+                sync_window_size()
+                tty.setraw(sys.stdin.fileno())
+
+            def sig_term_forward(signum, _):
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except Exception:
+                    pass
+                sys.exit(0)
+
+            signal.signal(signal.SIGTERM, sig_term_forward)
+
+            switch_target = None
+            try:
+                while True:
+                    try:
+                        rlist, _, _ = select.select([master_fd, sys.stdin.fileno()], [], [])
+                    except (InterruptedError, select.error):
+                        continue
+
+                    if master_fd in rlist:
+                        try:
+                            data = os.read(master_fd, 4096)
+                            if not data:
+                                break
+                            os.write(sys.stdout.fileno(), data)
+                        except OSError:
+                            break
+
+                    if sys.stdin.fileno() in rlist:
+                        try:
+                            chunk = os.read(sys.stdin.fileno(), 1024)
+                            if not chunk:
+                                break
+                        except OSError:
+                            break
+
+                        if b"\x1bb" in chunk or b"\x1bs" in chunk:
+                            subprocess.Popen([SQUAD_BIN, "--toggle-sidebar"])
+                            clean_chunk = chunk.replace(b"\x1bb", b"").replace(b"\x1bs", b"")
+                            if not clean_chunk:
+                                continue
+                            chunk = clean_chunk
+
+                        if b"\x1bB" in chunk:
+                            subprocess.Popen([SQUAD_BIN, "--sidebar-rail"])
+                            clean_chunk = chunk.replace(b"\x1bB", b"")
+                            if not clean_chunk:
+                                continue
+                            chunk = clean_chunk
+
+                        if b"\x1b=" in chunk:
+                            subprocess.Popen([SQUAD_BIN, "--equalize-splits"])
+                            clean_chunk = chunk.replace(b"\x1b=", b"")
+                            if not clean_chunk:
+                                continue
+                            chunk = clean_chunk
+
+                        chord_matched = None
+                        for chord, target_k in POPUP_CHORDS.items():
+                            if chord in chunk:
+                                chord_matched = target_k
+                                break
+
+                        if chord_matched:
+                            if chord_matched == cur_key:
+                                try:
+                                    os.kill(pid, signal.SIGTERM)
+                                except Exception:
+                                    pass
+                                cur_cmd = None
+                                break
+                            else:
+                                switch_target = chord_matched
+                                try:
+                                    os.kill(pid, signal.SIGTERM)
+                                except Exception:
+                                    pass
+                                break
+
+                        try:
+                            os.write(master_fd, chunk)
+                        except OSError:
+                            break
+
+                try:
+                    os.waitpid(pid, 0)
+                except Exception:
+                    pass
+            finally:
+                try:
+                    os.close(master_fd)
+                except Exception:
+                    pass
+
+            if switch_target and switch_target in POPUP_COMMANDS:
+                cur_key = switch_target
+                cur_cmd = list(POPUP_COMMANDS[cur_key])
+                sys.stdout.write("\033[2J\033[H\033[?25h")
+                sys.stdout.flush()
+            else:
+                break
+    finally:
+        if orig_attr and is_tty:
+            try:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, orig_attr)
+            except Exception:
+                pass
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        if lock_fd:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                lock_fd.close()
+            except Exception:
+                pass
+
+
+def toggle_popup(key_char: str, cwd: str, cmd_args: list[str]) -> None:
+    key_norm = key_char.lower()
+    is_locked = False
+    active_key = ""
+    active_pid = None
+    lock_file = get_popup_lock_file()
+
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "r") as f:
+                content = f.read().strip()
+                parts = content.split(":")
+                active_key = parts[0]
+                if len(parts) > 1 and parts[1].isdigit():
+                    active_pid = int(parts[1])
+            f_test = open(lock_file, "a")
+            try:
+                fcntl.flock(f_test, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(f_test, fcntl.LOCK_UN)
+                is_locked = False
+            except (BlockingIOError, OSError):
+                is_locked = True
+            finally:
+                f_test.close()
+        except Exception:
+            pass
+
+    if is_locked and active_key == key_norm:
+        subprocess.run(["tmux", "display-popup", "-C"], check=False)
+        if active_pid:
+            try:
+                os.kill(active_pid, signal.SIGTERM)
+            except Exception:
+                pass
+        return
+
+    if is_locked:
+        subprocess.run(["tmux", "display-popup", "-C"], check=False)
+        if active_pid:
+            try:
+                os.kill(active_pid, signal.SIGTERM)
+            except Exception:
+                pass
+        time.sleep(0.04)
+
+    target_cwd = resolve_workspace_cwd(cwd)
+    try:
+        os.chdir(target_cwd)
+    except Exception:
+        pass
+
+    h = "85%" if key_norm in ("t", "o", "p") else "88%"
+    w = "88%"
+
+    escaped_args = " ".join(f"'{arg}'" for arg in cmd_args)
+    wrapper_cmd = f"{SQUAD_BIN} --run-popup {key_norm} {escaped_args}"
+
+    subprocess.Popen([
+        "tmux", "display-popup",
+        "-E",
+        "-xC", "-yC",
+        "-w", w,
+        "-h", h,
+        "-d", target_cwd,
+        wrapper_cmd,
+    ], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def jump_attention(dump_only: bool = False) -> None:
+    locked_ids = get_locked_conversation_ids()
+    candidates = []
+
+    try:
+        if os.path.exists(LIVE_STATE_PATH):
+            with open(LIVE_STATE_PATH, "r", encoding="utf-8") as f:
+                live_data = json.load(f)
+            if isinstance(live_data, dict):
+                subagents = live_data.get("subagents", [])
+                for sa in subagents:
+                    if isinstance(sa, dict):
+                        cid = sa.get("conversationId") or sa.get("id")
+                        st = (sa.get("status") or "").lower()
+                        if cid:
+                            if st in ("waiting_for_input", "blocked", "approval_needed") or "blocked" in st:
+                                candidates.append((0, -time.time(), cid, "blocked"))
+                            elif "heal" in st:
+                                candidates.append((1, -time.time(), cid, "healing"))
+                            elif "error" in st or "fail" in st:
+                                candidates.append((1, -time.time(), cid, "errored"))
+                            elif st in ("running", "active"):
+                                candidates.append((2, -time.time(), cid, "active"))
+    except Exception:
+        pass
+
+    with connect_db_ro() as con:
+        if con is not None:
+            try:
+                cur = con.cursor()
+                cur.execute(
+                    """
+                    SELECT conversation_id, status, last_modified_time
+                    FROM conversation_summaries
+                    ORDER BY last_modified_time DESC
+                    LIMIT 50
+                    """
+                )
+                rows = cur.fetchall()
+                for row in rows:
+                    cid, db_status, lm = row
+                    m_ts = parse_mtime_ts(lm)
+                    info = get_session_info(cid, locked_ids, db_status, m_ts)
+                    st = info["state"]
+                    pri = STATE_PRIORITY.get(st, 9)
+                    if pri <= 2:
+                        candidates.append((pri, -m_ts, cid, st))
+            except Exception:
+                pass
+
+    now_ts = time.time()
+    for l_cid in locked_ids:
+        if not any(c[2] == l_cid for c in candidates):
+            info = get_session_info(l_cid, locked_ids, "", now_ts)
+            st = info["state"]
+            pri = STATE_PRIORITY.get(st, 2)
+            if pri <= 2:
+                candidates.append((pri, -now_ts, l_cid, st))
+
+    if candidates:
+        candidates.sort(key=lambda x: (x[0], x[1]))
+        best = candidates[0]
+        target_cid = best[2]
+        target_state = best[3]
+        if dump_only:
+            print(f"{target_cid} {target_state}")
+            return
+        view_session_interactive(target_cid)
+        tree_popup(focus_cid=target_cid)
+    else:
+        if dump_only:
+            print("NONE")
+            return
+        tree_popup()
+
+
+# ==============================================================================
+# Scoped Diff Popup & Diff Inspection Helpers
+# ==============================================================================
+
+DIFF_SCOPES = ["unstaged", "staged", "head", "branch"]
+
+
+def get_diff_renderer_file() -> str:
+    sk = re.sub(r"[^a-zA-Z0-9_\-]", "_", get_current_session_key() or "global")
+    return f"/tmp/agy_diff_renderer_{os.getuid()}_{sk}"
+
+
+DIFF_RENDERER_FILE = get_diff_renderer_file()
+
+
+def get_diff_scope_file() -> str:
+    sk = re.sub(r"[^a-zA-Z0-9_\-]", "_", get_current_session_key() or "global")
+    return f"/tmp/agy_diff_scope_{os.getuid()}_{sk}"
+
+
+def get_diff_renderer() -> str:
+    rf = get_diff_renderer_file()
+    if os.path.exists(rf):
+        try:
+            with open(rf, "r", encoding="utf-8") as f:
+                val = f.read().strip().lower()
+                if val in ("delta", "difft"):
+                    return val
+        except Exception:
+            pass
+    return "delta"
+
+
+def toggle_diff_renderer() -> None:
+    cur = get_diff_renderer()
+    nxt = "difft" if cur == "delta" else "delta"
+    rf = get_diff_renderer_file()
+    try:
+        with open(rf, "w", encoding="utf-8") as f:
+            f.write(nxt)
+    except Exception:
+        pass
+
+
+def stage_toggle_file(file_path: str, repo_root: str | None = None) -> None:
+    if not repo_root:
+        repo_root = get_git_repo_root()
+    clean_path = file_path.strip().split()[0] if file_path.strip() else ""
+    if not clean_path or clean_path.startswith("(") or clean_path == "Scope:":
+        return
+
+    staged_proc = subprocess.run(
+        ["git", "-C", repo_root, "diff", "--cached", "--name-only", "--", clean_path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    is_staged = bool(staged_proc.stdout.strip())
+
+    unstaged_proc = subprocess.run(
+        ["git", "-C", repo_root, "diff", "--name-only", "--", clean_path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    untracked_proc = subprocess.run(
+        ["git", "-C", repo_root, "ls-files", "--others", "--exclude-standard", "--", clean_path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    has_unstaged = bool(unstaged_proc.stdout.strip() or untracked_proc.stdout.strip())
+
+    if is_staged and not has_unstaged:
+        subprocess.run(["git", "-C", repo_root, "restore", "--staged", "--", clean_path], check=False)
+    else:
+        subprocess.run(["git", "-C", repo_root, "add", "--", clean_path], check=False)
+
+
+def get_base_branch(repo_root: str | None = None) -> str:
+    r = repo_root or get_git_repo_root()
+    for ref in ("origin/main", "main", "origin/master", "master"):
+        res = subprocess.run(["git", "-C", r, "rev-parse", "--verify", ref], capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            return ref
+    return "HEAD~1"
+
+
+def get_diff_files(scope: str = "unstaged", repo_root: str | None = None) -> list[dict]:
+    if not repo_root:
+        repo_root = get_git_repo_root()
+    files_map = {}
+    scope = (scope or "unstaged").lower()
+
+    if scope == "unstaged":
+        cmd = ["git", "-C", repo_root, "diff", "--numstat"]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    ins = int(parts[0]) if parts[0].isdigit() else 0
+                    del_ = int(parts[1]) if parts[1].isdigit() else 0
+                    path = parts[2].strip()
+                    files_map[path] = {"file": path, "ins": ins, "del": del_, "status": "M"}
+
+        cmd_un = ["git", "-C", repo_root, "ls-files", "--others", "--exclude-standard"]
+        res_un = subprocess.run(cmd_un, capture_output=True, text=True, check=False)
+        if res_un.returncode == 0:
+            for p in res_un.stdout.splitlines():
+                p = p.strip()
+                if not p:
+                    continue
+                if p not in files_map:
+                    cnt = 0
+                    full_p = os.path.join(repo_root, p)
+                    try:
+                        if os.path.isfile(full_p):
+                            with open(full_p, "rb") as f:
+                                cnt = sum(1 for _ in f)
+                    except Exception:
+                        cnt = 1
+                    files_map[p] = {"file": p, "ins": cnt, "del": 0, "status": "?"}
+
+    elif scope == "staged":
+        cmd = ["git", "-C", repo_root, "diff", "--cached", "--numstat"]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    ins = int(parts[0]) if parts[0].isdigit() else 0
+                    del_ = int(parts[1]) if parts[1].isdigit() else 0
+                    path = parts[2].strip()
+                    files_map[path] = {"file": path, "ins": ins, "del": del_, "status": "S"}
+
+    elif scope in ("all", "head"):
+        cmd = ["git", "-C", repo_root, "diff", "HEAD", "--numstat"]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    ins = int(parts[0]) if parts[0].isdigit() else 0
+                    del_ = int(parts[1]) if parts[1].isdigit() else 0
+                    path = parts[2].strip()
+                    files_map[path] = {"file": path, "ins": ins, "del": del_, "status": "M"}
+
+        cmd_un = ["git", "-C", repo_root, "ls-files", "--others", "--exclude-standard"]
+        res_un = subprocess.run(cmd_un, capture_output=True, text=True, check=False)
+        if res_un.returncode == 0:
+            for p in res_un.stdout.splitlines():
+                p = p.strip()
+                if p and p not in files_map:
+                    cnt = 0
+                    full_p = os.path.join(repo_root, p)
+                    try:
+                        if os.path.isfile(full_p):
+                            with open(full_p, "rb") as f:
+                                cnt = sum(1 for _ in f)
+                    except Exception:
+                        cnt = 1
+                    files_map[p] = {"file": p, "ins": cnt, "del": 0, "status": "?"}
+
+    elif scope in ("base", "branch"):
+        base = get_base_branch(repo_root)
+        cmd = ["git", "-C", repo_root, "diff", f"{base}...HEAD", "--numstat"]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    ins = int(parts[0]) if parts[0].isdigit() else 0
+                    del_ = int(parts[1]) if parts[1].isdigit() else 0
+                    path = parts[2].strip()
+                    files_map[path] = {"file": path, "ins": ins, "del": del_, "status": "B"}
+
+    return list(files_map.values())
+
+
+def next_diff_scope(cur: str) -> str:
+    cur = (cur or "unstaged").lower()
+    if cur in DIFF_SCOPES:
+        idx = (DIFF_SCOPES.index(cur) + 1) % len(DIFF_SCOPES)
+        return DIFF_SCOPES[idx]
+    return "unstaged"
+
+
+def format_diff_line(item: dict, max_path_len: int = 50) -> str:
+    path = item["file"]
+    ins = item["ins"]
+    del_ = item["del"]
+    st = item.get("status", "M")
+    st_color = C_GREEN if st in ("?", "A") else (C_YELLOW if st == "M" else C_CYAN)
+    ins_str = f"{C_GREEN}+{ins:<4}{C_RESET}"
+    del_str = f"{C_RED}-{del_:<4}{C_RESET}"
+    st_badge = f"{st_color}[{st}]{C_RESET}"
+    return f"{path:<{max_path_len}}  {ins_str} {del_str} {st_badge}"
+
+
+def preview_diff(file_path: str, scope: str = "", repo_root: str | None = None) -> None:
+    file_path = file_path.strip().split()[0] if file_path.strip() else ""
+    if not file_path or file_path.startswith("(") or file_path.startswith("[") or file_path == "Scope:":
+        print("No file selected.")
+        return
+
+    if not repo_root:
+        repo_root = get_git_repo_root()
+
+    scope_file = get_diff_scope_file()
+    if not scope:
+        try:
+            if os.path.exists(scope_file):
+                with open(scope_file, "r") as f:
+                    scope = f.read().strip()
+        except Exception:
+            pass
+    if not scope:
+        scope = "unstaged"
+    scope = scope.lower()
+
+    full_path = os.path.join(repo_root, file_path) if not os.path.isabs(file_path) else file_path
+    print(f"{C_BOLD}{C_PURPLE}=== DIFF PREVIEW: {file_path} [{scope.upper()}] ==={C_RESET}\n")
+
+    is_untracked = False
+    try:
+        check_un = subprocess.run(
+            ["git", "-C", repo_root, "ls-files", "--others", "--exclude-standard", "--", file_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if check_un.returncode == 0 and check_un.stdout.strip():
+            is_untracked = True
+    except Exception:
+        pass
+
+    if is_untracked and os.path.isfile(full_path):
+        if shutil.which("bat"):
+            subprocess.run(["bat", "--color=always", "--style=plain", full_path], check=False)
+        else:
+            try:
+                with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                    print(f.read())
+            except Exception as e:
+                print(f"Error reading {full_path}: {e}")
+        return
+
+    renderer = get_diff_renderer()
+    if renderer == "difft" and shutil.which("difft"):
+        base_cmd = ["git", "-c", "diff.external=difft --color=always", "-C", repo_root, "diff"]
+        if scope == "unstaged":
+            diff_cmd = base_cmd + ["--", file_path]
+        elif scope == "staged":
+            diff_cmd = base_cmd + ["--cached", "--", file_path]
+        elif scope in ("all", "head"):
+            diff_cmd = base_cmd + ["HEAD", "--", file_path]
+        elif scope in ("base", "branch"):
+            base = get_base_branch(repo_root)
+            diff_cmd = base_cmd + [f"{base}...HEAD", "--", file_path]
+        else:
+            diff_cmd = base_cmd + ["--", file_path]
+
+        res = subprocess.run(diff_cmd, capture_output=True, text=True, check=False)
+        if res.stdout:
+            print(res.stdout)
+        else:
+            if os.path.isfile(full_path):
+                if shutil.which("bat"):
+                    subprocess.run(["bat", "--color=always", "--style=plain", full_path], check=False)
+                else:
+                    print(f"{C_COMMENT}No diff changes detected in scope '{scope}'.{C_RESET}")
+            else:
+                print(f"{C_COMMENT}File {file_path} (deleted or not found){C_RESET}")
+    else:
+        if scope == "unstaged":
+            diff_cmd = ["git", "-C", repo_root, "diff", "--color=always", "--", file_path]
+        elif scope == "staged":
+            diff_cmd = ["git", "-C", repo_root, "diff", "--cached", "--color=always", "--", file_path]
+        elif scope in ("all", "head"):
+            diff_cmd = ["git", "-C", repo_root, "diff", "HEAD", "--color=always", "--", file_path]
+        elif scope in ("base", "branch"):
+            base = get_base_branch(repo_root)
+            diff_cmd = ["git", "-C", repo_root, "diff", f"{base}...HEAD", "--color=always", "--", file_path]
+        else:
+            diff_cmd = ["git", "-C", repo_root, "diff", "--color=always", "--", file_path]
+
+        res = subprocess.run(diff_cmd, capture_output=True, text=True, check=False)
+        if res.stdout:
+            if shutil.which("delta"):
+                delta_cmd = ["delta", "--paging=never"]
+                try:
+                    cols = int(os.environ.get("FZF_PREVIEW_COLUMNS") or 0)
+                except Exception:
+                    cols = 0
+                if cols >= 100:
+                    delta_cmd.extend(["--side-by-side", f"-w={cols}"])
+                subprocess.run(delta_cmd, input=res.stdout, text=True, check=False)
+            else:
+                print(res.stdout)
+        else:
+            if os.path.isfile(full_path):
+                if shutil.which("bat"):
+                    subprocess.run(["bat", "--color=always", "--style=plain", full_path], check=False)
+                else:
+                    print(f"{C_COMMENT}No diff changes detected in scope '{scope}'.{C_RESET}")
+            else:
+                print(f"{C_COMMENT}File {file_path} (deleted or not found){C_RESET}")
+
+
+def view_file_diff(file_path: str, scope: str = "unstaged", repo_root: str | None = None) -> None:
+    if not repo_root:
+        repo_root = get_git_repo_root()
+    full_path = os.path.join(repo_root, file_path) if not os.path.isabs(file_path) else file_path
+
+    is_untracked = False
+    try:
+        check_un = subprocess.run(
+            ["git", "-C", repo_root, "ls-files", "--others", "--exclude-standard", "--", file_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if check_un.returncode == 0 and check_un.stdout.strip():
+            is_untracked = True
+    except Exception:
+        pass
+
+    if is_untracked and os.path.isfile(full_path):
+        if shutil.which("bat"):
+            subprocess.run(["bat", "--paging=always", full_path], check=False)
+        else:
+            subprocess.run(["less", "-R", full_path], check=False)
+        return
+
+    scope = (scope or "unstaged").lower()
+    if scope == "unstaged":
+        cmd = ["git", "-C", repo_root, "diff", "--color=always", "--", file_path]
+    elif scope == "staged":
+        cmd = ["git", "-C", repo_root, "diff", "--cached", "--color=always", "--", file_path]
+    elif scope in ("all", "head"):
+        cmd = ["git", "-C", repo_root, "diff", "HEAD", "--color=always", "--", file_path]
+    elif scope in ("base", "branch"):
+        base = get_base_branch(repo_root)
+        cmd = ["git", "-C", repo_root, "diff", f"{base}...HEAD", "--color=always", "--", file_path]
+    else:
+        cmd = ["git", "-C", repo_root, "diff", "--color=always", "--", file_path]
+
+    diff_proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    diff_text = diff_proc.stdout
+    if not diff_text:
+        diff_text = f"No differences for {file_path} in scope {scope}."
+
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".diff", delete=False) as tf:
+        tf_name = tf.name
+        tf.write(diff_text)
+
+    try:
+        if shutil.which("bat"):
+            subprocess.run(["bat", "--paging=always", "-l", "diff", tf_name], check=False)
+        else:
+            subprocess.run(["less", "-R", tf_name], check=False)
+    finally:
+        if os.path.exists(tf_name):
+            try:
+                os.unlink(tf_name)
+            except Exception:
+                pass
+
+
+def diff_cycle() -> None:
+    scope_file = get_diff_scope_file()
+    cur = "unstaged"
+    try:
+        if os.path.exists(scope_file):
+            with open(scope_file, "r") as f:
+                cur = f.read().strip() or "unstaged"
+    except Exception:
+        pass
+
+    nxt = next_diff_scope(cur)
+    try:
+        with open(scope_file, "w") as f:
+            f.write(nxt)
+    except Exception:
+        pass
+
+    diff_list(nxt)
+
+
+def diff_list(scope: str = "") -> None:
+    scope_file = get_diff_scope_file()
+    if not scope:
+        try:
+            if os.path.exists(scope_file):
+                with open(scope_file, "r") as f:
+                    scope = f.read().strip()
+        except Exception:
+            pass
+    if not scope:
+        scope = "unstaged"
+    try:
+        with open(scope_file, "w") as f:
+            f.write(scope)
+    except Exception:
+        pass
+
+    renderer = get_diff_renderer()
+    repo_root = get_git_repo_root()
+    banner = f"  {C_CYAN}{C_BOLD}[{scope.upper()}]{C_RESET}  {C_PURPLE}{C_BOLD}[{renderer.upper()}]{C_RESET}  {C_COMMENT}(Ctrl-d:Scope · Ctrl-t:AST/Line · Ctrl-s:Stage · Ctrl-e:Edit · Enter:Full){C_RESET}"
+    print(banner)
+    items = get_diff_files(scope, repo_root=repo_root)
+    if items:
+        for it in items:
+            print(format_diff_line(it))
+    else:
+        print(f"{C_COMMENT}(No changed files in scope: {scope}){C_RESET}")
+
+
+def diff_popup(scope: str = "unstaged", dump_only: bool = False) -> None:
+    repo_root = get_git_repo_root()
+    if dump_only:
+        items = get_diff_files(scope, repo_root=repo_root)
+        if not items:
+            print(f"(No changes in scope '{scope}')")
+            return
+        for it in items:
+            print(f"{it['file']:<50} +{it['ins']:<4} -{it['del']:<4} [{it.get('status', 'M')}]")
+        return
+
+    if not shutil.which("fzf"):
+        sys.stderr.write("fzf is required for --diff-popup\n")
+        return
+
+    cur_scope = scope
+    scope_file = get_diff_scope_file()
+    try:
+        with open(scope_file, "w", encoding="utf-8") as f:
+            f.write(cur_scope)
+    except Exception:
+        pass
+
+    squad_bin = SQUAD_BIN
+
+    while True:
+        try:
+            if os.path.exists(scope_file):
+                with open(scope_file, "r") as f:
+                    cur_scope = f.read().strip() or cur_scope
+        except Exception:
+            pass
+
+        renderer = get_diff_renderer()
+        banner = f"  {C_CYAN}{C_BOLD}[{cur_scope.upper()}]{C_RESET}  {C_PURPLE}{C_BOLD}[{renderer.upper()}]{C_RESET}  {C_COMMENT}(Ctrl-d:Scope · Ctrl-t:AST/Line · Ctrl-s:Stage · Ctrl-e:Edit · Enter:Full){C_RESET}"
+        items = get_diff_files(cur_scope, repo_root=repo_root)
+        if items:
+            lines = [banner] + [format_diff_line(it) for it in items]
+            input_text = "\n".join(lines) + "\n"
+        else:
+            input_text = f"{banner}\n{C_COMMENT}(No changed files in scope: {cur_scope}){C_RESET}\n"
+
+        fzf_cmd = [
+            "fzf",
+            "--ansi",
+            "--header-lines=1",
+            "--multi",
+            f"--bind=ctrl-d:reload({squad_bin} --diff-cycle)",
+            f"--bind=ctrl-t:execute-silent({squad_bin} --diff-toggle-renderer)+reload({squad_bin} --diff-list)+refresh-preview",
+            f"--bind=ctrl-s:execute-silent({squad_bin} --diff-stage '{{1}}')+reload({squad_bin} --diff-list)+refresh-preview",
+            f"--bind=ctrl-e:execute(${{EDITOR:-micro}} '{{1}}')+reload({squad_bin} --diff-list)+refresh-preview",
+            "--bind=alt-m:toggle+down,tab:toggle+down",
+            "--bind=alt-p:abort,alt-d:abort,alt-t:abort,alt-o:abort,alt-g:abort,alt-y:abort,ctrl-q:abort,esc:abort",
+            f"--preview={squad_bin} --preview-diff '{{1}}'",
+            "--preview-window=right:65%:wrap",
+        ]
+
+        res = subprocess.run(fzf_cmd, input=input_text, text=True, capture_output=True, cwd=repo_root)
+        if res.returncode != 0 or not res.stdout.strip():
+            break
+
+        selected_lines = [l.strip() for l in res.stdout.splitlines() if l.strip()]
+        for selected_line in selected_lines:
+            tokens = selected_line.split()
+            if not tokens or tokens[0].startswith("(") or tokens[0].startswith("[") or tokens[0] == "Scope:":
+                continue
+            sel_file = tokens[0]
+
+            try:
+                if os.path.exists(scope_file):
+                    with open(scope_file, "r") as f:
+                        cur_scope = f.read().strip() or cur_scope
+            except Exception:
+                pass
+
+            view_file_diff(sel_file, cur_scope, repo_root=repo_root)
+
+
+# ==============================================================================
+# Preview & Tree Inspection
+# ==============================================================================
+
+def _print_markdown(content: str) -> None:
+    processed = preprocess_mermaid_blocks(content)
+    if shutil.which("bat"):
+        subprocess.run(
+            ["bat", "--language=markdown", "--style=plain", "--color=always", "--paging=never"],
+            input=processed + "\n",
+            text=True,
+            check=False,
+        )
+    else:
+        print(processed)
+
+
+def preview_conversation(line_or_id: str) -> None:
+    m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", line_or_id)
+    cid = m.group(1) if m else line_or_id.strip()
+    if not cid:
+        print("No conversation ID provided.")
+        return
+
+    brain_dir = os.path.join(BRAIN_DIR, cid)
+    locked_ids = get_locked_conversation_ids()
+
+    db_title = ""
+    step_count = "?"
+    db_status = ""
+    lm_str = ""
+    parent_id = None
+    if os.path.isfile(DB_PATH):
+        try:
+            with connect_db_ro() as con:
+                cur = con.cursor()
+                cur.execute(
+                    "SELECT title, step_count, status, last_modified_time, parent_conversation_id FROM conversation_summaries WHERE conversation_id = ?",
+                    (cid,),
+                )
+                row = cur.fetchone()
+                if row:
+                    db_title = row[0] or ""
+                    step_count = row[1] if row[1] is not None else "?"
+                    db_status = row[2] or ""
+                    lm_str = row[3] or ""
+                    parent_id = row[4]
+        except Exception:
+            pass
+
+    info = get_session_info(cid, locked_ids, db_status, parse_mtime_ts(lm_str))
+    state = info["state"]
+
+    disp_title = db_title.strip()
+    if not disp_title:
+        task_p = os.path.join(brain_dir, "task.md")
+        if os.path.isfile(task_p):
+            try:
+                with open(task_p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("# "):
+                            disp_title = line[2:].strip()
+                            break
+            except Exception:
+                pass
+    if not disp_title:
+        disp_title = "(session)"
+
+    print(f"{C_BOLD}{C_PURPLE}=== CONVERSATION: {cid} ==={C_RESET}")
+    print(f"{C_BOLD}Role / Title:{C_RESET} {disp_title}")
+    icon, lbl = format_state_badge(state)
+    badge = f"{icon} {lbl}"
+    print(f"{C_BOLD}Status:{C_RESET} {badge}   {C_BOLD}Steps:{C_RESET} {C_YELLOW}{step_count}{C_RESET}   {C_BOLD}Modified:{C_RESET} {C_COMMENT}{lm_str}{C_RESET}")
+    if parent_id:
+        print(f"{C_BOLD}Parent ID:{C_RESET} {C_COMMENT}{parent_id}{C_RESET}")
+    if info.get("detail"):
+        print(f"{C_BOLD}Current Action:{C_RESET} {C_CYAN}{info['detail']}{C_RESET}")
+    print()
+
+    found_any = False
+
+    task_p = os.path.join(brain_dir, "task.md")
+    if os.path.isfile(task_p):
+        found_any = True
+        print(f"{C_BOLD}{C_PURPLE}=== TASK.MD ==={C_RESET}")
+        try:
+            with open(task_p, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                t_lines = content.splitlines()
+                if len(t_lines) > 25:
+                    _print_markdown("\n".join(t_lines[:25]))
+                    print(f"{C_COMMENT}... [{len(t_lines) - 25} more lines in task.md] ...{C_RESET}")
+                else:
+                    _print_markdown(content)
+        except Exception:
+            pass
+        print()
+
+    plan_p = os.path.join(brain_dir, "implementation_plan.md")
+    if os.path.isfile(plan_p):
+        found_any = True
+        print(f"{C_BOLD}{C_CYAN}=== IMPLEMENTATION PLAN ==={C_RESET}")
+        try:
+            with open(plan_p, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                p_lines = content.splitlines()
+                if len(p_lines) > 30:
+                    _print_markdown("\n".join(p_lines[:30]))
+                    print(f"{C_COMMENT}... [{len(p_lines) - 30} more lines in plan] ...{C_RESET}")
+                else:
+                    _print_markdown(content)
+        except Exception:
+            pass
+        print()
+
+    latest_response_text = ""
+    tr_p = os.path.join(brain_dir, ".system_generated", "logs", "transcript.jsonl")
+    if os.path.isfile(tr_p):
+        found_any = True
+        print(f"{C_BOLD}{C_YELLOW}=== RECENT STEPS ==={C_RESET}")
+        try:
+            with open(tr_p, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+            for line in lines[-15:]:
+                try:
+                    step = json.loads(line)
+                    idx = step.get("step_index", "?")
+                    st_type = step.get("type", "")
+                    status = step.get("status", "")
+                    tool_descs = extract_step_tool_summaries(step)
+                    tool_str = f" -> ⚙ {', '.join(tool_descs)}" if tool_descs else ""
+                    print(f"{C_COMMENT}[Step {idx}]{C_RESET} {C_GREEN}{st_type}{C_RESET} ({status}){tool_str}")
+                except Exception:
+                    pass
+
+            for line in reversed(lines):
+                try:
+                    step = json.loads(line)
+                    if step.get("type") == "PLANNER_RESPONSE" and step.get("content"):
+                        latest_response_text = step.get("content").strip()
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if latest_response_text:
+        print(f"\n{C_BOLD}{C_GREEN}=== LATEST RESPONSE ==={C_RESET}")
+        resp_lines = latest_response_text.splitlines()
+        if len(resp_lines) > 40:
+            _print_markdown("\n".join(resp_lines[:40]))
+            print(f"{C_COMMENT}... [{len(resp_lines) - 40} more lines - use Ctrl-l / Enter to view full] ...{C_RESET}")
+        else:
+            _print_markdown(latest_response_text)
+
+    if not found_any:
+        print(f"{C_COMMENT}No task.md, implementation_plan.md, or transcript found for {cid}{C_RESET}")
+
+
+def view_session_interactive(cid: str) -> None:
+    brain_dir = os.path.join(BRAIN_DIR, cid)
+    task_p = os.path.join(brain_dir, "task.md")
+    plan_p = os.path.join(brain_dir, "implementation_plan.md")
+    tr_p = os.path.join(brain_dir, ".system_generated", "logs", "transcript.jsonl")
+
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as tf:
+        tmp_path = tf.name
+        tf.write(f"# Session {cid}\n\n")
+        db_title = ""
+        db_status = ""
+        agent_name = ""
+        if os.path.isfile(DB_PATH):
+            try:
+                with connect_db_ro() as con:
+                    cur = con.cursor()
+                    cur.execute("SELECT title, status, agent_name FROM conversation_summaries WHERE conversation_id = ?", (cid,))
+                    row = cur.fetchone()
+                    if row:
+                        db_title = row[0] or ""
+                        db_status = row[1] or ""
+                        agent_name = row[2] or ""
+            except Exception:
+                pass
+        role_title = extract_node_title(cid, db_title, "", "", agent_name)
+        tf.write(f"**Role/Title:** {role_title}  \n**Status:** {db_status or 'active'}\n\n---\n\n")
+
+        if os.path.isfile(task_p):
+            tf.write("# TASK.MD\n\n")
+            with open(task_p, "r", encoding="utf-8", errors="replace") as f:
+                tf.write(preprocess_mermaid_blocks(f.read()))
+            tf.write("\n\n---\n\n")
+        if os.path.isfile(plan_p):
+            tf.write("# IMPLEMENTATION PLAN\n\n")
+            with open(plan_p, "r", encoding="utf-8", errors="replace") as f:
+                tf.write(preprocess_mermaid_blocks(f.read()))
+            tf.write("\n\n---\n\n")
+        if os.path.isfile(tr_p):
+            tf.write("# RECENT TRANSCRIPT STEPS\n\n```\n")
+            with open(tr_p, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+            for line in lines[-30:]:
+                try:
+                    step = json.loads(line)
+                    idx = step.get("step_index", "?")
+                    st_type = step.get("type", "")
+                    status = step.get("status", "")
+                    tool_descs = extract_step_tool_summaries(step)
+                    tool_str = f" -> ⚙ {', '.join(tool_descs)}" if tool_descs else ""
+                    tf.write(f"[Step {idx}] {st_type} ({status}){tool_str}\n")
+                except Exception:
+                    pass
+            tf.write("```\n")
+
+    try:
+        if shutil.which("bat"):
+            paging_flag = "--paging=always" if sys.stdin.isatty() else "--paging=never"
+            subprocess.run(["bat", paging_flag, "-l", "markdown", tmp_path], check=False)
+        else:
+            if sys.stdin.isatty():
+                subprocess.run(["less", "-R", tmp_path], check=False)
+            else:
+                with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
+                    print(f.read())
+    finally:
+        if os.path.isfile(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+def view_plan(arg_str: str) -> None:
+    m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", arg_str)
+    cid = m.group(1) if m else arg_str.strip()
+    if not cid:
+        print("No conversation ID provided.")
+        return
+    brain_dir = os.path.join(BRAIN_DIR, cid)
+    plan_p = os.path.join(brain_dir, "implementation_plan.md")
+    task_p = os.path.join(brain_dir, "task.md")
+    target = plan_p if os.path.isfile(plan_p) else (task_p if os.path.isfile(task_p) else None)
+    if not target:
+        print(f"No implementation_plan.md or task.md found for {cid}")
+        input("Press Enter to return...")
+        return
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as f:
+            content = preprocess_mermaid_blocks(f.read())
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as tf:
+            tf.write(content)
+            tmp_target = tf.name
+        try:
+            if shutil.which("bat"):
+                subprocess.run(["bat", "--paging=always", "-l", "markdown", tmp_target], check=False)
+            else:
+                subprocess.run(["less", "-R", tmp_target], check=False)
+        finally:
+            if os.path.isfile(tmp_target):
+                os.unlink(tmp_target)
+    except Exception:
+        if shutil.which("bat"):
+            subprocess.run(["bat", "--paging=always", "-l", "markdown", target], check=False)
+        else:
+            subprocess.run(["less", "-R", target], check=False)
+
+
+def tail_transcript(arg_str: str) -> None:
+    m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", arg_str)
+    cid = m.group(1) if m else arg_str.strip()
+    if not cid:
+        print("No conversation ID provided.")
+        return
+    brain_dir = os.path.join(BRAIN_DIR, cid)
+    tr_p = os.path.join(brain_dir, ".system_generated", "logs", "transcript.jsonl")
+    if not os.path.isfile(tr_p):
+        print(f"No transcript found for {cid}")
+        input("Press Enter to return...")
+        return
+
+    print(f"{C_BOLD}{C_CYAN}=== Streaming Transcript for {cid} ==={C_RESET}")
+    print(f"{C_COMMENT}(Press Ctrl+C to stop){C_RESET}\n")
+
+    def format_step_line(line: str) -> None:
+        try:
+            s = json.loads(line)
+            idx = s.get("step_index", "?")
+            st_type = s.get("type", "")
+            status = s.get("status", "")
+            tool_descs = extract_step_tool_summaries(s)
+            tool_str = f" -> ⚙ {', '.join(tool_descs)}" if tool_descs else ""
+            print(f"{C_COMMENT}[Step {idx}]{C_RESET} {C_GREEN}{st_type}{C_RESET} ({status}){tool_str}")
+        except Exception:
+            pass
+
+    try:
+        with open(tr_p, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+            for l in lines[-20:]:
+                format_step_line(l)
+            watcher = InotifyWatcher()
+            try:
+                watcher.add_path(tr_p)
+                while True:
+                    l = f.readline()
+                    if l:
+                        format_step_line(l)
+                    else:
+                        watcher.wait(timeout_ms=500)
+            finally:
+                watcher.close()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"Error streaming transcript: {e}")
+
+
+def extract_node_title(cid: str, db_title: str, prev: str, parent_id: str = "", agent_name: str = "") -> str:
+    subagent_json_paths = []
+    if parent_id and parent_id.strip():
+        subagent_json_paths.append(os.path.join(BRAIN_DIR, parent_id, ".system_generated", "subagents", f"{cid}.json"))
+    subagent_json_paths.append(os.path.join(BRAIN_DIR, cid, ".system_generated", "subagents", f"{cid}.json"))
+
+    for sa_p in subagent_json_paths:
+        if os.path.isfile(sa_p):
+            try:
+                with open(sa_p, "r", encoding="utf-8") as f:
+                    sa_data = json.load(f)
+                desc = sa_data.get("subagentDescriptor") or {}
+                role = desc.get("role") or sa_data.get("role")
+                if role and str(role).strip().lower() not in ("self", "research"):
+                    clean_role = str(role).strip()
+                    return f"@{clean_role}" if not clean_role.startswith("@") else clean_role
+            except Exception:
+                pass
+
+    tr_p = os.path.join(BRAIN_DIR, cid, ".system_generated", "logs", "transcript.jsonl")
+    if os.path.isfile(tr_p):
+        try:
+            with open(tr_p, "r", encoding="utf-8") as f:
+                for _ in range(6):
+                    line = f.readline()
+                    if not line:
+                        break
+                    first = json.loads(line)
+                    cnt = first.get("content") or ""
+                    m2 = re.search(r'Role:\s*"([^"]+)"', cnt)
+                    if m2:
+                        r = m2.group(1).strip()
+                        return f"@{r}" if not r.startswith("@") else r
+                    m = re.search(r"Execute this ([^\n\r:\(\)]+)", cnt)
+                    if m:
+                        return m.group(1).strip()
+        except Exception:
+            pass
+
+    if agent_name and agent_name.strip() and agent_name.strip().lower() not in ("self", "research", "subagent"):
+        name = agent_name.strip()
+        return f"@{name}" if not name.startswith("@") else name
+
+    if db_title and db_title.strip():
+        return db_title.strip()
+
+    task_p = os.path.join(BRAIN_DIR, cid, "task.md")
+    if os.path.isfile(task_p):
+        try:
+            with open(task_p, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("# "):
+                        return line[2:].strip()
+        except Exception:
+            pass
+
+    if agent_name and agent_name.strip():
+        name = agent_name.strip()
+        return f"@{name}" if not name.startswith("@") else name
+
+    if prev and prev.strip():
+        first_line = prev.strip().splitlines()[0]
+        if first_line:
+            return first_line
+
+    if parent_id and parent_id.strip():
+        return f"@subagent-{cid[:6]}"
+    return f"session-{cid[:6]}"
+
+
+def build_tree_lines(focus_cid: str = "") -> list[str]:
+    locked_ids = get_locked_conversation_ids()
+    worktrees = get_git_worktrees(resolve_workspace_cwd())
+    wt_map = {}
+    for wt in worktrees:
+        p = wt.get("path", "")
+        if p:
+            wt_map[os.path.basename(p)] = wt.get("name", "wt")
+
+    rows = []
+    with connect_db_ro() as con:
+        if con is not None:
+            try:
+                cur = con.cursor()
+                cur.execute(
+                    """
+                    SELECT conversation_id, title, preview, step_count, parent_conversation_id, nesting_depth, last_modified_time, status, workspace_uris, agent_name
+                    FROM conversation_summaries
+                    ORDER BY last_modified_time DESC
+                    LIMIT 70
+                    """
+                )
+                rows = cur.fetchall()
+            except Exception as e:
+                sys.stderr.write(f"Error querying database: {e}\n")
+                return []
+
+    node_data = {}
+    by_id = {r[0]: r for r in rows}
+    children = {}
+    roots = []
+
+    for r in rows:
+        cid = r[0]
+        db_title = r[1]
+        prev = r[2]
+        steps = r[3] or 0
+        parent_id = r[4]
+        depth = r[5] or 0
+        lm_str = r[6] or ""
+        db_status = r[7] or ""
+        ws_uris = r[8] if len(r) > 8 else ""
+        agent_name = r[9] if len(r) > 9 else ""
+
+        m_ts = parse_mtime_ts(lm_str)
+        info = get_session_info(cid, locked_ids, db_status, m_ts)
+        st = info["state"]
+        pri = STATE_PRIORITY.get(st, 9)
+        node_data[cid] = {
+            "state": st,
+            "pri": pri,
+            "mtime": m_ts,
+            "ws_uris": ws_uris,
+            "agent_name": agent_name,
+        }
+
+        if parent_id and parent_id in by_id:
+            children.setdefault(parent_id, []).append(r)
+        else:
+            roots.append(r)
+
+    roots.sort(key=lambda r: (node_data[r[0]]["pri"], -node_data[r[0]]["mtime"]))
+    for pid, kids in children.items():
+        kids.sort(key=lambda r: (node_data[r[0]]["pri"], -node_data[r[0]]["mtime"]))
+
+    if focus_cid:
+        def has_cid(node_r: tuple) -> bool:
+            if node_r[0] == focus_cid:
+                return True
+            for ch in children.get(node_r[0], []):
+                if has_cid(ch):
+                    return True
+            return False
+
+        matching_roots = [r for r in roots if has_cid(r)]
+        other_roots = [r for r in roots if not has_cid(r)]
+        roots = matching_roots + other_roots
+
+    tree_lines = []
+
+    def format_node(node: tuple, prefix: str = "") -> None:
+        cid = node[0]
+        title = node[1]
+        prev = node[2]
+        steps = node[3] or 0
+        parent_id = node[4]
+        nd = node_data.get(cid, {})
+        agent_name = nd.get("agent_name", "")
+        st = nd.get("state", "idle")
+        icon, lbl = format_state_badge(st)
+        badge = f"{icon} {lbl}"
+
+        disp_title = extract_node_title(cid, title, prev, parent_id, agent_name)
+        pref_len = visible_len(prefix)
+        avail_title = max(12, 42 - pref_len)
+        if visible_len(disp_title) > avail_title:
+            cut = disp_title[:avail_title - 1]
+            disp_title = (cut.rsplit(' ', 1)[0] if ' ' in cut[12:] else cut) + "…"
+
+        steps_badge = f"{C_YELLOW}[{steps or 0:>3}s]{C_RESET}"
+        cid_str = f"{C_COMMENT}[{cid}]{C_RESET}"
+
+        wt_badge = ""
+        ws_str = nd.get("ws_uris", "")
+        for base_p, wt_name in wt_map.items():
+            if base_p in ws_str:
+                wt_badge = f" {C_CYAN} {wt_name}{C_RESET}"
+                break
+
+        badge_pad = " " * max(0, 11 - visible_len(badge))
+        title_pad = " " * max(0, 42 - pref_len - visible_len(disp_title))
+        line_str = f"{badge}{badge_pad} {prefix}{C_WHITE}{disp_title}{title_pad}{C_RESET} {steps_badge}{wt_badge}  {cid_str}"
+        tree_lines.append(line_str)
+
+        kid_list = children.get(cid, [])
+        for idx, k in enumerate(kid_list):
+            is_last = idx == len(kid_list) - 1
+            connector = "  └─ " if is_last else "  ├─ "
+            format_node(k, prefix + connector)
+
+    for root in roots:
+        format_node(root)
+        if len(tree_lines) >= 60:
+            break
+
+    return tree_lines[:60]
+
+
+def resolve_antigravity_repo_dir() -> str:
+    env_root = os.environ.get("ANTIGRAVITY_WORKSPACE_ROOT")
+    if env_root and os.path.isdir(env_root):
+        return env_root
+    script_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidates = [
+        script_parent,
+        os.path.expanduser("~/Projects/antigravity_settings"),
+        os.path.expanduser("~/Projects/CachyOS/antigravity-settings"),
+        "/home/heocop/Projects/antigravity_settings",
+    ]
+    for d in candidates:
+        if os.path.isfile(os.path.join(d, "scripts", "verify-harness.sh")):
+            return d
+    if os.path.isdir(script_parent):
+        return script_parent
+    return os.path.expanduser("~/Projects/antigravity_settings")
+
+
+def resolve_export_script_path() -> str:
+    repo = resolve_antigravity_repo_dir()
+    for rel in ("scripts/export-harness.sh", "export.sh"):
+        p = os.path.join(repo, rel)
+        if os.path.isfile(p):
+            return p
+    return os.path.join(repo, "scripts", "export-harness.sh")
+
+
+ANTIGRAVITY_REPO_DIR = resolve_antigravity_repo_dir()
+VERIFY_HARNESS_SCRIPT = os.path.join(ANTIGRAVITY_REPO_DIR, "scripts", "verify-harness.sh")
+EXPORT_HARNESS_SCRIPT = resolve_export_script_path()
+
+
+COMMAND_PALETTE_ITEMS = [
+    {
+        "id": "sidebar-toggle",
+        "title": "󰕮 Toggle Sidebar (Full / Hidden)",
+        "desc": "Toggles the tmux right-sidebar between full status view and hidden state.",
+        "shortcut": "Alt+b / Alt+s",
+        "target": f"{SQUAD_BIN} --toggle-sidebar",
+        "category": "Navigation & UI",
+    },
+    {
+        "id": "sidebar-rail",
+        "title": "Toggle Compact Rail Sidebar (8-col)",
+        "desc": "Toggles ultra-compact 8-column rail sidebar showing quick agent glyphs and pulse icons.",
+        "shortcut": "Alt+B",
+        "target": f"{SQUAD_BIN} --sidebar-rail",
+        "category": "Navigation & UI",
+    },
+    {
+        "id": "attention-jump",
+        "title": "⚠ Jump to Highest-Priority / Blocked Agent",
+        "desc": "Inspects live swarm state and focuses the most critical blocked, healing, or errored agent conversation.",
+        "shortcut": "Alt+o",
+        "target": f"{SQUAD_BIN} --jump-attention",
+        "category": "Swarm Governance",
+    },
+    {
+        "id": "session-tree",
+        "title": "󰙅 Browse Session & Subagent Hierarchy Tree",
+        "desc": "Launches the interactive FZF session and subagent hierarchy tree with instant preview, plan view, and transcript tailing.",
+        "shortcut": "Alt+t",
+        "target": f"{SQUAD_BIN} --tree-popup",
+        "category": "Swarm Governance",
+    },
+    {
+        "id": "scoped-diff",
+        "title": " Open Scoped Git & Turn Diff Inspector",
+        "desc": "Interactive git diff explorer across unstaged, staged, all, and base scopes with delta or difftastic AST diffing.",
+        "shortcut": "Alt+d",
+        "target": f"{SQUAD_BIN} --diff-popup",
+        "category": "Git & Diagnostics",
+    },
+    {
+        "id": "commit-graph",
+        "title": " Open Serie Interactive Git Commit Graph",
+        "desc": "Launches Serie interactive terminal git commit graph visualizer for browsing branch topology and history.",
+        "shortcut": "serie",
+        "target": "serie",
+        "category": "Git & Diagnostics",
+    },
+    {
+        "id": "equalize-splits",
+        "title": "󰖲 Equalize & Re-balance Workspace Panes",
+        "desc": "Re-balances all split panes in the current window while preserving fixed sidebar geometry.",
+        "shortcut": "Alt+=",
+        "target": f"{SQUAD_BIN} --equalize-splits",
+        "category": "Window Management",
+    },
+    {
+        "id": "verify-harness",
+        "title": "✓ Run 6-Gate SOTA Harness Verification Suite",
+        "desc": "Executes out-of-process Oracle Plan Review and 6-gate harness validation pipeline across all agents.",
+        "shortcut": "verify-harness.sh",
+        "target": f"bash {VERIFY_HARNESS_SCRIPT}",
+        "category": "Quality & Verification",
+    },
+    {
+        "id": "housekeeping",
+        "title": "󰃢 Run Inter-Session Housekeeping & WAL Sweeper",
+        "desc": "Cleans temporary WAL caches, stale lock files, expired checkpoints, and optimizes SQLite databases.",
+        "shortcut": "housekeeping.py",
+        "target": f"python3 {os.path.expanduser('~/.gemini/antigravity/scripts/housekeeping.py')}",
+        "category": "Maintenance",
+    },
+    {
+        "id": "sync-repo",
+        "title": "󰊢 Export Live TUI Configs to CachyOS Staging Repo",
+        "desc": "Exports live TUI configurations, tmux styles, and shell integrations to the CachyOS staging repository.",
+        "shortcut": "export-harness.sh",
+        "target": f"bash {EXPORT_HARNESS_SCRIPT}",
+        "category": "Maintenance",
+    },
+]
+
+
+def preview_command(cmd_id: str) -> None:
+    clean_id = cmd_id.strip().split()[0] if cmd_id.strip() else ""
+    item = next((it for it in COMMAND_PALETTE_ITEMS if it["id"] == clean_id), None)
+    if not item:
+        print(f"Unknown command: {cmd_id}")
+        return
+
+    print(f"{C_BOLD}{C_PURPLE}=== ANTIGRAVITY COMMAND PALETTE ==={C_RESET}")
+    print(f"{C_BOLD}Command:{C_RESET}     {C_BOLD}{C_CYAN}{item['id']}{C_RESET}")
+    print(f"{C_BOLD}Action:{C_RESET}      {C_WHITE}{item['title']}{C_RESET}")
+    print(f"{C_BOLD}Category:{C_RESET}    {C_YELLOW}{item['category']}{C_RESET}")
+    print(f"{C_BOLD}Shortcut:{C_RESET}    {C_GREEN}{item['shortcut']}{C_RESET}")
+    print(f"{C_BOLD}Execution:{C_RESET}   {C_COMMENT}{item['target']}{C_RESET}")
+    print()
+    print(f"{C_BOLD}Description:{C_RESET}")
+    print(f"  {item['desc']}")
+    print()
+    if item["id"] == "attention-jump":
+        locked = get_locked_conversation_ids()
+        print(f"{C_BOLD}Attention Telemetry:{C_RESET} {len(locked)} locked/active session(s)")
+    elif item["id"] == "scoped-diff":
+        renderer = get_diff_renderer()
+        print(f"{C_BOLD}Active Diff Renderer:{C_RESET} {C_GREEN}{renderer.upper()}{C_RESET}")
+
+
+def execute_palette_command(cmd_id: str) -> None:
+    clean_id = cmd_id.strip().split()[0] if cmd_id.strip() else ""
+    if clean_id == "sidebar-toggle":
+        toggle_sidebar()
+    elif clean_id in ("sidebar-rail", "rail-sidebar"):
+        toggle_rail_sidebar()
+    elif clean_id == "attention-jump":
+        jump_attention()
+    elif clean_id == "session-tree":
+        tree_popup()
+    elif clean_id == "scoped-diff":
+        diff_popup()
+    elif clean_id == "commit-graph":
+        repo_root = get_git_repo_root()
+        if shutil.which("serie"):
+            subprocess.run(["serie"], cwd=repo_root, check=False)
+        else:
+            subprocess.run(["git", "-C", repo_root, "log", "--graph", "--oneline", "--all"], check=False)
+    elif clean_id == "equalize-splits":
+        equalize_splits()
+    elif clean_id == "verify-harness":
+        subprocess.run(["bash", VERIFY_HARNESS_SCRIPT], check=False)
+    elif clean_id == "housekeeping":
+        subprocess.run(["python3", os.path.expanduser("~/.gemini/antigravity/scripts/housekeeping.py")], check=False)
+    elif clean_id == "sync-repo":
+        subprocess.run(["bash", EXPORT_HARNESS_SCRIPT], check=False)
+
+
+def command_palette(dump_only: bool = False) -> None:
+    lines = [f"{it['id']:<17} │ {it['title']}" for it in COMMAND_PALETTE_ITEMS]
+    if dump_only:
+        for l in lines:
+            print(l)
+        return
+
+    if not shutil.which("fzf"):
+        sys.stderr.write("fzf is required for --command-palette\n")
+        return
+
+    squad_bin = SQUAD_BIN
+    input_text = "\n".join(lines) + "\n"
+
+    fzf_cmd = [
+        "fzf",
+        "--ansi",
+        "--header=Antigravity Command Palette (Enter: Execute · Alt+p/Esc: Close)",
+        "--bind=alt-p:abort,alt-d:abort,alt-t:abort,alt-o:abort,alt-g:abort,alt-y:abort,ctrl-q:abort,esc:abort",
+        f"--preview={squad_bin} --preview-command '{{1}}'",
+        "--preview-window=right:55%:wrap",
+    ]
+
+    res = subprocess.run(fzf_cmd, input=input_text, text=True, capture_output=True)
+    if res.returncode == 0 and res.stdout.strip():
+        sel_line = res.stdout.strip()
+        execute_palette_command(sel_line)
+
+
+def tree_popup(focus_cid: str = "", dump_only: bool = False) -> None:
+    if not os.path.isfile(DB_PATH):
+        sys.stderr.write(f"Database not found: {DB_PATH}\n")
+        return
+
+    if not dump_only and not shutil.which("fzf"):
+        sys.stderr.write("fzf is required for --tree-popup\n")
+        return
+
+    if dump_only:
+        lines = build_tree_lines(focus_cid=focus_cid)
+        print("\n".join(lines))
+        return
+
+    squad_bin = SQUAD_BIN
+    active_focus = focus_cid
+
+    while True:
+        tree_lines = build_tree_lines(focus_cid=active_focus)
+        if not tree_lines:
+            print("No sessions found in database.")
+            break
+        input_text = "\n".join(tree_lines) + "\n"
+
+        fzf_cmd = [
+            "fzf",
+            "--ansi",
+            "--header=Antigravity Session & Subagent Tree (Alt+t/Esc: Close, Enter: View, Ctrl-r: Refresh, Ctrl-d: Diff, Ctrl-l: Log, Ctrl-p: Plan)",
+            "--bind=alt-p:abort,alt-t:abort,alt-o:abort,alt-d:abort,alt-g:abort,alt-y:abort,ctrl-q:abort,esc:abort",
+            f"--bind=ctrl-r:reload({squad_bin} --dump-tree)",
+            f"--bind=ctrl-d:execute({squad_bin} --diff-popup)",
+            f"--bind=ctrl-l:execute({squad_bin} --tail-transcript '{{-1}}')",
+            f"--bind=ctrl-p:execute({squad_bin} --view-plan '{{-1}}')",
+            f"--preview={squad_bin} --preview-conversation '{{-1}}'",
+            "--preview-window=right:60%:wrap",
+        ]
+        if active_focus:
+            fzf_cmd.append(f"--query={active_focus}")
+
+        res = subprocess.run(fzf_cmd, input=input_text, text=True, capture_output=True)
+        active_focus = ""
+
+        if res.returncode != 0 or not res.stdout.strip():
+            break
+
+        selected_line = res.stdout.strip()
+        m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", selected_line)
+        if m:
+            cid = m.group(1)
+            view_session_interactive(cid)
+        else:
+            break
+
+
+def main() -> None:
+    target_session = None
+    if "--session" in sys.argv:
+        try:
+            s_idx = sys.argv.index("--session")
+            if s_idx + 1 < len(sys.argv):
+                target_session = sys.argv[s_idx + 1]
+        except Exception:
+            pass
+    elif "--target" in sys.argv:
+        try:
+            s_idx = sys.argv.index("--target")
+            if s_idx + 1 < len(sys.argv):
+                target_session = sys.argv[s_idx + 1]
+        except Exception:
+            pass
+    bounce = "--bounce" in sys.argv
+
+    if "--toggle-sidebar" in sys.argv:
+        toggle_sidebar(session=target_session)
+    elif "--ensure-sidebar" in sys.argv:
+        toggle_sidebar(ensure_only=True, session=target_session)
+    elif "--tree-popup" in sys.argv:
+        focus_cid = ""
+        if "--focus" in sys.argv:
+            try:
+                idx = sys.argv.index("--focus")
+                if idx + 1 < len(sys.argv):
+                    focus_cid = sys.argv[idx + 1]
+            except Exception:
+                pass
+        tree_popup(focus_cid=focus_cid)
+    elif "--dump-tree" in sys.argv:
+        tree_popup(dump_only=True)
+    elif "--inspect-session" in sys.argv:
+        args = [a for a in sys.argv[2:] if not a.startswith("-")]
+        if not args and len(sys.argv) > 2:
+            args = [sys.argv[-1]]
+        if args:
+            view_session_interactive(args[0])
+        else:
+            print("Usage: agy-squad --inspect-session <conversation_id>")
+    elif "--diff-popup" in sys.argv:
+        dump = "--dump" in sys.argv
+        scope = "unstaged"
+        if "--scope" in sys.argv:
+            try:
+                idx = sys.argv.index("--scope")
+                if idx + 1 < len(sys.argv):
+                    scope = sys.argv[idx + 1]
+            except Exception:
+                pass
+        diff_popup(scope=scope, dump_only=dump)
+    elif "--diff-list" in sys.argv:
+        scope = "unstaged"
+        args = [a for a in sys.argv[2:] if not a.startswith("-")]
+        if args:
+            scope = args[0]
+        diff_list(scope)
+    elif "--diff-cycle" in sys.argv:
+        diff_cycle()
+    elif "--diff-toggle-renderer" in sys.argv:
+        toggle_diff_renderer()
+    elif "--diff-stage" in sys.argv:
+        idx = sys.argv.index("--diff-stage")
+        tgt_file = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else ""
+        if tgt_file:
+            stage_toggle_file(tgt_file)
+    elif "--preview-diff" in sys.argv:
+        args = [a for a in sys.argv[2:] if not a.startswith("--")]
+        target_file = args[0] if len(args) > 0 else ""
+        scope = args[1] if len(args) > 1 else ""
+        preview_diff(target_file, scope)
+    elif "--command-palette" in sys.argv:
+        dump = "--dump" in sys.argv
+        command_palette(dump_only=dump)
+    elif "--preview-command" in sys.argv:
+        args = [a for a in sys.argv[2:] if not a.startswith("--")]
+        target_cmd = args[0] if len(args) > 0 else ""
+        preview_command(target_cmd)
+    elif "--jump-attention" in sys.argv:
+        dump = "--dump" in sys.argv
+        jump_attention(dump_only=dump)
+    elif "--equalize-splits" in sys.argv:
+        equalize_splits(session=target_session, bounce=bounce)
+    elif "--rail-sidebar" in sys.argv or "--sidebar-rail" in sys.argv or "--toggle-rail" in sys.argv:
+        toggle_rail_sidebar()
+    elif "--view-plan" in sys.argv:
+        args = sys.argv[2:] if len(sys.argv) > 2 else []
+        view_plan(" ".join(args))
+    elif "--tail-transcript" in sys.argv:
+        args = sys.argv[2:] if len(sys.argv) > 2 else []
+        tail_transcript(" ".join(args))
+    elif "--preview-conversation" in sys.argv or "--preview-item" in sys.argv:
+        args = sys.argv[2:] if len(sys.argv) > 2 else []
+        arg_str = " ".join(args)
+        preview_conversation(arg_str)
+    elif "--run-popup" in sys.argv:
+        idx = sys.argv.index("--run-popup")
+        if idx + 2 < len(sys.argv):
+            k = sys.argv[idx + 1]
+            cmd = sys.argv[idx + 2:]
+            run_popup(k, cmd)
+    elif "--toggle-popup" in sys.argv:
+        idx = sys.argv.index("--toggle-popup")
+        if idx + 3 < len(sys.argv):
+            k = sys.argv[idx + 1]
+            cwd = sys.argv[idx + 2]
+            cmd = sys.argv[idx + 3:]
+            toggle_popup(k, cwd, cmd)
+    else:
+        print("Usage: agy-squad [--toggle-sidebar | --ensure-sidebar | --sidebar-rail | --tree-popup | --dump-tree | --inspect-session <cid> | --diff-popup | --diff-list | --diff-cycle | --diff-toggle-renderer | --diff-stage <file> | --preview-diff | --command-palette | --preview-command <id> | --jump-attention | --equalize-splits | --run-popup | --toggle-popup]")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

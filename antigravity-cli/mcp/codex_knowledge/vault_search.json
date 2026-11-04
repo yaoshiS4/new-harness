@@ -1,0 +1,1 @@
+{"name":"vault_search","description":"","parameters":{"properties":{"limit":{"default":20,"title":"Limit","type":"integer"},"query":{"title":"Query","type":"string"},"slug":{"title":"Slug","type":"string"}},"required":["slug","query"],"title":"vault_searchArguments","type":"object"}}

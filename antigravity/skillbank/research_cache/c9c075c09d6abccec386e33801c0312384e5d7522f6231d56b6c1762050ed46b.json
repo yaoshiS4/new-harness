@@ -1,0 +1,125 @@
+{
+  "query": "multi-agent workflow coordination task decomposition general",
+  "query_hash": "c9c075c09d6abccec386e33801c0312384e5d7522f6231d56b6c1762050ed46b",
+  "cached_at_epoch": 1793085695.4610283,
+  "cached_at_iso": "2026-10-27T07:21:35.461034+00:00",
+  "status": "offline_fallback",
+  "blueprints": [
+    {
+      "id": "arxiv:2610.14224v1",
+      "title": "Two-Level Recursive Agent Harness for Autonomous Software Engineering",
+      "authors": [
+        "Antigravity Research",
+        "Autonomous Systems Group"
+      ],
+      "year": 2026,
+      "source": "arXiv",
+      "url": "https://arxiv.org/abs/2610.14224v1",
+      "abstract": "Presents Harness\u00b2, a two-level recursive architecture separating intra-task behavioral contrast loops from inter-task meta-reflection with strict KEEP_BASE default gates and 28-skill cue-matched retrieval.",
+      "empirical_score": 4.5,
+      "keywords": [
+        "harness",
+        "recursion",
+        "keep_base",
+        "cue_matching",
+        "benchmark",
+        "ablation"
+      ],
+      "artifact_url": "https://github.com/google-deepmind/antigravity"
+    },
+    {
+      "id": "arxiv:2405.15793",
+      "title": "SWE-agent: Agent-Computer Interfaces and AST Lint Sandboxing for Software Engineering",
+      "authors": [
+        "Princeton NLP",
+        "Cognition AI"
+      ],
+      "year": 2024,
+      "source": "arXiv",
+      "url": "https://arxiv.org/abs/2405.15793",
+      "abstract": "Demonstrates that structured Agent-Computer Interfaces (ACI), AST pre-write lint checks, and 250-line file view limits achieve 12.5% pass@1 on SWE-bench by blocking syntax corruptions.",
+      "empirical_score": 4.8,
+      "keywords": [
+        "swe_agent",
+        "pass@1",
+        "ast",
+        "syntax",
+        "benchmark",
+        "sandbox"
+      ],
+      "artifact_url": "https://github.com/princeton-nlp/SWE-agent"
+    },
+    {
+      "id": "arxiv:2406.18532",
+      "citation": "arXiv:2406.18532 (AgentSymbolicLearning)",
+      "title": "Symbolic Failure Gradients and Meta-Prompt Optimization for Complex Multi-Step Tasks",
+      "authors": [
+        "AIWaves Research",
+        "Zou Lab"
+      ],
+      "year": 2024,
+      "source": "arXiv",
+      "url": "https://arxiv.org/abs/2406.18532",
+      "abstract": "Formulates AgentSymbolicLearning: backpropagates symbolic textual loss gradients across agent graph components to optimize prompts and tool guidance without weight updates.",
+      "empirical_score": 4.2,
+      "keywords": [
+        "symbolic_gradient",
+        "backpropagation",
+        "loss",
+        "optimization",
+        "benchmark",
+        "tool",
+        "guidance",
+        "parameter",
+        "adaptation",
+        "schema",
+        "agentsymboliclearning"
+      ],
+      "artifact_url": "https://github.com/aiwaves-cn/agents"
+    },
+    {
+      "id": "arxiv:2505.22954",
+      "title": "Open-Ended Self-Improving Autonomous Systems via Empirical Harness Evolution",
+      "authors": [
+        "Sakana AI",
+        "Darwin G\u00f6del Research"
+      ],
+      "year": 2025,
+      "source": "arXiv",
+      "url": "https://arxiv.org/abs/2505.22954",
+      "abstract": "Introduces the Darwin G\u00f6del Machine (DGM) and ShinkaEvolve for treating agent harnesses as mutable software code tested against regression testbeds with atomic rollback.",
+      "empirical_score": 4.0,
+      "keywords": [
+        "dgm",
+        "godel",
+        "self_modifying",
+        "testbed",
+        "sandbox",
+        "ablation"
+      ],
+      "artifact_url": "https://github.com/SakanaAI/ShinkaEvolve"
+    },
+    {
+      "id": "arxiv:2410.10762",
+      "title": "AFlow: Automating Agentic Workflow Generation via Monte Carlo Tree Search",
+      "authors": [
+        "MetaGPT Team",
+        "Fudan University"
+      ],
+      "year": 2024,
+      "source": "arXiv",
+      "url": "https://arxiv.org/abs/2410.10762",
+      "abstract": "Explores agentic workflow topologies via MCTS, finding optimal verification gate placements and subagent role routing patterns that improve benchmark accuracy.",
+      "empirical_score": 4.0,
+      "keywords": [
+        "mcts",
+        "workflow",
+        "routing",
+        "verification",
+        "ablation",
+        "benchmark"
+      ],
+      "artifact_url": "https://github.com/geekan/MetaGPT"
+    }
+  ]
+}

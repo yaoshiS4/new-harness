@@ -1,0 +1,1 @@
+{"name":"project_register","description":"","parameters":{"properties":{"project_path":{"title":"Project Path","type":"string"},"slug":{"anyOf":[{"type":"string"},{"type":"null"}],"default":null,"title":"Slug"}},"required":["project_path"],"title":"project_registerArguments","type":"object"}}

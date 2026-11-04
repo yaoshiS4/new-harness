@@ -1,0 +1,106 @@
+[theme]
+name = "catppuccin"
+
+[terminal]
+default_shell = "/usr/bin/zsh"
+shell_mode = "auto"
+new_cwd = "follow"
+kitty_graphics = true
+
+[session]
+resume_agents_on_restore = true
+startup_per_agent_delay_ms = 100
+
+[ui]
+sidebar_width = 34
+sidebar_min_width = 26
+sidebar_max_width = 42
+sidebar_start_collapsed = false
+status_indicators = "dots"
+tab_bar_position = "top"
+
+[[ui.tab_bar_right]]
+type = "command"
+command = "/home/heocop/.local/bin/agy-statusline --tab-bar"
+interval_seconds = 3
+timeout_seconds = 2
+
+[ui.toast]
+delivery = "herdr"
+delay_seconds = 1
+
+[ui.toast.herdr]
+position = "bottom-right"
+
+[keys]
+prefix = "ctrl+b"
+focus_pane_left = ["prefix+h", "alt+left"]
+focus_pane_right = ["prefix+l", "alt+right"]
+switch_tab = ["prefix+1..9", "alt+1..9"]
+
+[[keys.command]]
+key = "alt+p"
+type = "popup"
+command = "/home/heocop/.local/bin/agy-squad --run-popup p /home/heocop/.local/bin/agy-squad --command-palette"
+width = "82%"
+height = "80%"
+
+[[keys.command]]
+key = "alt+b"
+type = "shell"
+command = "/home/heocop/.local/bin/agy-squad --toggle-sidebar"
+
+[[keys.command]]
+key = "alt+s"
+type = "shell"
+command = "/home/heocop/.local/bin/agy-squad --toggle-sidebar"
+
+[[keys.command]]
+key = "alt+S"
+type = "shell"
+command = "/home/heocop/.local/bin/agy-squad --sidebar-rail"
+
+[[keys.command]]
+key = "alt+g"
+type = "popup"
+command = "/home/heocop/.local/bin/agy-squad --run-popup g lazygit"
+width = "88%"
+height = "88%"
+
+[[keys.command]]
+key = "alt+y"
+type = "popup"
+command = "/home/heocop/.local/bin/agy-squad --run-popup y yazi"
+width = "88%"
+height = "88%"
+
+[[keys.command]]
+key = "alt+t"
+type = "popup"
+command = "/home/heocop/.local/bin/agy-squad --run-popup t /home/heocop/.local/bin/agy-squad --tree-popup"
+width = "88%"
+height = "85%"
+
+[[keys.command]]
+key = "alt+d"
+type = "popup"
+command = "/home/heocop/.local/bin/agy-squad --run-popup d /home/heocop/.local/bin/agy-squad --diff-popup"
+width = "88%"
+height = "88%"
+
+[[keys.command]]
+key = "alt+o"
+type = "popup"
+command = "/home/heocop/.local/bin/agy-squad --run-popup o /home/heocop/.local/bin/agy-squad --jump-attention"
+width = "88%"
+height = "85%"
+
+[[keys.command]]
+key = "alt+="
+type = "shell"
+command = "/home/heocop/.local/bin/agy-squad --equalize-splits"
+
+[[keys.command]]
+key = "alt+equal"
+type = "shell"
+command = "/home/heocop/.local/bin/agy-squad --equalize-splits"

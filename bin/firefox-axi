@@ -1,0 +1,1750 @@
+#!/usr/bin/env python3
+"""
+firefox-axi - Native Firefox Marionette CLI controller.
+Follows the 10 AXI Principles (TOON output, 3-4 fields, aggregates, disclosure).
+Zero third-party dependencies (Python 3 stdlib only, Marionette wire protocol v3).
+"""
+
+import base64
+import json
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+VERSION = "0.1.0"
+LIVE_PORT = 2828
+MANAGED_PORT = 2829
+HOST = "127.0.0.1"
+
+CACHE_DIR = Path(os.path.expanduser("~/.cache/firefox-axi"))
+MANAGED_PROFILE = CACHE_DIR / "profile"
+PID_FILE = CACHE_DIR / "firefox.pid"
+STATE_FILE = CACHE_DIR / "state.json"
+LIVE_PROFILE = Path(os.path.expanduser("~/.mozilla/firefox/iy0d7yye.default-release"))
+FIREFOX_BIN = "/usr/lib/firefox/firefox" if os.path.exists("/usr/lib/firefox/firefox") else "firefox"
+
+GLOBAL_FLAGS = {"--help", "-h", "--version", "-v", "-V", "--full", "--fields"}
+
+SUBCOMMAND_SPECS = {
+    "status": {
+        "summary": "Show live (2828) and managed (2829) Firefox Marionette connection status",
+        "flags": [
+            ("--full", "false", "show untruncated URLs and titles"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi status",
+            "firefox-axi",
+        ],
+    },
+    "open": {
+        "summary": "Navigate active Firefox tab to URL (auto-starts managed Firefox if needed)",
+        "flags": [
+            ("--full", "false", "show untruncated page metadata"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi open https://example.com",
+            "firefox-axi navigate https://news.ycombinator.com",
+        ],
+    },
+    "navigate": {
+        "summary": "Alias for 'open <url>' — navigate active Firefox tab to URL",
+        "flags": [
+            ("--full", "false", "show untruncated page metadata"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi navigate https://example.com",
+            "firefox-axi open https://example.com",
+        ],
+    },
+    "snapshot": {
+        "summary": "Tag visible interactive/semantic DOM elements with @eN UIDs and emit TOON snapshot",
+        "flags": [
+            ("--full", "false", "lift 30-element cap and label truncation"),
+            ("--fields", "none", "comma-separated field subset (uid,tag,role,label)"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi snapshot",
+            "firefox-axi snapshot --full",
+        ],
+    },
+    "click": {
+        "summary": "Click element by @eN snapshot UID or CSS selector",
+        "flags": [
+            ("--full", "false", "show untruncated title and URL"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi click @e1",
+            "firefox-axi click \"a[href]\"",
+        ],
+    },
+    "fill": {
+        "summary": "Focus input/textarea by @eN UID or CSS selector, set value, and dispatch input/change events",
+        "flags": [
+            ("--full", "false", "show untruncated value and URL"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi fill @e2 \"search query\"",
+            "firefox-axi fill \"input[name=q]\" \"antigravity\"",
+        ],
+    },
+    "press": {
+        "summary": "Dispatch keydown/keypress/keyup events on active element",
+        "flags": [
+            ("--full", "false", "show untruncated URL"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi press Enter",
+            "firefox-axi press Escape",
+        ],
+    },
+    "eval": {
+        "summary": "Execute JavaScript in page content context and return result in TOON",
+        "flags": [
+            ("--full", "false", "lift 500-char value truncation"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi eval \"document.title\"",
+            "firefox-axi eval \"document.querySelectorAll('a').length\"",
+        ],
+    },
+    "chrome-eval": {
+        "summary": "Execute privileged JavaScript in Firefox chrome (system) context",
+        "flags": [
+            ("--full", "false", "lift 500-char value truncation"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi chrome-eval \"Services.appinfo.version\"",
+            "firefox-axi chrome-eval \"gBrowser.tabs.length\"",
+        ],
+    },
+    "tabs": {
+        "summary": "List all open Firefox tabs with index, handle, active state, and title",
+        "flags": [
+            ("--full", "false", "show all tabs and untruncated titles"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi tabs",
+            "firefox-axi tabs --full",
+        ],
+    },
+    "newtab": {
+        "summary": "Open a new Firefox tab and optionally navigate to URL",
+        "flags": [
+            ("--full", "false", "show untruncated URL"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi newtab https://example.com",
+            "firefox-axi newtab",
+        ],
+    },
+    "selecttab": {
+        "summary": "Switch active Firefox tab by numeric index (0..N-1) or window handle",
+        "flags": [
+            ("--full", "false", "show untruncated title"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi selecttab 0",
+            "firefox-axi selecttab 1",
+        ],
+    },
+    "closetab": {
+        "summary": "Close Firefox tab by numeric index, handle, or active tab if omitted",
+        "flags": [
+            ("--full", "false", "show untruncated handle"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi closetab",
+            "firefox-axi closetab 1",
+        ],
+    },
+    "screenshot": {
+        "summary": "Capture PNG screenshot via WebDriver:TakeScreenshot",
+        "flags": [
+            ("--full", "false", "capture full document scroll height if supported"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi screenshot /tmp/ff-test.png",
+            "firefox-axi screenshot",
+        ],
+    },
+    "start": {
+        "summary": "Start managed Firefox on port 2829 (or live profile on 2828 with --live)",
+        "flags": [
+            ("--headed", "false", "run managed Firefox with visible window instead of headless"),
+            ("--live", "false", "launch/restart default Firefox profile with --marionette on 2828"),
+            ("--full", "false", "show full profile details"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi start",
+            "firefox-axi start --headed",
+        ],
+    },
+    "stop": {
+        "summary": "Stop managed Firefox instance on port 2829",
+        "flags": [
+            ("--full", "false", "show full shutdown details"),
+            ("--fields", "none", "comma-separated field subset"),
+            ("--help", "false", "show this help"),
+        ],
+        "examples": [
+            "firefox-axi stop",
+            "firefox-axi status",
+        ],
+    },
+}
+
+
+def toon_value(val):
+    if val is None:
+        return ""
+    s = str(val).replace("\r", " ").replace("\n", " ").strip()
+    if any(c in s for c in (",", '"', "\n")):
+        return '"' + s.replace('"', '""') + '"'
+    return s
+
+
+def filter_fields(default_fields, custom_fields):
+    if not custom_fields:
+        return default_fields
+    valid = [f.strip() for f in custom_fields.split(",") if f.strip() in default_fields]
+    return valid if valid else default_fields
+
+
+def emit_list(name, rows, fields, total=None, custom_fields=None):
+    use_fields = filter_fields(fields, custom_fields)
+    count_str = (
+        f"{len(rows)} of {total} total"
+        if total is not None and total != len(rows)
+        else str(len(rows))
+    )
+    header = f"{name}[{count_str}]{{{','.join(use_fields)}}}:"
+    lines = [header]
+    for r in rows:
+        lines.append("  " + ",".join(toon_value(r.get(f, "")) for f in use_fields))
+    return "\n".join(lines)
+
+
+def emit_block(name, lines):
+    return f"{name}[{len(lines)}]:\n" + "\n".join("  " + l for l in lines)
+
+
+def truncate_str(s, limit=500, full=False):
+    if full or s is None:
+        return str(s or "")
+    s = str(s)
+    if len(s) <= limit:
+        return s
+    return s[:limit] + f"... ({len(s)} chars total, pass --full)"
+
+
+def fail_error(msg, fix_msg, help_cmds=None, code=1):
+    lines = [
+        f"error: {msg}",
+        f"fix: {fix_msg}",
+        f"suggestion: {fix_msg}",
+    ]
+    if help_cmds:
+        lines.append(emit_block("help", help_cmds))
+    print("\n".join(lines))
+    sys.exit(code)
+
+
+def parse_subcommand_args(cmd_name, raw_args):
+    spec = SUBCOMMAND_SPECS[cmd_name]
+    allowed_flags = {f[0] for f in spec["flags"]} | {"-h"}
+    flags = set()
+    custom_fields = None
+    positionals = []
+
+    i = 0
+    while i < len(raw_args):
+        arg = raw_args[i]
+        if arg in ("--help", "-h"):
+            print_subcommand_help(cmd_name)
+            sys.exit(0)
+        elif arg.startswith("--fields="):
+            custom_fields = arg.split("=", 1)[1]
+            flags.add("--fields")
+        elif arg == "--fields":
+            if i + 1 >= len(raw_args):
+                fail_error(
+                    f"missing value for --fields in '{cmd_name}'",
+                    f"pass comma-separated field names, e.g. firefox-axi {cmd_name} --fields {','.join(['uid','tag'])}",
+                    [f"firefox-axi {cmd_name} --help"],
+                    code=2,
+                )
+            custom_fields = raw_args[i + 1]
+            flags.add("--fields")
+            i += 1
+        elif arg.startswith("-"):
+            if arg not in allowed_flags:
+                valid_list = ", ".join(sorted(f[0] for f in spec["flags"]))
+                fail_error(
+                    f"unknown flag {arg} for '{cmd_name}'",
+                    f"valid flags for '{cmd_name}': {valid_list}",
+                    [f"firefox-axi {cmd_name} --help"],
+                    code=2,
+                )
+            flags.add(arg)
+        else:
+            positionals.append(arg)
+        i += 1
+
+    return flags, custom_fields, positionals
+
+
+def print_subcommand_help(cmd_name):
+    spec = SUBCOMMAND_SPECS[cmd_name]
+    flag_rows = [
+        {"flag": f[0], "default": f[1], "description": f[2]}
+        for f in spec["flags"]
+    ]
+    lines = [
+        f"command: firefox-axi {cmd_name}",
+        f"summary: {spec['summary']}",
+        emit_list("flags", flag_rows, ["flag", "default", "description"]),
+        emit_block("examples", spec["examples"]),
+        emit_block("help", spec["examples"][:2]),
+    ]
+    print("\n".join(lines))
+
+
+def print_top_help():
+    cmd_rows = [
+        {"command": k, "summary": v["summary"]}
+        for k, v in SUBCOMMAND_SPECS.items()
+        if k != "navigate"
+    ]
+    flag_rows = [
+        {"flag": "--help, -h", "default": "false", "description": "show help reference"},
+        {"flag": "--version, -v", "default": "false", "description": "show version"},
+        {"flag": "--full", "default": "false", "description": "lift row and text truncation caps"},
+        {"flag": "--fields", "default": "none", "description": "select comma-separated TOON fields"},
+    ]
+    examples = [
+        "firefox-axi",
+        "firefox-axi open https://example.com",
+        "firefox-axi snapshot",
+        "firefox-axi click @e1",
+        "firefox-axi eval \"document.title\"",
+        "firefox-axi chrome-eval \"Services.appinfo.version\"",
+        "firefox-axi screenshot /tmp/ff-test.png",
+    ]
+    lines = [
+        "bin: ~/.local/bin/firefox-axi",
+        "description: Native Firefox Marionette CLI controller (Python 3 stdlib, wire protocol v3)",
+        "usage: firefox-axi [command] [args] [flags]",
+        emit_list("commands", cmd_rows, ["command", "summary"]),
+        emit_list("flags", flag_rows, ["flag", "default", "description"]),
+        emit_block("examples", examples),
+        emit_block("help", [
+            "firefox-axi status",
+            "firefox-axi open https://example.com",
+            "firefox-axi snapshot",
+        ]),
+    ]
+    print("\n".join(lines))
+
+
+def is_port_open(port, timeout=0.15):
+    try:
+        with socket.create_connection((HOST, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def load_state():
+    if STATE_FILE.exists():
+        try:
+            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def save_state(data):
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        STATE_FILE.write_text(json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+
+
+class MarionetteError(Exception):
+    def __init__(self, err_type, message):
+        super().__init__(f"{err_type}: {message}")
+        self.err_type = err_type
+        self.message = message
+
+
+class MarionetteClient:
+    def __init__(self, port, timeout=12.0):
+        self.port = port
+        self.timeout = timeout
+        self.sock = None
+        self.msg_id = 0
+        self.session_id = None
+
+    def connect(self):
+        self.sock = socket.create_connection((HOST, self.port), timeout=2.0)
+        self.sock.settimeout(self.timeout)
+        greeting = self._recv_packet()
+        if not isinstance(greeting, dict) or greeting.get("marionetteProtocol") != 3:
+            raise MarionetteError("protocol_error", f"unexpected greeting: {greeting}")
+        res = self.call("WebDriver:NewSession", {})
+        if isinstance(res, dict):
+            self.session_id = res.get("sessionId")
+        return self
+
+    def _recv_packet(self):
+        buf = b""
+        while b":" not in buf:
+            chunk = self.sock.recv(64)
+            if not chunk:
+                raise MarionetteError("connection_closed", "unexpected EOF reading packet length")
+            buf += chunk
+        len_str, rest = buf.split(b":", 1)
+        length = int(len_str.decode("ascii"))
+        chunks = [rest]
+        received = len(rest)
+        while received < length:
+            chunk = self.sock.recv(min(65536, length - received))
+            if not chunk:
+                raise MarionetteError("connection_closed", "unexpected EOF reading packet body")
+            chunks.append(chunk)
+            received += len(chunk)
+        body = b"".join(chunks)[:length]
+        return json.loads(body.decode("utf-8"))
+
+    def call(self, command, params=None):
+        self.msg_id += 1
+        mid = self.msg_id
+        payload = json.dumps([0, mid, command, params or {}]).encode("utf-8")
+        frame = f"{len(payload)}:".encode("ascii") + payload
+        self.sock.sendall(frame)
+        resp = self._recv_packet()
+        if not isinstance(resp, list) or len(resp) < 4:
+            raise MarionetteError("protocol_error", f"invalid response frame: {resp}")
+        _, r_id, err, result = resp
+        if err is not None:
+            if isinstance(err, dict):
+                raise MarionetteError(err.get("error", "marionette_error"), err.get("message", str(err)))
+            raise MarionetteError("marionette_error", str(err))
+        if isinstance(result, dict) and list(result.keys()) == ["value"]:
+            return result["value"]
+        return result
+
+    def set_context(self, ctx):
+        return self.call("Marionette:SetContext", {"value": ctx})
+
+    def ensure_active_tab(self):
+        st = load_state()
+        saved_handle = st.get(f"active_handle_{self.port}")
+        saved_idx = st.get(f"active_index_{self.port}")
+        try:
+            handles = self.call("WebDriver:GetWindowHandles") or []
+            if saved_handle and saved_handle in handles:
+                self.call("WebDriver:SwitchToWindow", {"handle": saved_handle, "focus": True})
+            elif isinstance(saved_idx, int) and 0 <= saved_idx < len(handles):
+                self.call("WebDriver:SwitchToWindow", {"handle": handles[saved_idx], "focus": True})
+            elif handles:
+                curr = self.call("WebDriver:GetWindowHandle")
+                if curr not in handles:
+                    self.call("WebDriver:SwitchToWindow", {"handle": handles[-1], "focus": True})
+        except Exception:
+            pass
+
+    def remember_active_tab(self, handle=None):
+        try:
+            handles = self.call("WebDriver:GetWindowHandles") or []
+            if not handle:
+                handle = self.call("WebDriver:GetWindowHandle")
+            if handle:
+                st = load_state()
+                st[f"active_handle_{self.port}"] = handle
+                if handle in handles:
+                    st[f"active_index_{self.port}"] = handles.index(handle)
+                save_state(st)
+        except Exception:
+            pass
+
+    def close(self):
+        if self.sock:
+            try:
+                if self.session_id:
+                    self.call("WebDriver:DeleteSession", {})
+            except Exception:
+                pass
+            try:
+                self.sock.close()
+            except Exception:
+                pass
+            self.sock = None
+
+    def __enter__(self):
+        return self.connect()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+def ensure_managed_profile():
+    MANAGED_PROFILE.mkdir(parents=True, exist_ok=True)
+    user_js = MANAGED_PROFILE / "user.js"
+    prefs = [
+        f'user_pref("marionette.port", {MANAGED_PORT});',
+        'user_pref("remote.system-access-check.enabled", false);',
+        'user_pref("browser.shell.checkDefaultBrowser", false);',
+        'user_pref("browser.startup.homepage_override.mstone", "ignore");',
+        'user_pref("browser.startup.page", 0);',
+        'user_pref("browser.startup.homepage", "about:blank");',
+        'user_pref("datareporting.policy.dataSubmissionEnabled", false);',
+        'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);',
+        'user_pref("browser.tabs.warnOnClose", false);',
+    ]
+    user_js.write_text("\n".join(prefs) + "\n", encoding="utf-8")
+
+
+def start_managed_firefox(headed=False):
+    if is_port_open(MANAGED_PORT):
+        return read_managed_pid() or 0
+
+    ensure_managed_profile()
+    for lock_name in ("lock", ".parentlock"):
+        lp = MANAGED_PROFILE / lock_name
+        if lp.exists() or lp.is_symlink():
+            try:
+                lp.unlink()
+            except Exception:
+                pass
+
+    cmd = [
+        FIREFOX_BIN,
+        "--no-remote",
+        "--new-instance",
+        "--profile",
+        str(MANAGED_PROFILE),
+        "--marionette",
+    ]
+    if not headed:
+        cmd.append("--headless")
+    cmd.append("about:blank")
+
+    env = os.environ.copy()
+    env["MOZ_REMOTE_ALLOW_SYSTEM_ACCESS"] = "1"
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+        env=env,
+    )
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(proc.pid), encoding="utf-8")
+
+    deadline = time.time() + 12.0
+    while time.time() < deadline:
+        if is_port_open(MANAGED_PORT, timeout=0.2):
+            return proc.pid
+        time.sleep(0.1)
+
+    fail_error(
+        f"managed Firefox failed to open Marionette port {MANAGED_PORT} within 12s",
+        "check '/usr/lib/firefox/firefox --version' and ~/.cache/firefox-axi/profile",
+        ["firefox-axi status", "firefox-axi stop"],
+        code=1,
+    )
+
+
+def find_managed_pids():
+    pids = set()
+    if PID_FILE.exists():
+        try:
+            pid = int(PID_FILE.read_text(encoding="utf-8").strip())
+            cmdline_file = Path(f"/proc/{pid}/cmdline")
+            if cmdline_file.exists() and "firefox" in cmdline_file.read_text(errors="ignore"):
+                pids.add(pid)
+        except Exception:
+            pass
+
+    prof_str = str(MANAGED_PROFILE)
+    try:
+        for entry in os.scandir("/proc"):
+            if not entry.name.isdigit():
+                continue
+            pid = int(entry.name)
+            try:
+                cmdline = Path(f"/proc/{pid}/cmdline").read_text(errors="ignore")
+                if "firefox" in cmdline and prof_str in cmdline:
+                    pids.add(pid)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return sorted(pids)
+
+
+def read_managed_pid():
+    pids = find_managed_pids()
+    return pids[0] if pids else None
+
+
+def resolve_active_port(auto_start=True):
+    if is_port_open(LIVE_PORT):
+        return LIVE_PORT, "live"
+    if is_port_open(MANAGED_PORT):
+        return MANAGED_PORT, "managed"
+    if auto_start:
+        start_managed_firefox(headed=False)
+        return MANAGED_PORT, "managed"
+    return None, "stopped"
+
+
+def ensure_content_ready(client):
+    client.set_context("content")
+    client.ensure_active_tab()
+    try:
+        url = client.call("WebDriver:GetCurrentURL") or ""
+        if url.startswith("about:home") or url.startswith("about:newtab") or url.startswith("about:welcome"):
+            client.call("WebDriver:Navigate", {"url": "about:blank"})
+    except Exception:
+        pass
+
+
+def get_page_summary(client):
+    client.set_context("content")
+    try:
+        title = client.call("WebDriver:GetTitle") or ""
+    except Exception:
+        title = ""
+    try:
+        url = client.call("WebDriver:GetCurrentURL") or ""
+    except Exception:
+        url = ""
+    try:
+        handles = client.call("WebDriver:GetWindowHandles") or []
+    except Exception:
+        handles = []
+    return title, url, handles
+
+
+def format_js_result(val, full=False):
+    if val is None:
+        return "null", "null"
+    if isinstance(val, bool):
+        return "boolean", "true" if val else "false"
+    if isinstance(val, (int, float)):
+        return "number", str(val)
+    if isinstance(val, str):
+        return "string", truncate_str(val, 500, full=full)
+    if isinstance(val, list):
+        return f"array[{len(val)}]", truncate_str(json.dumps(val, ensure_ascii=False), 500, full=full)
+    if isinstance(val, dict):
+        return "object", truncate_str(json.dumps(val, ensure_ascii=False), 500, full=full)
+    return type(val).__name__, truncate_str(str(val), 500, full=full)
+
+
+def eval_js_in_current_context(client, js_code):
+    code = js_code.strip()
+
+    def run_raw(script_body):
+        try:
+            return client.call("WebDriver:ExecuteScript", {"script": script_body, "args": []})
+        except MarionetteError as err:
+            if "privileged scope" in err.message:
+                client.call("WebDriver:Navigate", {"url": "about:blank"})
+                return client.call("WebDriver:ExecuteScript", {"script": script_body, "args": []})
+            raise
+
+    candidates = [f"return (\n{code}\n);"]
+    if ";" in code:
+        parts = [p.strip() for p in code.rstrip(";").split(";") if p.strip()]
+        if len(parts) > 1 and not parts[-1].startswith("return "):
+            rewritten = "; ".join(parts[:-1]) + f"; return ({parts[-1]});"
+            candidates.append(rewritten)
+    candidates.append(code)
+
+    last_err = None
+    for idx, cand in enumerate(candidates):
+        try:
+            return run_raw(cand)
+        except MarionetteError as e:
+            last_err = e
+            if idx < len(candidates) - 1 and ("SyntaxError" in e.message or "javascript error" in e.err_type):
+                continue
+            raise
+    if last_err:
+        raise last_err
+    return None
+
+
+def handle_status(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("status", raw_args)
+    if pos:
+        fail_error(
+            f"unexpected argument '{pos[0]}' for 'status'",
+            "run 'firefox-axi status' with no positional arguments",
+            ["firefox-axi status --help"],
+            code=2,
+        )
+    full = "--full" in flags
+    live_open = is_port_open(LIVE_PORT)
+    managed_open = is_port_open(MANAGED_PORT)
+
+    state = "stopped"
+    active_port = LIVE_PORT
+    tabs_count = 0
+    active_url = "none"
+
+    if live_open:
+        state = "live"
+        active_port = LIVE_PORT
+    elif managed_open:
+        state = "managed"
+        active_port = MANAGED_PORT
+
+    if state != "stopped":
+        try:
+            with MarionetteClient(active_port) as client:
+                client.ensure_active_tab()
+                _, url, handles = get_page_summary(client)
+                tabs_count = len(handles)
+                active_url = truncate_str(url or "about:blank", 120, full=full)
+        except Exception:
+            pass
+
+    status_rows = [
+        {
+            "state": state,
+            "port": active_port,
+            "tabs": tabs_count,
+            "url": active_url,
+        }
+    ]
+    port_rows = [
+        {
+            "mode": "live",
+            "port": LIVE_PORT,
+            "listening": "true" if live_open else "false",
+            "profile": "~/.mozilla/firefox/iy0d7yye.default-release",
+        },
+        {
+            "mode": "managed",
+            "port": MANAGED_PORT,
+            "listening": "true" if managed_open else "false",
+            "profile": "~/.cache/firefox-axi/profile",
+        },
+    ]
+
+    lines = [
+        "bin: ~/.local/bin/firefox-axi",
+        "description: Native Firefox Marionette CLI controller (AXI/TOON)",
+        emit_list("status", status_rows, ["state", "port", "tabs", "url"], custom_fields=custom_fields),
+        emit_list("ports", port_rows, ["mode", "port", "listening", "profile"]),
+        emit_block("help", [
+            "firefox-axi open https://example.com",
+            "firefox-axi snapshot",
+            "firefox-axi tabs",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_open(raw_args, cmd_label="open"):
+    flags, custom_fields, pos = parse_subcommand_args(cmd_label, raw_args)
+    if not pos:
+        fail_error(
+            f"missing required <url> argument for '{cmd_label}'",
+            f"firefox-axi {cmd_label} https://example.com",
+            [f"firefox-axi {cmd_label} https://example.com"],
+            code=2,
+        )
+    full = "--full" in flags
+    url = pos[0].strip()
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
+        url = "https://" + url
+
+    port, _ = resolve_active_port(auto_start=True)
+    try:
+        with MarionetteClient(port) as client:
+            client.set_context("content")
+            client.ensure_active_tab()
+            client.call("WebDriver:Navigate", {"url": url})
+            client.remember_active_tab()
+            title, curr_url, handles = get_page_summary(client)
+    except Exception as e:
+        fail_error(
+            f"failed to navigate to '{url}': {e}",
+            "verify URL format and Marionette connection with 'firefox-axi status'",
+            ["firefox-axi status", "firefox-axi open https://example.com"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "title": truncate_str(title or "(untitled)", 120, full=full),
+            "url": truncate_str(curr_url or url, 160, full=full),
+            "tabs": len(handles),
+        }
+    ]
+    lines = [
+        emit_list("page", rows, ["title", "url", "tabs"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi snapshot",
+            "firefox-axi eval \"document.title\"",
+            "firefox-axi screenshot /tmp/firefox-axi-screenshot.png",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+SNAPSHOT_JS = """
+const sel = 'a, button, input, select, textarea, [role], h1, h2, h3, p, summary';
+const nodes = Array.from(document.querySelectorAll(sel));
+const items = [];
+let idx = 0;
+for (const el of nodes) {
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden' || (rect.width === 0 && rect.height === 0)) {
+    continue;
+  }
+  idx += 1;
+  const uid = 'e' + idx;
+  el.setAttribute('data-axi-uid', uid);
+  const tag = el.tagName.toLowerCase();
+  const role = el.getAttribute('role') || el.getAttribute('type') || tag;
+  let label = (
+    el.innerText ||
+    el.value ||
+    el.getAttribute('aria-label') ||
+    el.getAttribute('placeholder') ||
+    el.getAttribute('title') ||
+    el.getAttribute('href') ||
+    ''
+  ).replace(/\\s+/g, ' ').trim();
+  items.push({ uid: '@' + uid, tag, role, label });
+}
+return {
+  title: document.title || '',
+  url: location.href || '',
+  total: items.length,
+  items
+};
+"""
+
+
+def handle_snapshot(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("snapshot", raw_args)
+    if pos:
+        fail_error(
+            f"unexpected positional argument '{pos[0]}' for 'snapshot'",
+            "run 'firefox-axi snapshot' or 'firefox-axi snapshot --full'",
+            ["firefox-axi snapshot --help"],
+            code=2,
+        )
+    full = "--full" in flags
+    port, _ = resolve_active_port(auto_start=True)
+    try:
+        with MarionetteClient(port) as client:
+            ensure_content_ready(client)
+            snap = client.call("WebDriver:ExecuteScript", {"script": SNAPSHOT_JS, "args": []})
+    except Exception as e:
+        fail_error(
+            f"snapshot failed: {e}",
+            "open a web page first with 'firefox-axi open https://example.com'",
+            ["firefox-axi open https://example.com", "firefox-axi status"],
+            code=1,
+        )
+
+    snap = snap or {}
+    items = snap.get("items") or []
+    total = snap.get("total", len(items))
+    limit = len(items) if full else min(30, len(items))
+    disp_items = []
+    for it in items[:limit]:
+        disp_items.append({
+            "uid": it.get("uid", ""),
+            "tag": it.get("tag", ""),
+            "role": it.get("role", ""),
+            "label": truncate_str(it.get("label", ""), 80, full=full),
+        })
+
+    page_rows = [
+        {
+            "title": truncate_str(snap.get("title") or "(untitled)", 100, full=full),
+            "url": truncate_str(snap.get("url") or "about:blank", 140, full=full),
+            "total_elements": total,
+        }
+    ]
+    first_uid = disp_items[0]["uid"] if disp_items else "@e1"
+    lines = [
+        emit_list("page", page_rows, ["title", "url", "total_elements"]),
+        emit_list("elements", disp_items, ["uid", "tag", "role", "label"], total=total, custom_fields=custom_fields),
+        emit_block("help", [
+            f"firefox-axi click {first_uid}",
+            f"firefox-axi fill {first_uid} \"value\"",
+            "firefox-axi snapshot --full",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def resolve_target_selector(target):
+    target = target.strip()
+    if target.startswith("@"):
+        uid = target[1:]
+        return f'[data-axi-uid="{uid}"]'
+    return target
+
+
+def handle_click(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("click", raw_args)
+    if not pos:
+        fail_error(
+            "missing required <@uid|selector> argument for 'click'",
+            "firefox-axi click @e1",
+            ["firefox-axi snapshot", "firefox-axi click @e1"],
+            code=2,
+        )
+    full = "--full" in flags
+    target = pos[0]
+    css_sel = resolve_target_selector(target)
+    port, _ = resolve_active_port(auto_start=True)
+
+    try:
+        with MarionetteClient(port) as client:
+            ensure_content_ready(client)
+            found = client.call(
+                "WebDriver:ExecuteScript",
+                {
+                    "script": """
+                    const el = document.querySelector(arguments[0]);
+                    if (!el) return false;
+                    el.scrollIntoView({block: 'center', inline: 'center'});
+                    return true;
+                    """,
+                    "args": [css_sel],
+                },
+            )
+            if not found:
+                fail_error(
+                    f"element not found for target '{target}' (selector: {css_sel})",
+                    "run 'firefox-axi snapshot' to refresh @eN UIDs and inspect available elements",
+                    ["firefox-axi snapshot"],
+                    code=1,
+                )
+
+            clicked = False
+            try:
+                elem_obj = client.call("WebDriver:FindElement", {"using": "css selector", "value": css_sel})
+                elem_id = None
+                if isinstance(elem_obj, dict):
+                    elem_id = next(iter(elem_obj.values()), None)
+                elif isinstance(elem_obj, str):
+                    elem_id = elem_obj
+                if elem_id:
+                    client.call("WebDriver:ElementClick", {"id": elem_id})
+                    clicked = True
+            except Exception:
+                clicked = False
+
+            if not clicked:
+                client.call(
+                    "WebDriver:ExecuteScript",
+                    {
+                        "script": "const el = document.querySelector(arguments[0]); if (el) el.click();",
+                        "args": [css_sel],
+                    },
+                )
+            time.sleep(0.15)
+            title, url, _ = get_page_summary(client)
+    except SystemExit:
+        raise
+    except Exception as e:
+        fail_error(
+            f"click failed on '{target}': {e}",
+            "run 'firefox-axi snapshot' to verify element state",
+            ["firefox-axi snapshot"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "action": "click",
+            "target": target,
+            "title": truncate_str(title or "(untitled)", 100, full=full),
+            "url": truncate_str(url or "", 140, full=full),
+        }
+    ]
+    lines = [
+        emit_list("action", rows, ["action", "target", "title", "url"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi snapshot",
+            "firefox-axi eval \"location.href\"",
+            "firefox-axi screenshot /tmp/firefox-axi-screenshot.png",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_fill(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("fill", raw_args)
+    if len(pos) < 2:
+        fail_error(
+            "missing required arguments for 'fill': expected <@uid|selector> <text>",
+            "firefox-axi fill @e1 \"search text\"",
+            ["firefox-axi snapshot", "firefox-axi fill @e1 \"search text\""],
+            code=2,
+        )
+    full = "--full" in flags
+    target = pos[0]
+    text = " ".join(pos[1:])
+    css_sel = resolve_target_selector(target)
+    port, _ = resolve_active_port(auto_start=True)
+
+    try:
+        with MarionetteClient(port) as client:
+            ensure_content_ready(client)
+            ok = client.call(
+                "WebDriver:ExecuteScript",
+                {
+                    "script": """
+                    const el = document.querySelector(arguments[0]);
+                    if (!el) return false;
+                    const val = arguments[1];
+                    el.scrollIntoView({block: 'center', inline: 'center'});
+                    el.focus();
+                    const proto = el.tagName === 'TEXTAREA'
+                      ? window.HTMLTextAreaElement.prototype
+                      : window.HTMLInputElement.prototype;
+                    const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+                    if (desc && desc.set) {
+                      desc.set.call(el, val);
+                    } else if ('value' in el) {
+                      el.value = val;
+                    } else {
+                      el.textContent = val;
+                    }
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                    """,
+                    "args": [css_sel, text],
+                },
+            )
+            if not ok:
+                fail_error(
+                    f"element not found for target '{target}' (selector: {css_sel})",
+                    "run 'firefox-axi snapshot' to refresh @eN UIDs",
+                    ["firefox-axi snapshot"],
+                    code=1,
+                )
+            _, url, _ = get_page_summary(client)
+    except SystemExit:
+        raise
+    except Exception as e:
+        fail_error(
+            f"fill failed on '{target}': {e}",
+            "run 'firefox-axi snapshot' to verify input selector",
+            ["firefox-axi snapshot"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "action": "fill",
+            "target": target,
+            "value": truncate_str(text, 80, full=full),
+            "url": truncate_str(url or "", 140, full=full),
+        }
+    ]
+    lines = [
+        emit_list("action", rows, ["action", "target", "value", "url"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi press Enter",
+            "firefox-axi snapshot",
+            "firefox-axi click @e1",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_press(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("press", raw_args)
+    if not pos:
+        fail_error(
+            "missing required <key> argument for 'press'",
+            "firefox-axi press Enter",
+            ["firefox-axi press Enter"],
+            code=2,
+        )
+    full = "--full" in flags
+    key = pos[0]
+    port, _ = resolve_active_port(auto_start=True)
+
+    try:
+        with MarionetteClient(port) as client:
+            ensure_content_ready(client)
+            active_tag = client.call(
+                "WebDriver:ExecuteScript",
+                {
+                    "script": """
+                    const k = arguments[0];
+                    const t = document.activeElement || document.body;
+                    for (const type of ['keydown', 'keypress', 'keyup']) {
+                      t.dispatchEvent(new KeyboardEvent(type, { key: k, code: k, bubbles: true, cancelable: true }));
+                    }
+                    return (t && t.tagName) ? t.tagName.toLowerCase() : 'body';
+                    """,
+                    "args": [key],
+                },
+            )
+            _, url, _ = get_page_summary(client)
+    except Exception as e:
+        fail_error(
+            f"press '{key}' failed: {e}",
+            "verify page is loaded with 'firefox-axi status'",
+            ["firefox-axi status", "firefox-axi snapshot"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "action": "press",
+            "key": key,
+            "active_tag": active_tag or "body",
+            "url": truncate_str(url or "", 140, full=full),
+        }
+    ]
+    lines = [
+        emit_list("action", rows, ["action", "key", "active_tag", "url"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi snapshot",
+            "firefox-axi eval \"document.title\"",
+            "firefox-axi tabs",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_eval(raw_args, privileged=False):
+    cmd_name = "chrome-eval" if privileged else "eval"
+    flags, custom_fields, pos = parse_subcommand_args(cmd_name, raw_args)
+    if not pos:
+        example_js = "Services.appinfo.version" if privileged else "document.title"
+        fail_error(
+            f"missing required <js> argument for '{cmd_name}'",
+            f"firefox-axi {cmd_name} \"{example_js}\"",
+            [f"firefox-axi {cmd_name} \"{example_js}\""],
+            code=2,
+        )
+    full = "--full" in flags
+    js_code = " ".join(pos)
+    port, _ = resolve_active_port(auto_start=True)
+    scope = "chrome" if privileged else "content"
+
+    try:
+        with MarionetteClient(port) as client:
+            if privileged:
+                client.set_context("chrome")
+                val = eval_js_in_current_context(client, js_code)
+                try:
+                    client.set_context("content")
+                except Exception:
+                    pass
+            else:
+                ensure_content_ready(client)
+                val = eval_js_in_current_context(client, js_code)
+    except MarionetteError as e:
+        if privileged and "MOZ_REMOTE_ALLOW_SYSTEM_ACCESS" in e.message:
+            fail_error(
+                f"chrome-eval denied on port {port}: {e.message}",
+                "set user_pref('remote.system-access-check.enabled', false) or restart Firefox with MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1",
+                ["firefox-axi start", "firefox-axi status"],
+                code=1,
+            )
+        fail_error(
+            f"{cmd_name} failed: {e.message}",
+            f"check JavaScript syntax for '{cmd_name}'",
+            [f"firefox-axi {cmd_name} --help"],
+            code=1,
+        )
+    except Exception as e:
+        fail_error(
+            f"{cmd_name} failed: {e}",
+            f"verify Marionette connection with 'firefox-axi status'",
+            ["firefox-axi status"],
+            code=1,
+        )
+
+    vtype, vstr = format_js_result(val, full=full)
+    rows = [
+        {
+            "scope": scope,
+            "type": vtype,
+            "value": vstr,
+        }
+    ]
+    next_help = (
+        [
+            "firefox-axi eval \"document.title\"",
+            "firefox-axi tabs",
+        ]
+        if privileged
+        else [
+            "firefox-axi snapshot",
+            "firefox-axi chrome-eval \"Services.appinfo.version\"",
+        ]
+    )
+    lines = [
+        emit_list("result", rows, ["scope", "type", "value"], custom_fields=custom_fields),
+        emit_block("help", next_help),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def collect_tabs(client, full=False):
+    client.ensure_active_tab()
+    handles = client.call("WebDriver:GetWindowHandles") or []
+    try:
+        active_handle = client.call("WebDriver:GetWindowHandle")
+    except Exception:
+        active_handle = handles[0] if handles else ""
+
+    rows = []
+    for idx, h in enumerate(handles):
+        title = ""
+        try:
+            client.call("WebDriver:SwitchToWindow", {"handle": h, "focus": False})
+            client.set_context("content")
+            title = client.call("WebDriver:GetTitle") or ""
+        except Exception:
+            title = ""
+        rows.append({
+            "index": idx,
+            "handle": h,
+            "active": "true" if h == active_handle else "false",
+            "title": truncate_str(title or "(untitled)", 100, full=full),
+        })
+
+    if active_handle and active_handle in handles:
+        try:
+            client.call("WebDriver:SwitchToWindow", {"handle": active_handle, "focus": True})
+        except Exception:
+            pass
+    return rows, handles, active_handle
+
+
+def handle_tabs(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("tabs", raw_args)
+    if pos:
+        fail_error(
+            f"unexpected argument '{pos[0]}' for 'tabs'",
+            "run 'firefox-axi tabs' with no positional arguments",
+            ["firefox-axi tabs --help"],
+            code=2,
+        )
+    full = "--full" in flags
+    port, _ = resolve_active_port(auto_start=True)
+    try:
+        with MarionetteClient(port) as client:
+            rows, _, _ = collect_tabs(client, full=full)
+    except Exception as e:
+        fail_error(
+            f"failed to list tabs: {e}",
+            "check Marionette status with 'firefox-axi status'",
+            ["firefox-axi status"],
+            code=1,
+        )
+
+    lines = [
+        emit_list("tabs", rows, ["index", "handle", "active", "title"], total=len(rows), custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi newtab https://example.com",
+            "firefox-axi selecttab 0",
+            "firefox-axi closetab 0",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_newtab(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("newtab", raw_args)
+    full = "--full" in flags
+    url = pos[0].strip() if pos else None
+    if url and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
+        url = "https://" + url
+
+    port, _ = resolve_active_port(auto_start=True)
+    try:
+        with MarionetteClient(port) as client:
+            client.set_context("content")
+            res = client.call("WebDriver:NewWindow", {"type": "tab", "focus": True})
+            new_handle = res.get("handle") if isinstance(res, dict) else str(res)
+            client.call("WebDriver:SwitchToWindow", {"handle": new_handle, "focus": True})
+            if url:
+                client.call("WebDriver:Navigate", {"url": url})
+            client.remember_active_tab(new_handle)
+            _, curr_url, handles = get_page_summary(client)
+            idx = handles.index(new_handle) if new_handle in handles else len(handles) - 1
+    except Exception as e:
+        fail_error(
+            f"failed to open new tab: {e}",
+            "check Marionette status with 'firefox-axi status'",
+            ["firefox-axi status"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "action": "newtab",
+            "index": idx,
+            "handle": new_handle,
+            "url": truncate_str(curr_url or url or "about:blank", 140, full=full),
+        }
+    ]
+    lines = [
+        emit_list("tab", rows, ["action", "index", "handle", "url"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi tabs",
+            "firefox-axi snapshot",
+            f"firefox-axi closetab {idx}",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def resolve_handle_arg(handles, target_arg):
+    if target_arg.isdigit():
+        idx = int(target_arg)
+        if 0 <= idx < len(handles):
+            return idx, handles[idx]
+    for i, h in enumerate(handles):
+        if h == target_arg or h.startswith(target_arg):
+            return i, h
+    return None, None
+
+
+def handle_selecttab(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("selecttab", raw_args)
+    if not pos:
+        fail_error(
+            "missing required <index|handle> argument for 'selecttab'",
+            "firefox-axi selecttab 0",
+            ["firefox-axi tabs", "firefox-axi selecttab 0"],
+            code=2,
+        )
+    full = "--full" in flags
+    target_arg = pos[0]
+    port, _ = resolve_active_port(auto_start=True)
+
+    try:
+        with MarionetteClient(port) as client:
+            handles = client.call("WebDriver:GetWindowHandles") or []
+            idx, handle = resolve_handle_arg(handles, target_arg)
+            if handle is None:
+                fail_error(
+                    f"tab '{target_arg}' not found ({len(handles)} open tabs)",
+                    "run 'firefox-axi tabs' to view valid tab indices and handles",
+                    ["firefox-axi tabs"],
+                    code=1,
+                )
+            client.call("WebDriver:SwitchToWindow", {"handle": handle, "focus": True})
+            try:
+                client.set_context("chrome")
+                client.call(
+                    "WebDriver:ExecuteScript",
+                    {
+                        "script": "if (window.gBrowser && gBrowser.tabs[arguments[0]]) gBrowser.selectedTab = gBrowser.tabs[arguments[0]];",
+                        "args": [idx],
+                    },
+                )
+            except Exception:
+                pass
+            client.set_context("content")
+            client.remember_active_tab(handle)
+            title, _, _ = get_page_summary(client)
+    except SystemExit:
+        raise
+    except Exception as e:
+        fail_error(
+            f"failed to select tab '{target_arg}': {e}",
+            "run 'firefox-axi tabs' to inspect open tabs",
+            ["firefox-axi tabs"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "action": "selecttab",
+            "index": idx,
+            "handle": handle,
+            "title": truncate_str(title or "(untitled)", 100, full=full),
+        }
+    ]
+    lines = [
+        emit_list("tab", rows, ["action", "index", "handle", "title"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi snapshot",
+            "firefox-axi tabs",
+            "firefox-axi open https://example.com",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_closetab(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("closetab", raw_args)
+    target_arg = pos[0] if pos else None
+    port, _ = resolve_active_port(auto_start=True)
+
+    try:
+        with MarionetteClient(port) as client:
+            client.ensure_active_tab()
+            handles = client.call("WebDriver:GetWindowHandles") or []
+            if not handles:
+                fail_error(
+                    "no open tabs to close",
+                    "open a tab with 'firefox-axi open https://example.com'",
+                    ["firefox-axi open https://example.com"],
+                    code=1,
+                )
+            if target_arg is not None:
+                _, close_handle = resolve_handle_arg(handles, target_arg)
+                if close_handle is None:
+                    fail_error(
+                        f"tab '{target_arg}' not found ({len(handles)} open tabs)",
+                        "run 'firefox-axi tabs' to view valid tab indices and handles",
+                        ["firefox-axi tabs"],
+                        code=1,
+                    )
+                client.call("WebDriver:SwitchToWindow", {"handle": close_handle, "focus": True})
+            else:
+                close_handle = client.call("WebDriver:GetWindowHandle")
+
+            remaining = client.call("WebDriver:CloseWindow") or []
+            new_active = remaining[-1] if remaining else "none"
+            if remaining:
+                client.call("WebDriver:SwitchToWindow", {"handle": new_active, "focus": True})
+                client.remember_active_tab(new_active)
+    except SystemExit:
+        raise
+    except Exception as e:
+        fail_error(
+            f"failed to close tab: {e}",
+            "run 'firefox-axi tabs' to inspect open tabs",
+            ["firefox-axi tabs"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "action": "closetab",
+            "closed_handle": close_handle,
+            "remaining_tabs": len(remaining),
+            "active_handle": new_active,
+        }
+    ]
+    lines = [
+        emit_list(
+            "tab",
+            rows,
+            ["action", "closed_handle", "remaining_tabs", "active_handle"],
+            custom_fields=custom_fields,
+        ),
+        emit_block("help", [
+            "firefox-axi tabs",
+            "firefox-axi snapshot",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_screenshot(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("screenshot", raw_args)
+    out_path = Path(os.path.expanduser(pos[0])) if pos else Path("/tmp/firefox-axi-screenshot.png")
+    full = "--full" in flags
+    port, _ = resolve_active_port(auto_start=True)
+
+    try:
+        with MarionetteClient(port) as client:
+            ensure_content_ready(client)
+            b64_data = client.call("WebDriver:TakeScreenshot", {"full": full, "hash": False})
+            _, url, _ = get_page_summary(client)
+        if not b64_data:
+            raise RuntimeError("empty screenshot payload from Marionette")
+        png_bytes = base64.b64decode(b64_data)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(png_bytes)
+    except Exception as e:
+        fail_error(
+            f"screenshot failed: {e}",
+            "verify page is open and target directory is writable",
+            ["firefox-axi status", "firefox-axi open https://example.com"],
+            code=1,
+        )
+
+    rows = [
+        {
+            "path": str(out_path),
+            "bytes": len(png_bytes),
+            "url": truncate_str(url or "about:blank", 140, full=full),
+        }
+    ]
+    lines = [
+        emit_list("screenshot", rows, ["path", "bytes", "url"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi snapshot",
+            "firefox-axi open https://example.com",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_start(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("start", raw_args)
+    if pos:
+        fail_error(
+            f"unexpected positional argument '{pos[0]}' for 'start'",
+            "run 'firefox-axi start [--headed] [--live]'",
+            ["firefox-axi start --help"],
+            code=2,
+        )
+    headed = "--headed" in flags
+    live = "--live" in flags
+
+    if live:
+        if is_port_open(LIVE_PORT):
+            rows = [{"action": "start", "mode": "live", "port": LIVE_PORT, "state": "already_running"}]
+        else:
+            env = os.environ.copy()
+            env["MOZ_REMOTE_ALLOW_SYSTEM_ACCESS"] = "1"
+            subprocess.Popen(
+                [FIREFOX_BIN, "--marionette"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env=env,
+            )
+            deadline = time.time() + 8.0
+            opened = False
+            while time.time() < deadline:
+                if is_port_open(LIVE_PORT, timeout=0.2):
+                    opened = True
+                    break
+                time.sleep(0.1)
+            state_str = "running" if opened else "pending_restart"
+            rows = [{"action": "start", "mode": "live", "port": LIVE_PORT, "state": state_str}]
+        lines = [
+            emit_list("daemon", rows, ["action", "mode", "port", "state"], custom_fields=custom_fields),
+            emit_block("help", [
+                "firefox-axi status",
+                "firefox-axi open https://example.com",
+                "firefox-axi tabs",
+            ]),
+        ]
+        print("\n".join(lines))
+        sys.exit(0)
+
+    if is_port_open(MANAGED_PORT):
+        pid = read_managed_pid() or 0
+        rows = [{"action": "start", "mode": "managed", "port": MANAGED_PORT, "pid": pid}]
+    else:
+        pid = start_managed_firefox(headed=headed)
+        rows = [{"action": "start", "mode": "managed", "port": MANAGED_PORT, "pid": pid}]
+
+    lines = [
+        emit_list("daemon", rows, ["action", "mode", "port", "pid"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi open https://example.com",
+            "firefox-axi status",
+            "firefox-axi stop",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def handle_stop(raw_args):
+    flags, custom_fields, pos = parse_subcommand_args("stop", raw_args)
+    if pos:
+        fail_error(
+            f"unexpected positional argument '{pos[0]}' for 'stop'",
+            "run 'firefox-axi stop' with no positional arguments",
+            ["firefox-axi stop --help"],
+            code=2,
+        )
+
+    was_open = is_port_open(MANAGED_PORT)
+    pids = find_managed_pids()
+
+    if not was_open and not pids:
+        rows = [{"action": "stop", "mode": "managed", "port": MANAGED_PORT, "state": "already_stopped"}]
+        lines = [
+            emit_list("daemon", rows, ["action", "mode", "port", "state"], custom_fields=custom_fields),
+            emit_block("help", [
+                "firefox-axi start",
+                "firefox-axi status",
+            ]),
+        ]
+        print("\n".join(lines))
+        sys.exit(0)
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except Exception:
+            pass
+
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        if not is_port_open(MANAGED_PORT, timeout=0.1) and not find_managed_pids():
+            break
+        time.sleep(0.1)
+
+    for pid in find_managed_pids():
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception:
+            pass
+
+    for f in (PID_FILE, STATE_FILE):
+        if f.exists():
+            try:
+                f.unlink()
+            except Exception:
+                pass
+
+    rows = [{"action": "stop", "mode": "managed", "port": MANAGED_PORT, "state": "stopped"}]
+    lines = [
+        emit_list("daemon", rows, ["action", "mode", "port", "state"], custom_fields=custom_fields),
+        emit_block("help", [
+            "firefox-axi start",
+            "firefox-axi status",
+        ]),
+    ]
+    print("\n".join(lines))
+    sys.exit(0)
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        handle_status([])
+
+    first = args[0]
+    if first in ("--help", "-h"):
+        print_top_help()
+        sys.exit(0)
+
+    if first in ("--version", "-v", "-V"):
+        print(f"firefox-axi: {VERSION} (spec axi/1.0-2026-07)")
+        sys.exit(0)
+
+    if first in ("--full", "--fields") or first.startswith("--fields="):
+        handle_status(args)
+
+    if first.startswith("-"):
+        fail_error(
+            f"unknown flag {first}",
+            "valid flags: --full, --fields, --help, --version",
+            ["firefox-axi --help"],
+            code=2,
+        )
+
+    cmd = first
+    rest = args[1:]
+
+    if cmd in ("status", "home", "summary"):
+        handle_status(rest)
+    elif cmd == "open":
+        handle_open(rest, cmd_label="open")
+    elif cmd == "navigate":
+        handle_open(rest, cmd_label="navigate")
+    elif cmd == "snapshot":
+        handle_snapshot(rest)
+    elif cmd == "click":
+        handle_click(rest)
+    elif cmd == "fill":
+        handle_fill(rest)
+    elif cmd == "press":
+        handle_press(rest)
+    elif cmd == "eval":
+        handle_eval(rest, privileged=False)
+    elif cmd == "chrome-eval":
+        handle_eval(rest, privileged=True)
+    elif cmd == "tabs":
+        handle_tabs(rest)
+    elif cmd == "newtab":
+        handle_newtab(rest)
+    elif cmd == "selecttab":
+        handle_selecttab(rest)
+    elif cmd == "closetab":
+        handle_closetab(rest)
+    elif cmd == "screenshot":
+        handle_screenshot(rest)
+    elif cmd == "start":
+        handle_start(rest)
+    elif cmd == "stop":
+        handle_stop(rest)
+    else:
+        valid_cmds = ", ".join(k for k in SUBCOMMAND_SPECS if k != "navigate")
+        fail_error(
+            f"unknown command '{cmd}'",
+            f"valid commands: {valid_cmds}",
+            ["firefox-axi --help", "firefox-axi status"],
+            code=2,
+        )
+
+
+if __name__ == "__main__":
+    main()

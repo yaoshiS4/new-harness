@@ -1,0 +1,19 @@
+{
+  "plugins": {
+    "browseros-neo": {
+      "enabled": false
+    },
+    "codex-agents-runtime": {
+      "enabled": false
+    },
+    "harmony-healer-sidecar": {
+      "enabled": false
+    },
+    "open-design": {
+      "enabled": false
+    },
+    "stitch-mcp": {
+      "enabled": false
+    }
+  }
+}

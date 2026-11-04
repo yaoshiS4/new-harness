@@ -1,0 +1,2432 @@
+#!/usr/bin/env python3
+"""
+agy-sidebar - Antigravity Live Reactive TUI Sidebar Monitor.
+Displays real-time model telemetry, context gauges, attention-prioritized subagent lifecycle,
+active background tasks, MCP servers, LSP/LST code intelligence, and quota countdowns.
+"""
+
+from __future__ import annotations
+
+import atexit
+import glob
+import json
+import os
+import re
+import select
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+# -----------------------------------------------------------------------------
+# 1. Imports from agy_tui_core
+# -----------------------------------------------------------------------------
+_REPO_LIB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
+_LOCAL_LIB = os.path.expanduser("~/.local/lib")
+for p in (_REPO_LIB, _LOCAL_LIB):
+    if p not in sys.path and os.path.isdir(p):
+        sys.path.insert(0, p)
+from agy_tui_core import (
+    BRAIN_DIR,
+    CACHE_PATHS,
+    C_BOLD,
+    C_COMMENT,
+    C_CYAN,
+    C_GREEN,
+    C_ORANGE,
+    C_PINK,
+    C_PURPLE,
+    C_RED,
+    C_RESET,
+    C_ROSEWATER,
+    C_SURFACE,
+    C_WHITE,
+    C_YELLOW,
+    DB_PATH,
+    LIVE_STATE_PATH,
+    LIVE_STATE_LOCK_PATH,
+    SIDEBAR_MODE_PATH,
+    LOCK_PATH,
+    MCP_CONFIG_PATH,
+    MCP_TOOLS_DIR,
+    PRESENCE_DIR,
+    SQUAD_BIN,
+    STATE_BLOCKED,
+    STATE_DONE,
+    STATE_ERR,
+    STATE_HEALING,
+    STATE_IDLE,
+    STATE_PRIORITY,
+    STATUSLINE_BIN,
+    InotifyWatcher,
+    classify_agent_state,
+    format_line,
+    format_state_badge,
+    get_git_worktrees,
+    get_git_diff_stat,
+    get_locked_conversation_ids,
+    get_spinner_frame,
+    get_sidebar_mode,
+    set_sidebar_mode,
+    render_smooth_gauge,
+    render_braille_sparkline,
+    strip_ansi,
+    visible_len,
+    connect_db_ro,
+    read_live_state,
+    get_current_session_key,
+    update_live_state_atomic,
+    resolve_root_conversation_id,
+    resolve_workspace_cwd,
+    read_quota_cache,
+    trigger_background_quota_refresh,
+    trigger_background_refresh_if_needed,
+    format_token_k,
+    resolve_session_token_telemetry,
+    format_countdown,
+    format_countdown_short,
+    discover_brain_subagents,
+    discover_brain_tasks,
+    discover_cycle_mode,
+    merge_and_dedup_subagents,
+)
+
+MCP_CONFIG_PATH = os.environ.get("MCP_CONFIG_PATH") or os.path.expanduser("~/.gemini/config/mcp_config.json")
+
+_LAST_SUBAGENT_ROWS: dict[int, int] = {}
+_CLI_WIDTH_OVERRIDE: int | None = None
+_CLI_LINES_OVERRIDE: int | None = None
+_RESIZE_FLAG = False
+_GLOBAL_WATCHER: InotifyWatcher | None = None
+
+if "-h" in sys.argv or "--help" in sys.argv:
+    print(
+        "Usage: agy-sidebar [options]\n\n"
+        "Options:\n"
+        "  --once            Render a single frame and exit\n"
+        "  --rail            Render compact rail mode\n"
+        "  --width <N>       Force terminal width override\n"
+        "  --lines <N>       Force terminal height override\n"
+        "  --reset-state     Reset live state JSON\n"
+        "  -h, --help        Show this help message\n"
+    )
+    sys.exit(0)
+
+if "--width" in sys.argv:
+    try:
+        w_idx = sys.argv.index("--width")
+        if w_idx + 1 < len(sys.argv) and sys.argv[w_idx + 1].isdigit():
+            _CLI_WIDTH_OVERRIDE = int(sys.argv[w_idx + 1])
+    except Exception:
+        pass
+
+if "--lines" in sys.argv:
+    try:
+        l_idx = sys.argv.index("--lines")
+        if l_idx + 1 < len(sys.argv) and sys.argv[l_idx + 1].isdigit():
+            _CLI_LINES_OVERRIDE = int(sys.argv[l_idx + 1])
+    except Exception:
+        pass
+
+# -----------------------------------------------------------------------------
+# 2. LSP & LST Detection Candidates
+# -----------------------------------------------------------------------------
+LSP_CANDIDATES = [
+    ("typescript", ("typescript-language-server", "tsserver", "vtsls")),
+    ("pyright", ("pyright-langserver", "pyright", "basedpyright")),
+    ("rust", ("rust-analyzer",)),
+    ("go", ("gopls",)),
+    ("clangd", ("clangd",)),
+    ("html/css", ("vscode-html-language-server", "vscode-css-language-server")),
+    ("json", ("vscode-json-language-server",)),
+    ("yaml", ("yaml-language-server",)),
+    ("bash/zsh", ("bash-language-server",)),
+]
+
+# -----------------------------------------------------------------------------
+# 3. TTL Caches for Low-CPU Polling
+# -----------------------------------------------------------------------------
+_DETECT_LANGS_CACHE: dict[str, tuple[float, set[str]]] = {}
+_IS_BIN_CACHE: dict[tuple, tuple[float, bool]] = {}
+_RUNNING_CMDS_CACHE: tuple[float, list[str]] = (0.0, [])
+_TASK_PROGRESS_CACHE: dict[str, tuple[float, tuple[int, int]]] = {}
+_SUBAGENT_ROLES_CACHE: dict[str, tuple[float, dict[str, str]]] = {}
+_SUB_TRANSCRIPT_CACHE: dict[str, tuple[float, float, dict]] = {}
+_MCP_CALLS_CACHE: dict[str, tuple[float, float, dict[str, int]]] = {}
+
+# Terminal cleanup state
+orig_termios = None
+
+
+# -----------------------------------------------------------------------------
+# 4. Text & Layout Helpers
+# -----------------------------------------------------------------------------
+def section_header(title: str, width: int, folded: bool = False) -> str:
+    """Render a CachyOS Emerald-styled section header with optional fold indicator."""
+    fold_tag = f" {C_YELLOW}[+]{C_RESET}" if folded else ""
+    prefix = f"{C_GREEN}{C_BOLD}◆ {title}{C_RESET}{fold_tag} "
+    pref_len = visible_len(prefix)
+    dashes = max(0, width - pref_len)
+    return format_line(f"{prefix}{C_COMMENT}{'─' * dashes}{C_RESET}", width)
+
+
+def fit_category_rows(
+    rows: list[str],
+    fixed_count: int,
+    width: int,
+    overflow_noun: str = "more",
+    min_count: int = 0,
+) -> list[str]:
+    """
+    Fit rows to budget. Never emit '… +X more' without showing at least 1 actual row.
+    """
+    if len(rows) > fixed_count:
+        if fixed_count <= 1:
+            return list(rows[:1]) if fixed_count == 1 else []
+        cutoff = max(1, fixed_count - 1)
+        overflow_count = len(rows) - cutoff
+        res = list(rows[:cutoff])
+        res.append(format_line(f" {C_COMMENT}… +{overflow_count} {overflow_noun}{C_RESET}", width))
+        return res
+    if min_count > 0 and len(rows) < min_count:
+        res = list(rows)
+        res.extend([""] * (min_count - len(rows)))
+        return res
+    return list(rows)
+
+
+def get_terminal_width(fallback: int = 38) -> int:
+    if _CLI_WIDTH_OVERRIDE is not None:
+        return max(6, _CLI_WIDTH_OVERRIDE)
+    cols, _ = shutil.get_terminal_size(fallback=(0, 0))
+    if cols > 0:
+        return max(6, cols)
+    env_cols = os.environ.get("COLUMNS")
+    if env_cols:
+        try:
+            return max(6, int(env_cols))
+        except ValueError:
+            pass
+    return max(6, fallback)
+
+
+def get_terminal_height(fallback: int = 42) -> int:
+    if _CLI_LINES_OVERRIDE is not None:
+        return max(8, _CLI_LINES_OVERRIDE)
+    _, rows = shutil.get_terminal_size(fallback=(0, 0))
+    if rows > 0:
+        return max(8, rows)
+    env_lines = os.environ.get("LINES")
+    if env_lines:
+        try:
+            return max(8, int(env_lines))
+        except ValueError:
+            pass
+    return max(8, fallback)
+
+
+# -----------------------------------------------------------------------------
+# 5. Live State & Quota Readers
+# -----------------------------------------------------------------------------
+
+
+def reset_live_state(target_dir: str | None = None) -> None:
+    proj = target_dir or os.getcwd()
+    sk = get_current_session_key()
+    cur_git_stat = get_git_diff_stat(proj)
+
+    def mutator(data: dict) -> dict:
+        now = time.time()
+        existing_mode = data.get("sidebar_mode") or get_sidebar_mode(data)
+        model = data.get("model") or {
+            "id": "gemini-4-argon",
+            "display_name": "Gemini 4 Argon",
+            "effort": "medium",
+        }
+        quota = data.get("quota") or {}
+        sessions = data.setdefault("sessions", {})
+        if not isinstance(sessions, dict):
+            sessions = {}
+            data["sessions"] = sessions
+
+        sess_state = {
+            "ts": now,
+            "conversation_id": "",
+            "workspace": {
+                "current_dir": proj,
+                "project_dir": proj,
+            },
+            "vcs": {
+                "branch": "",
+                "dirty": False,
+            },
+            "git_diff": [0, 0, 0],
+            "git_diff_turn": [0, 0, 0],
+            "git_diff_baseline": list(cur_git_stat),
+            "model": model,
+            "context_window": {
+                "used_percentage": 0.0,
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
+                "context_window_size": 1048576,
+                "exceeds_200k_tokens": False,
+            },
+            "cache_hit_pct": 0,
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+            "ctx_history": [],
+            "vel_history": [],
+            "tok_per_min": 0,
+            "turn_duration_sec": 0,
+            "turn_start_ts": 0.0,
+            "cycle_mode": "normal",
+            "sidebar_mode": existing_mode,
+            "subagents": [],
+            "subagent_count": 0,
+            "task_count": 0,
+            "artifact_count": 0,
+            "cost": {
+                "total_cost_usd": 0.0,
+                "total_duration_ms": 0,
+                "total_usd": 0.0,
+            },
+            "agent": {},
+            "vim": {"mode": "NORMAL"},
+            "quota": quota,
+            "sidebar_hidden": False,
+            "sidebar_running": True,
+            "sidebar_check_ts": now,
+            "sidebar_toggle_ts": now,
+        }
+        if sk:
+            sessions[sk] = sess_state
+
+        if (not sk) or (data.get("active_session_key") in ("", sk)) or (len(sessions) <= 1):
+            data.update({
+                "ts": now,
+                "conversation_id": "",
+                "workspace": sess_state["workspace"],
+                "vcs": sess_state["vcs"],
+                "git_diff": sess_state["git_diff"],
+                "git_diff_turn": sess_state["git_diff_turn"],
+                "git_diff_baseline": sess_state["git_diff_baseline"],
+                "model": model,
+                "context_window": sess_state["context_window"],
+                "cache_hit_pct": 0,
+                "usage": sess_state["usage"],
+                "ctx_history": [],
+                "vel_history": [],
+                "tok_per_min": 0,
+                "turn_duration_sec": 0,
+                "turn_start_ts": 0.0,
+                "cycle_mode": "normal",
+                "sidebar_mode": existing_mode,
+                "subagents": [],
+                "subagent_count": 0,
+                "task_count": 0,
+                "artifact_count": 0,
+                "cost": sess_state["cost"],
+                "agent": {},
+                "vim": sess_state["vim"],
+                "quota": quota,
+                "sidebar_hidden": False,
+                "sidebar_running": True,
+                "sidebar_check_ts": now,
+                "sidebar_toggle_ts": now,
+            })
+        return data
+
+    update_live_state_atomic(mutator)
+
+
+def resolve_sidebar_project_dir(state: dict, root_cid: str = "") -> str:
+    """
+    Resolve the actual project workspace directory for the sidebar.
+    Delegates to agy_tui_core.resolve_workspace_cwd with database workspace fallback.
+    """
+    ws = state.get("workspace") or {}
+    proj = ws.get("project_dir") or ws.get("current_dir") or state.get("project_dir") or ""
+
+    if (not proj or proj == "/") and root_cid and os.path.isfile(DB_PATH):
+        with connect_db_ro(DB_PATH) as con:
+            if con is not None:
+                try:
+                    cur = con.cursor()
+                    cur.execute(
+                        "SELECT workspace_uris FROM conversation_summaries WHERE conversation_id = ?",
+                        (root_cid,),
+                    )
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        try:
+                            uris = json.loads(row[0])
+                            if isinstance(uris, list) and uris:
+                                u = str(uris[0])
+                                p = u[7:] if u.startswith("file://") else u
+                                if p and p != "/":
+                                    proj = p
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+    return resolve_workspace_cwd(explicit_dir=proj, state=state)
+
+
+# -----------------------------------------------------------------------------
+# 6. Deep State Discovery: Roles, Processes & Transcripts
+# -----------------------------------------------------------------------------
+def get_subagent_roles_from_transcript(root_cid: str) -> dict[str, str]:
+    if not root_cid:
+        return {}
+    now = time.time()
+    cached = _SUBAGENT_ROLES_CACHE.get(root_cid)
+    if cached and (now - cached[0] <= 3.0):
+        return cached[1]
+
+    role_map: dict[str, str] = {}
+    full_path = os.path.join(BRAIN_DIR, root_cid, ".system_generated", "logs", "transcript_full.jsonl")
+    comp_path = os.path.join(BRAIN_DIR, root_cid, ".system_generated", "logs", "transcript.jsonl")
+    target_path = full_path if os.path.isfile(full_path) else comp_path
+
+    if os.path.isfile(target_path):
+        try:
+            pending_role = ""
+            with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line_s = line.strip()
+                    if not line_s:
+                        continue
+                    try:
+                        step_data = json.loads(line_s)
+                    except Exception:
+                        step_data = {}
+
+                    # Check tool_calls in step_data or raw line for invoke_subagent
+                    tool_calls = step_data.get("tool_calls") if isinstance(step_data, dict) else None
+                    if tool_calls and isinstance(tool_calls, list):
+                        for tc in tool_calls:
+                            if isinstance(tc, dict) and tc.get("name") == "invoke_subagent":
+                                args = tc.get("args") or tc.get("parameters") or tc.get("Arguments") or {}
+                                r = args.get("Role") or args.get("role") or ""
+                                if r:
+                                    pending_role = str(r).strip()
+                    elif "invoke_subagent" in line_s:
+                        m_role = re.search(r'\\?\"Role\\?\":\s*\\?\"([^\"]+?)\\?\"', line_s)
+                        if m_role:
+                            pending_role = m_role.group(1).strip()
+
+                    # Look for conversationId in step_data or raw line
+                    cid = ""
+                    if isinstance(step_data, dict):
+                        content_str = str(step_data.get("content") or "")
+                        if "conversationId" in content_str or "conversation_id" in content_str:
+                            m_cid = re.search(r'[\"\']conversationI[dD][\"\']\s*:\s*[\"\']([^\"\']+)[\"\']', content_str)
+                            if m_cid:
+                                cid = m_cid.group(1).strip()
+                        if not cid:
+                            cid = str(step_data.get("conversationId") or step_data.get("conversation_id") or "").strip()
+
+                    if not cid and pending_role:
+                        m_cid = re.search(r'[\"\']conversationI[dD][\"\']\s*:\s*[\"\']([^\"\']+)[\"\']', line_s)
+                        if m_cid:
+                            cid = m_cid.group(1).strip()
+
+                    if cid and pending_role:
+                        role_map[cid] = pending_role
+                        pending_role = ""
+        except Exception:
+            pass
+
+    _SUBAGENT_ROLES_CACHE[root_cid] = (now, role_map)
+    return role_map
+
+
+def get_running_process_cmdlines() -> list[str]:
+    global _RUNNING_CMDS_CACHE
+    now = time.time()
+    cache_ts, cached_val = _RUNNING_CMDS_CACHE
+    if now - cache_ts <= 2.0:
+        return cached_val
+
+    cmdlines = []
+    try:
+        for pid in os.listdir("/proc"):
+            if pid.isdigit():
+                try:
+                    with open(f"/proc/{pid}/cmdline", "rb") as f:
+                        data = f.read().decode("utf-8", errors="ignore")
+                        if data:
+                            cmdlines.append(data.replace("\x00", " "))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    _RUNNING_CMDS_CACHE = (now, cmdlines)
+    return cmdlines
+
+
+def is_binary_installed(bin_names: tuple[str, ...], proj: str = "") -> bool:
+    now = time.time()
+    cache_key = (bin_names, proj)
+    cached = _IS_BIN_CACHE.get(cache_key)
+    if cached and (now - cached[0] <= 15.0):
+        return cached[1]
+
+    extra_paths = [
+        os.path.expanduser("~/.local/bin"),
+        os.path.expanduser("~/.cargo/bin"),
+        os.path.expanduser("~/go/bin"),
+        "/usr/bin",
+        "/usr/local/bin",
+    ]
+    if proj:
+        extra_paths.insert(0, os.path.join(proj, "node_modules", ".bin"))
+        extra_paths.insert(0, os.path.join(proj, ".venv", "bin"))
+    res = False
+    for name in bin_names:
+        if shutil.which(name):
+            res = True
+            break
+        for p in extra_paths:
+            if os.path.exists(os.path.join(p, name)):
+                res = True
+                break
+        if res:
+            break
+    _IS_BIN_CACHE[cache_key] = (now, res)
+    return res
+
+
+def detect_project_languages(proj: str) -> set[str]:
+    if not proj or not os.path.isdir(proj):
+        return set()
+    norm = os.path.normpath(proj)
+    if norm in ("/", "/home", os.path.expanduser("~")):
+        return set()
+    now = time.time()
+    cached = _DETECT_LANGS_CACHE.get(proj)
+    if cached and (now - cached[0] <= 15.0):
+        return cached[1]
+
+    langs = set()
+    skip_dirs = {
+        "node_modules", ".git", "dist", "build", ".venv", "venv",
+        "target", ".next", ".turbo", "__pycache__", ".cache", ".codegraph",
+    }
+
+    root_files = set()
+    try:
+        with os.scandir(proj) as it:
+            for entry in it:
+                root_files.add(entry.name)
+    except Exception:
+        pass
+
+    if any(f in root_files for f in ("tsconfig.json", "package.json")):
+        langs.add("typescript")
+        langs.add("json")
+    if any(f in root_files for f in ("pyproject.toml", "requirements.txt", "setup.py", "Pipfile")):
+        langs.add("pyright")
+    if "Cargo.toml" in root_files:
+        langs.add("rust")
+    if "go.mod" in root_files:
+        langs.add("go")
+    if any(f in root_files for f in ("CMakeLists.txt", "compile_commands.json", "Makefile")):
+        langs.add("clangd")
+
+    ext_map = {
+        (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"): "typescript",
+        (".py", ".pyi"): "pyright",
+        (".rs",): "rust",
+        (".go",): "go",
+        (".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"): "clangd",
+        (".html", ".htm", ".css", ".scss", ".sass", ".less"): "html/css",
+        (".json", ".jsonc"): "json",
+        (".yml", ".yaml"): "yaml",
+        (".sh", ".zsh", ".bash"): "bash/zsh",
+    }
+
+    def scan_dir(dir_path: str, depth: int) -> None:
+        if depth > 2:
+            return
+        try:
+            with os.scandir(dir_path) as it:
+                for entry in it:
+                    if entry.is_dir(follow_symlinks=False):
+                        if entry.name not in skip_dirs and not entry.name.startswith("."):
+                            scan_dir(entry.path, depth + 1)
+                    elif entry.is_file(follow_symlinks=False):
+                        name = entry.name.lower()
+                        for exts, lang in ext_map.items():
+                            if lang not in langs and any(name.endswith(e) for e in exts):
+                                langs.add(lang)
+        except Exception:
+            pass
+
+    scan_dir(proj, 1)
+    _DETECT_LANGS_CACHE[proj] = (now, langs)
+    return langs
+
+
+def get_task_progress(conv_id: str | None = None, proj_dir: str | None = None) -> tuple[int, int]:
+    root_cid = resolve_root_conversation_id(conv_id)
+    cache_key = f"{root_cid}:{proj_dir or ''}"
+    now = time.time()
+    cached = _TASK_PROGRESS_CACHE.get(cache_key)
+    if cached and (now - cached[0] <= 3.0):
+        return cached[1]
+
+    latest_user_input_ts = 0.0
+    if root_cid and os.path.isfile(DB_PATH):
+        with connect_db_ro(DB_PATH) as con:
+            if con is not None:
+                try:
+                    cur = con.cursor()
+                    cur.execute(
+                        "SELECT last_user_input_time FROM conversation_summaries WHERE conversation_id = ?",
+                        (root_cid,),
+                    )
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        try:
+                            latest_user_input_ts = datetime.fromisoformat(str(row[0]).replace("Z", "+00:00")).timestamp()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+    task_file = None
+    if root_cid and os.path.isdir(BRAIN_DIR):
+        candidate = os.path.join(BRAIN_DIR, root_cid, "task.md")
+        if os.path.isfile(candidate):
+            task_file = candidate
+
+    if not task_file and root_cid and os.path.isfile(DB_PATH):
+        with connect_db_ro(DB_PATH) as con:
+            if con is not None:
+                try:
+                    cur = con.cursor()
+                    cur.execute(
+                        "SELECT conversation_id FROM conversation_summaries WHERE parent_conversation_id = ? ORDER BY last_modified_time DESC",
+                        (root_cid,),
+                    )
+                    for sub_row in cur.fetchall():
+                        candidate = os.path.join(BRAIN_DIR, str(sub_row[0]), "task.md")
+                        if os.path.isfile(candidate):
+                            task_file = candidate
+                            break
+                except Exception:
+                    pass
+
+    if not task_file and proj_dir:
+        norm_proj = os.path.normpath(proj_dir)
+        if norm_proj not in ("/", "/home", os.path.expanduser("~")):
+            candidate = os.path.join(norm_proj, "task.md")
+            if os.path.isfile(candidate):
+                task_file = candidate
+
+    task_done = 0
+    task_total = 0
+    task_mtime = 0.0
+    if task_file and os.path.isfile(task_file):
+        try:
+            task_mtime = os.path.getmtime(task_file)
+            with open(task_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            task_done = len(re.findall(r"^\s*-\s*\[x\]", content, flags=re.IGNORECASE | re.MULTILINE))
+            task_total = len(re.findall(r"^\s*-\s*\[[\s/xX]\]", content, flags=re.MULTILINE))
+        except Exception:
+            pass
+
+    step_match = None
+    if root_cid:
+        transcript_path = os.path.join(BRAIN_DIR, root_cid, ".system_generated", "logs", "transcript.jsonl")
+        if os.path.isfile(transcript_path):
+            try:
+                with open(transcript_path, "rb") as f:
+                    f.seek(0, os.SEEK_END)
+                    size = f.tell()
+                    f.seek(max(0, size - 131072))
+                    raw = f.read().decode("utf-8", errors="ignore")
+                lines = raw.splitlines()
+                if size > 131072 and len(lines) > 1:
+                    lines = lines[1:]
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    try:
+                        item = json.loads(line)
+                    except Exception:
+                        continue
+                    itype = item.get("type")
+                    c_at_str = item.get("created_at") or ""
+                    c_at = 0.0
+                    if c_at_str:
+                        try:
+                            c_at = datetime.fromisoformat(c_at_str.replace("Z", "+00:00")).timestamp()
+                        except Exception:
+                            pass
+                    if itype == "USER_INPUT":
+                        if c_at >= latest_user_input_ts:
+                            latest_user_input_ts = c_at
+                            step_match = None
+                    elif itype == "PLANNER_RESPONSE":
+                        content = str(item.get("content") or "")
+                        m = re.search(r"\[Step\s+(\d+)\s+of\s+(\d+)\s+([^\]:]+)", content, re.IGNORECASE)
+                        if m:
+                            x = int(m.group(1))
+                            y = int(m.group(2))
+                            st = m.group(3).strip().lower()
+                            in_prog = any(w in st for w in ("in progress", "running", "auditing", "starting", "pending")) and ("done" not in st)
+                            step_done = max(0, min(y, x - 1)) if in_prog else max(0, min(y, x))
+                            step_match = (step_done, y)
+            except Exception:
+                pass
+
+    if task_total > 0 and (latest_user_input_ts == 0.0 or task_mtime >= latest_user_input_ts):
+        progress = (task_done, task_total)
+    elif step_match is not None:
+        progress = step_match
+    elif task_total > 0:
+        progress = (task_done, task_total)
+    else:
+        progress = (0, 0)
+
+    _TASK_PROGRESS_CACHE[cache_key] = (now, progress)
+    return progress
+
+
+# -----------------------------------------------------------------------------
+# 7. Telemetry: MCP Call Counter, Self-Healing, and Transcript Enricher
+# -----------------------------------------------------------------------------
+def resolve_mcp_server_states() -> tuple[dict[str, dict], dict[str, dict]]:
+    """Resolve active and disabled MCP servers from MCP_CONFIG_PATH, config.json plugins, and plugins/*/mcp_config.json."""
+    mcp_active: dict[str, dict] = {}
+    mcp_disabled: dict[str, dict] = {}
+    if os.path.exists(MCP_CONFIG_PATH):
+        try:
+            with open(MCP_CONFIG_PATH, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            raw_active = cfg.get("mcpServers") or {}
+            raw_disabled = cfg.get("disabledMcpServers") or {}
+            if isinstance(raw_disabled, dict):
+                for d_name, d_val in raw_disabled.items():
+                    mcp_disabled[d_name] = d_val if isinstance(d_val, dict) else {"disabled": True}
+            if isinstance(raw_active, dict):
+                for s_name, s_val in raw_active.items():
+                    if isinstance(s_val, dict) and s_val.get("disabled"):
+                        mcp_disabled[s_name] = s_val
+                        continue
+                    if s_name in mcp_disabled:
+                        dis_val = mcp_disabled[s_name]
+                        if isinstance(dis_val, dict) and dis_val.get("disabled", True):
+                            continue
+                    mcp_active[s_name] = s_val if isinstance(s_val, dict) else {}
+        except Exception:
+            pass
+
+    cfg_dir = os.path.dirname(MCP_CONFIG_PATH) if MCP_CONFIG_PATH else ""
+    if cfg_dir and os.path.isdir(cfg_dir):
+        plugins_state: dict = {}
+        config_json_path = os.path.join(cfg_dir, "config.json")
+        if os.path.isfile(config_json_path):
+            try:
+                with open(config_json_path, "r", encoding="utf-8") as f:
+                    config_data = json.load(f)
+                if isinstance(config_data, dict) and isinstance(config_data.get("plugins"), dict):
+                    plugins_state = config_data["plugins"]
+            except Exception:
+                pass
+
+        seen_plugins: set[str] = set()
+        for plugin_mcp_path in sorted(glob.glob(os.path.join(cfg_dir, "plugins", "*", "mcp_config.json"))):
+            try:
+                plugin_dir = os.path.dirname(plugin_mcp_path)
+                plugin_id = os.path.basename(plugin_dir)
+                seen_plugins.add(plugin_id)
+                has_explicit_config = False
+                plugin_enabled = True
+                if plugin_id in plugins_state:
+                    p_entry = plugins_state[plugin_id]
+                    if isinstance(p_entry, dict) and "enabled" in p_entry:
+                        plugin_enabled = bool(p_entry["enabled"])
+                        has_explicit_config = True
+                    elif isinstance(p_entry, bool):
+                        plugin_enabled = p_entry
+                        has_explicit_config = True
+                if not has_explicit_config:
+                    plugin_json_path = os.path.join(plugin_dir, "plugin.json")
+                    if os.path.isfile(plugin_json_path):
+                        try:
+                            with open(plugin_json_path, "r", encoding="utf-8") as pf:
+                                plugin_json = json.load(pf)
+                            if isinstance(plugin_json, dict):
+                                plugin_enabled = not bool(plugin_json.get("disabled", False))
+                        except Exception:
+                            pass
+
+                with open(plugin_mcp_path, "r", encoding="utf-8") as mf:
+                    p_cfg = json.load(mf)
+                p_servers = (p_cfg.get("mcpServers") or {}) if isinstance(p_cfg, dict) else {}
+                if isinstance(p_servers, dict):
+                    for s_name, s_val in p_servers.items():
+                        srv_dict = s_val if isinstance(s_val, dict) else {}
+                        if not plugin_enabled or srv_dict.get("disabled"):
+                            if has_explicit_config:
+                                mcp_active.pop(s_name, None)
+                            if s_name not in mcp_active:
+                                mcp_disabled[s_name] = srv_dict
+                        else:
+                            if not has_explicit_config and s_name in mcp_disabled:
+                                continue
+                            mcp_disabled.pop(s_name, None)
+                            mcp_active[s_name] = srv_dict
+            except Exception:
+                pass
+
+        for plugin_id, p_entry in plugins_state.items():
+            if plugin_id in seen_plugins:
+                continue
+            enabled_val: bool | None = None
+            if isinstance(p_entry, dict) and "enabled" in p_entry:
+                enabled_val = bool(p_entry["enabled"])
+            elif isinstance(p_entry, bool):
+                enabled_val = p_entry
+            if enabled_val is True and plugin_id in mcp_disabled:
+                srv_dict = mcp_disabled.pop(plugin_id)
+                mcp_active[plugin_id] = srv_dict if isinstance(srv_dict, dict) else {}
+            elif enabled_val is False and plugin_id in mcp_active:
+                srv_dict = mcp_active.pop(plugin_id)
+                mcp_disabled[plugin_id] = srv_dict if isinstance(srv_dict, dict) else {"disabled": True}
+
+    return mcp_active, mcp_disabled
+
+
+def get_configured_mcp_servers() -> set[str]:
+    """Read configured MCP server names from MCP_CONFIG_PATH and enabled plugins."""
+    mcp_active, _ = resolve_mcp_server_states()
+    return set(mcp_active.keys())
+
+
+def get_mcp_call_counts(root_cid: str) -> dict[str, int]:
+    """Count session MCP tool calls per server from root transcript."""
+    if not root_cid:
+        return {}
+    tr_path = os.path.join(BRAIN_DIR, root_cid, ".system_generated", "logs", "transcript.jsonl")
+    if not os.path.isfile(tr_path):
+        tr_path = os.path.join(BRAIN_DIR, root_cid, ".system_generated", "logs", "transcript_full.jsonl")
+        if not os.path.isfile(tr_path):
+            return {}
+
+    try:
+        mtime = os.path.getmtime(tr_path)
+    except Exception:
+        return {}
+
+    now = time.time()
+    cached = _MCP_CALLS_CACHE.get(root_cid)
+    if cached and cached[0] == mtime and (now - cached[1] <= 3.0):
+        return cached[2]
+
+    known_servers = get_configured_mcp_servers()
+    counts: dict[str, int] = {}
+    try:
+        with open(tr_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if "call_mcp_tool" in line or "mcp_" in line:
+                    # Match ServerName with optional escaped quotes
+                    srv_names = re.findall(r'\\?"ServerName\\?":\s*\\?"([^"\\]+)\\?"', line)
+                    for s in srv_names:
+                        counts[s] = counts.get(s, 0) + 1
+                    # Match eager tools and find prefix in configured server names
+                    eager_matches = re.findall(r'\\?"(?:tool_name|name)\\?":\s*\\?"mcp_([a-zA-Z0-9_]+)\\?"', line)
+                    for m in eager_matches:
+                        matched_srv = None
+                        for srv in known_servers:
+                            if m.startswith(srv):
+                                matched_srv = srv
+                                break
+                        if not matched_srv:
+                            matched_srv = m.split("_")[0]
+                        counts[matched_srv] = counts.get(matched_srv, 0) + 1
+    except Exception:
+        pass
+
+    _MCP_CALLS_CACHE[root_cid] = (mtime, now, counts)
+    return counts
+
+
+def get_self_healing_status() -> tuple[bool, str]:
+    """Detect active test-3-round-loop.sh or healing loop in running processes."""
+    cmds = get_running_process_cmdlines()
+    for cmd in cmds:
+        if "test-3-round-loop" in cmd:
+            m_round = re.search(r"round\s*(\d+)(?:/3)?", cmd, re.IGNORECASE)
+            if m_round:
+                return True, f"Round {m_round.group(1)}/3"
+            return True, "test-3-round-loop"
+        if "verify-oracle" in cmd:
+            return True, "verify-oracle"
+    return False, ""
+
+
+def get_subagent_transcript_info(cid: str) -> dict:
+    """Extract step count, start time, error state, and latest tool action from child transcript."""
+    if not cid:
+        return {}
+    tr_path = os.path.join(BRAIN_DIR, cid, ".system_generated", "logs", "transcript.jsonl")
+    if not os.path.isfile(tr_path):
+        tr_path = os.path.join(BRAIN_DIR, cid, ".system_generated", "logs", "transcript_full.jsonl")
+        if not os.path.isfile(tr_path):
+            return {}
+
+    try:
+        mtime = os.path.getmtime(tr_path)
+    except Exception:
+        return {}
+
+    now = time.time()
+    cached = _SUB_TRANSCRIPT_CACHE.get(cid)
+    if cached and cached[0] == mtime and (now - cached[1] <= 2.0):
+        return cached[2]
+
+    info = {
+        "step_count": 0,
+        "started_at": 0.0,
+        "last_ts": mtime,
+        "latest_tool_action": "",
+        "latest_tool_summary": "",
+        "has_error": False,
+        "is_blocked": False,
+        "is_finished": False,
+    }
+    try:
+        first_ts = 0.0
+        last_item = None
+        with open(tr_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line_str = line.strip()
+                if not line_str:
+                    continue
+                try:
+                    item = json.loads(line_str)
+                    last_item = item
+                except Exception:
+                    continue
+                itype = item.get("type")
+                c_at_str = item.get("created_at") or ""
+                if c_at_str and first_ts == 0.0:
+                    try:
+                        first_ts = datetime.fromisoformat(c_at_str.replace("Z", "+00:00")).timestamp()
+                    except Exception:
+                        pass
+
+                if itype == "PLANNER_RESPONSE":
+                    info["step_count"] += 1
+                    if item.get("status") == "ERROR":
+                        info["has_error"] = True
+                    calls = item.get("tool_calls") or []
+                    if isinstance(calls, list) and calls:
+                        last_call = calls[-1]
+                        if isinstance(last_call, dict):
+                            act = last_call.get("toolAction") or last_call.get("toolSummary") or ""
+                            summ = last_call.get("toolSummary") or ""
+                            call_args = last_call.get("args") or last_call.get("parameters") or last_call.get("Arguments")
+                            if isinstance(call_args, dict):
+                                act = call_args.get("toolAction") or call_args.get("toolSummary") or act
+                                summ = call_args.get("toolSummary") or summ
+                            if act:
+                                info["latest_tool_action"] = act
+                            if summ:
+                                info["latest_tool_summary"] = summ
+                            tool_name = str(last_call.get("name") or "")
+                            if tool_name == "ask_question":
+                                info["is_blocked"] = True
+
+        if last_item:
+            l_type = last_item.get("type")
+            l_status = str(last_item.get("status") or "").upper()
+            l_calls = last_item.get("tool_calls") or []
+            if l_type == "PLANNER_RESPONSE" and not l_calls and l_status == "DONE":
+                info["is_finished"] = True
+            elif l_status in ("COMPLETED", "TERMINATED", "CANCELLED", "CANCELED"):
+                info["is_finished"] = True
+
+        if first_ts > 0.0:
+            info["started_at"] = first_ts
+        else:
+            try:
+                info["started_at"] = os.path.getctime(tr_path)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    _SUB_TRANSCRIPT_CACHE[cid] = (mtime, now, info)
+    return info
+
+
+def _sub_lbl(sub: dict) -> str:
+    """Format human-readable subagent mnemonic role label."""
+    role = (sub.get("role") or "").strip()
+    name = (sub.get("name") or "agent").strip()
+    if role and len(role) <= 24 and "\n" not in role:
+        return role
+    first_line = role.splitlines()[0].strip() if role else ""
+    if first_line:
+        m_shard = re.search(r"\b(Shard\s*\d+)\b", first_line, re.IGNORECASE)
+        if m_shard:
+            return m_shard.group(1).title()
+        cleaned = re.sub(
+            r"^(Execute(\s+this)?|Conduct(\s+a)?|Run(\s+the)?|Audit(\s+all|\s+the)?)\s+",
+            "",
+            first_line,
+            flags=re.IGNORECASE,
+        ).strip()
+        cleaned = re.sub(r":.*$", "", cleaned).strip()
+        if cleaned and len(cleaned) <= 24:
+            return cleaned
+    return name[:20] if name else "agent"
+
+
+def enrich_subagents(all_subs: list[dict], root_cid: str, proj: str, now: float) -> list[dict]:
+    """
+    Enrich subagents with 4-state lifecycle, DB presence, transcript details,
+    and sort strictly by attention queue priority (blocked -> healing -> active -> waiting -> done).
+    """
+    locked_cids = get_locked_conversation_ids()
+    enriched = []
+    subs_by_id = {}
+
+    all_subs = merge_and_dedup_subagents(all_subs, root_cid)
+
+    for s in all_subs:
+        cid = str(s.get("id") or s.get("conversationId") or s.get("conversation_id") or "").strip()
+        if cid:
+            subs_by_id[cid] = s
+
+    # Discover child conversations from conversation_summaries.db
+    if root_cid and os.path.isfile(DB_PATH):
+        with connect_db_ro(DB_PATH) as con:
+            if con is not None:
+                try:
+                    cur = con.cursor()
+                    cur.execute(
+                        "SELECT conversation_id, status, last_modified_time, title, preview, agent_name FROM conversation_summaries "
+                        "WHERE parent_conversation_id = ? ORDER BY last_modified_time ASC",
+                        (root_cid,),
+                    )
+                    child_rows = cur.fetchall()
+                    for c_id, db_st, last_mod, title, preview, agent_name in child_rows:
+                        c_id_str = str(c_id)
+                        summary_txt = title or preview or agent_name or "subagent"
+                        db_st_str = str(db_st or "").upper()
+                        is_running = "RUNNING" in db_st_str
+                        is_idle = "COMPLETE" in db_st_str or "IDLE" in db_st_str
+                        if c_id_str not in subs_by_id:
+                            new_sub = {
+                                "id": c_id_str,
+                                "conversationId": c_id_str,
+                                "status": "running" if is_running else ("completed" if is_idle else (db_st or "running")),
+                                "role": summary_txt,
+                                "name": agent_name or "subagent",
+                                "db_running": is_running,
+                                "db_idle": is_idle,
+                            }
+                            subs_by_id[c_id_str] = new_sub
+                            all_subs.append(new_sub)
+                        else:
+                            if is_running:
+                                subs_by_id[c_id_str]["db_running"] = True
+                                if subs_by_id[c_id_str].get("status") in ("completed", "done", "idle", ""):
+                                    subs_by_id[c_id_str]["status"] = "running"
+                            elif is_idle:
+                                subs_by_id[c_id_str]["db_idle"] = True
+                                if "COMPLETE" in db_st_str:
+                                    subs_by_id[c_id_str]["status"] = "completed"
+                            cur_r = str(subs_by_id[c_id_str].get("role") or "").strip().lower()
+                            if not cur_r or cur_r in ("self", "research", "agent", "subagent"):
+                                subs_by_id[c_id_str]["role"] = summary_txt
+                except Exception:
+                    pass
+
+    roles_from_tr = get_subagent_roles_from_transcript(root_cid)
+    if roles_from_tr and isinstance(roles_from_tr, dict):
+        for sub in all_subs:
+            sub_id = str(sub.get("id") or sub.get("conversationId") or sub.get("conversation_id") or "").strip()
+            if sub_id and sub_id in roles_from_tr:
+                r_name = roles_from_tr[sub_id]
+                cur_r = (sub.get("role") or "").strip().lower()
+                if not cur_r or cur_r in ("self", "research", "agent", "subagent"):
+                    sub["role"] = r_name
+                    sub["name"] = r_name
+        role_vals = list(roles_from_tr.values())
+        for idx, sub in enumerate(all_subs):
+            cur_r = (sub.get("role") or "").strip().lower()
+            if (not cur_r or cur_r in ("self", "research", "agent", "subagent")) and idx < len(role_vals):
+                sub["role"] = role_vals[idx]
+                sub["name"] = role_vals[idx]
+    elif roles_from_tr and isinstance(roles_from_tr, list):
+        for idx, r_name in enumerate(roles_from_tr):
+            if idx < len(all_subs):
+                cur_r = (all_subs[idx].get("role") or "").strip().lower()
+                if not cur_r or cur_r in ("self", "research", "agent", "subagent"):
+                    all_subs[idx]["role"] = r_name
+                    all_subs[idx]["name"] = r_name
+
+    for sub in all_subs:
+        cid = str(sub.get("id") or sub.get("conversationId") or sub.get("conversation_id") or "").strip()
+        tr_info = get_subagent_transcript_info(cid) if cid else {}
+
+        raw_st = str(sub.get("status") or sub.get("state") or "running").strip()
+        state_detail = str(
+            sub.get("stateDetail")
+            or sub.get("toolAction")
+            or sub.get("toolSummary")
+            or tr_info.get("latest_tool_action")
+            or tr_info.get("latest_tool_summary")
+            or ""
+        ).strip()
+
+        is_locked = cid in locked_cids
+        is_healing = bool(
+            sub.get("is_healing")
+            or ("healing" in state_detail.lower())
+            or ("round " in state_detail.lower())
+            or ("retry" in state_detail.lower())
+        )
+        if tr_info.get("has_error") and raw_st not in ("completed", "done"):
+            raw_st = "errored"
+        if tr_info.get("is_blocked"):
+            raw_st = "waiting_for_input"
+
+        # Stale Subagent Liveness Check:
+        if not is_locked:
+            tr_last_ts = float(tr_info.get("last_ts") or 0.0)
+            if not tr_info.get("is_finished") and (sub.get("db_running") or raw_st in ("running", "active", "subagent_state_alive") or sub.get("state") == "SUBAGENT_STATE_ALIVE"):
+                if tr_last_ts > 0.0 and (now - tr_last_ts > 300.0):
+                    raw_st = "completed"
+                elif (now - float(sub.get("started_at") or tr_info.get("started_at") or 0.0) > 300.0) and tr_last_ts == 0.0:
+                    raw_st = "completed"
+                else:
+                    raw_st = "running"
+            elif tr_info.get("is_finished") or (sub.get("db_idle") and (tr_last_ts == 0.0 or now - tr_last_ts > 2.0)):
+                if raw_st not in ("errored",):
+                    raw_st = "completed"
+            elif tr_last_ts > 0.0 and (now - tr_last_ts > 300.0):
+                if raw_st not in ("completed", "done", "errored"):
+                    raw_st = "completed"
+            elif raw_st in ("running", "active") and (now - float(sub.get("started_at") or tr_info.get("started_at") or 0.0) > 300.0):
+                raw_st = "completed"
+
+        state_code = classify_agent_state(
+            raw_st,
+            state_detail=state_detail,
+            is_locked=is_locked,
+            is_healing=is_healing,
+        )
+
+        started_at = sub.get("started_at") or tr_info.get("started_at") or sub.get("created_at") or 0.0
+        if isinstance(started_at, str):
+            try:
+                started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                started_at = 0.0
+
+        step_count = int(sub.get("step_count") or sub.get("step_index") or tr_info.get("step_count") or 0)
+        lbl = _sub_lbl(sub)
+        priority = STATE_PRIORITY.get(state_code, 5)
+        end_ts = float(tr_info.get("last_ts") or now) if state_code in ("done", "errored") else now
+
+        enriched.append({
+            "id": cid,
+            "raw_sub": sub,
+            "role": sub.get("role") or sub.get("name") or "agent",
+            "label": lbl,
+            "state": state_code,
+            "state_detail": state_detail,
+            "priority": priority,
+            "started_at": started_at,
+            "end_ts": end_ts,
+            "last_ts": tr_info.get("last_ts") or started_at,
+            "step_count": step_count,
+            "is_locked": is_locked,
+            "workspace": sub.get("workspace") or "inherit",
+        })
+
+    # Strict attention queue sorting: lowest priority index first, ties broken by most recent started_at and deterministic id
+    enriched.sort(key=lambda s: (s["priority"], -float(s["started_at"] or 0.0), s["id"]))
+    return enriched
+
+
+# -----------------------------------------------------------------------------
+# 8. Compact Rail Mode (6–8 Column Vertical Rail)
+# -----------------------------------------------------------------------------
+def render_rail(width: int, term_lines: int = 42) -> list[str]:
+    """Render a clean 6–8 column compact vertical status rail."""
+    lines: list[str] = []
+    state = read_live_state()
+    state_cid = str(state.get("conversation_id") or "").strip()
+    root_cid = resolve_root_conversation_id(state_cid) if state_cid else ""
+    quota_state = read_quota_cache()
+    quota_map = quota_state.get("quota") or {}
+    quota_ts = float(quota_state.get("ts") or 0.0)
+    trigger_background_quota_refresh(quota_ts)
+    now = time.time()
+    spinner = get_spinner_frame(now)
+
+    # 1. Header
+    lines.append(format_line(f"{C_PURPLE}{C_BOLD}AGY{C_RESET}", width))
+    lines.append(format_line(f"{C_COMMENT}{'─' * width}{C_RESET}", width))
+
+    # 2. Model
+    model_info = state.get("model") or {}
+    raw_name = model_info.get("display_name") or model_info.get("id") or "Gemini 4 Argon"
+    short_m = "G4"
+    if "claude" in raw_name.lower():
+        short_m = "CLD"
+    elif "flash" in raw_name.lower():
+        short_m = "G3F"
+    lines.append(format_line(f"{C_ROSEWATER}{short_m}{C_RESET}", width))
+
+    # 3. Context & Telemetry
+    telem = resolve_session_token_telemetry(state, root_cid)
+    pct = round(float(telem["used_pct"]))
+    c_ctx = C_RED if pct >= 85 else (C_YELLOW if pct >= 60 else C_GREEN)
+    lines.append(format_line(f"{c_ctx}{pct}%{C_RESET}", width))
+    lines.append(format_line(f"{C_COMMENT}{'─' * width}{C_RESET}", width))
+
+    # 4. Tasks & Agents Telemetry
+    proj = resolve_sidebar_project_dir(state, root_cid)
+    state_subs = [s for s in (state.get("subagents") or []) if isinstance(s, dict)]
+    brain_subs = discover_brain_subagents(root_cid) if root_cid else []
+    all_subs = merge_and_dedup_subagents(state_subs, brain_subs) if brain_subs else state_subs
+
+    brain_tasks = discover_brain_tasks(root_cid) if root_cid else []
+    running_brain_tasks = [t for t in brain_tasks if t.get("status") == "running"]
+    task_count = max(len(running_brain_tasks), int(state.get("task_count") or 0))
+
+    enriched_subs = enrich_subagents(all_subs, root_cid, proj, now)
+
+    blocked_count = sum(1 for s in enriched_subs if s["state"] == "blocked")
+    healing_count = sum(1 for s in enriched_subs if s["state"] == "healing")
+    active_count = sum(1 for s in enriched_subs if s["state"] == "active")
+
+    if blocked_count > 0:
+        lines.append(format_line(f"{C_ORANGE}{C_BOLD}⚠ {blocked_count}{C_RESET}", width))
+    if healing_count > 0:
+        lines.append(format_line(f"{C_YELLOW}🩹 {healing_count}{C_RESET}", width))
+    if active_count > 0:
+        lines.append(format_line(f"{C_PURPLE}{spinner} {active_count}{C_RESET}", width))
+    if task_count > 0:
+        lines.append(format_line(f"{C_CYAN}⚙ {task_count}{C_RESET}", width))
+    if blocked_count == 0 and healing_count == 0 and active_count == 0 and task_count == 0:
+        lines.append(format_line(f"{C_COMMENT}○ idle{C_RESET}", width))
+
+    lines.append(format_line(f"{C_COMMENT}{'─' * width}{C_RESET}", width))
+
+    # 5. Quota (Gemini 5h / primary)
+    bucket_5h = quota_map.get("gemini-5h") or quota_map.get("3p-5h") or {}
+    frac = bucket_5h.get("remaining_fraction")
+    if frac is not None:
+        q_pct = round(float(frac) * 100)
+        c_q = C_RED if q_pct <= 15 else (C_YELLOW if q_pct <= 40 else C_GREEN)
+        lines.append(format_line(f"{C_COMMENT}5h{C_RESET}", width))
+        lines.append(format_line(f"{c_q}{q_pct}%{C_RESET}", width))
+    else:
+        lines.append(format_line(f"{C_COMMENT}5h --%{C_RESET}", width))
+
+    # 6. Bottom Time Badge
+    if term_lines >= len(lines) + 2:
+        time_str = datetime.now().strftime("%H:%M")
+        lines.append(format_line(f"{C_COMMENT}{'─' * width}{C_RESET}", width))
+        lines.append(format_line(f"{C_CYAN}{time_str}{C_RESET}", width))
+
+    return lines[:term_lines]
+
+
+# -----------------------------------------------------------------------------
+# 9. Main Full Sidebar Renderer
+# -----------------------------------------------------------------------------
+def render_sidebar(
+    width: int,
+    term_lines: int | None = None,
+    selected_idx: int = 0,
+    folded_sections: set[int] | None = None,
+    rail_mode: bool = False,
+    show_footer: bool = False,
+    state: dict | None = None,
+) -> list[str]:
+    """
+    Render Antigravity full sidebar with dynamic 2-pass flexbox allocator
+    and Btop responsive compact reflow.
+    """
+    if rail_mode or width <= 10 or get_sidebar_mode() == "rail":
+        rows = term_lines if term_lines is not None else get_terminal_height(fallback=42)
+        return render_rail(width, rows)
+
+    term_rows = term_lines if term_lines is not None else get_terminal_height(fallback=42)
+    bottom_reserve = 3 if term_rows >= 30 else (1 if term_rows >= 25 else 0)
+    usable_rows = max(16, term_rows - bottom_reserve)
+    folded = folded_sections if folded_sections is not None else set()
+    now = time.time()
+    tick_spinner = get_spinner_frame(now)
+
+    lines: list[str] = []
+    if state is None:
+        state = read_live_state()
+    state_cid = str(state.get("conversation_id") or "").strip()
+    root_cid = resolve_root_conversation_id(state_cid) if state_cid else ""
+    quota_state = read_quota_cache()
+    quota_map = quota_state.get("quota") or {}
+    quota_ts = float(quota_state.get("ts") or 0.0)
+    trigger_background_quota_refresh(quota_ts)
+    is_narrow = width < 26
+
+    # When vertical lines are constrained (<34) or width is narrow, activate Btop compact reflow
+    is_compact_reflow = (usable_rows < 34) or (width < 22)
+
+    # -------------------------------------------------------------------------
+    # 0. Sleek Title Bar (Zero Heavy ━━━ Rule, HH:MM Clock)
+    # -------------------------------------------------------------------------
+    time_str = datetime.now().strftime("%H:%M")
+    title_lbl = "󰚩 ANTIGRAVITY" if width >= 26 else "AGY"
+    pad = max(1, width - visible_len(title_lbl) - len(time_str) - 2)
+    sec0_lines = [
+        format_line(f" {C_BOLD}{C_PURPLE}{title_lbl}{C_RESET}{' ' * pad}{C_COMMENT}{time_str} {C_RESET}", width),
+    ]
+
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Deterministic Section Max Budgets
+    # -------------------------------------------------------------------------
+    cat1_budget = (6 if usable_rows >= 30 else 5) if 1 not in folded else 0
+    cat3_budget = (6 if usable_rows >= 34 else 4) if 3 not in folded else 0
+    cat4_budget = (3 if usable_rows >= 36 else 2) if 4 not in folded else 0
+    cat5_budget = 4 if 5 not in folded else 0
+
+    sep12 = 1 if usable_rows >= 26 else 0
+    sep23 = 1 if usable_rows >= 26 else 0
+    sep34 = 1 if usable_rows >= 26 else 0
+    sep45 = 1 if usable_rows >= 26 else 0
+
+    footer_rows = 1 if (show_footer and width >= 20) else 0
+
+    # 1. SESSION (Colon-Free 8-char Aligned Keys)
+    # -------------------------------------------------------------------------
+    cat1_rows: list[str] = []
+    sec1_hdr = section_header("SESSION", width, folded=1 in folded)
+
+    if 1 not in folded:
+        model_info = state.get("model") or {}
+        raw_name = model_info.get("display_name") or model_info.get("id") or "Gemini 4 Argon"
+        effort = (model_info.get("effort") or "").capitalize()
+        m_clean = re.sub(r"\s*\((Low|Medium|High|XHigh)\)", "", raw_name, flags=re.IGNORECASE).strip()
+        if not effort:
+            m = re.search(r"\((Low|Medium|High|XHigh)\)", raw_name, flags=re.IGNORECASE)
+            if m:
+                effort = m.group(1).capitalize()
+
+        target_m = m_clean
+        if width < 32:
+            target_m = target_m.replace("Gemini", "Gem").replace("Claude", "Cld")
+            if effort == "Medium":
+                effort = "Med"
+
+        effort_badge = f" {C_COMMENT}[{effort}]{C_RESET}" if effort else ""
+        cat1_rows.append(format_line(f" {C_ROSEWATER}{C_BOLD}{target_m}{C_RESET}{effort_badge}", width))
+
+        # Row 2: Mode & Perf/Cost
+        raw_cycle = state.get("cycle_mode")
+        if not raw_cycle and root_cid:
+            raw_cycle = discover_cycle_mode(root_cid=root_cid)
+        cycle_mode = (raw_cycle or "normal").strip().upper()
+        if cycle_mode == "PLAN":
+            mode_badge = f"{C_BOLD}{C_CYAN}[PLAN]{C_RESET}"
+        elif cycle_mode == "AUTO":
+            mode_badge = f"{C_BOLD}{C_GREEN}[AUTO]{C_RESET}"
+        else:
+            mode_badge = f"{C_BOLD}{C_COMMENT}[NORMAL]{C_RESET}"
+
+        cost_info = state.get("cost") or {}
+        total_usd = float(cost_info.get("total_usd") or 0.0)
+        tok_vel = state.get("tok_per_min") or state.get("token_burn_velocity")
+
+        perf_suffix = ""
+        if total_usd > 0.004:
+            perf_suffix += f" {C_COMMENT}·{C_RESET} {C_GREEN}${total_usd:.2f}{C_RESET}"
+        if tok_vel is not None and 0 < int(tok_vel) < 500_000:
+            tpm = int(tok_vel)
+            tpm_str = f"{tpm/1000:.1f}k/m" if tpm < 10000 else f"{round(tpm/1000)}k/m"
+            perf_suffix += f" {C_COMMENT}·{C_RESET} {C_CYAN}{tpm_str}{C_RESET}"
+
+        mode_line = f" {mode_badge}{perf_suffix}"
+        if visible_len(mode_line) > width:
+            mode_line = f" {mode_badge}"
+        cat1_rows.append(format_line(mode_line, width))
+
+        # Row 3: Context & Cache
+        telem = resolve_session_token_telemetry(state, root_cid)
+        pct = telem["used_pct"]
+        cache_hit_pct = telem["cache_hit_pct"]
+        exceeds_200k = telem["exceeds_200k"]
+
+        gauge_str = render_smooth_gauge(pct, cells=5, style="smooth", invert_colors=False)
+        pct_str = f"{pct:>4.1f}%" if (0 < pct < 10 and width >= 32) else f"{round(pct):>3}%"
+        cache_color = C_GREEN if cache_hit_pct >= 80 else (C_CYAN if cache_hit_pct >= 50 else C_YELLOW)
+        cache_str = f" {C_COMMENT}·{C_RESET} {cache_color}⚡{cache_hit_pct}%{C_RESET}"
+
+        ctx_line = f" {gauge_str} {pct_str}{cache_str}"
+        ctx_hist = state.get("ctx_history") or []
+        if isinstance(ctx_hist, list) and len(ctx_hist) >= 2 and (visible_len(ctx_line) + 4 <= width):
+            spark = render_braille_sparkline([float(x) for x in ctx_hist], width=3)
+            ctx_line += f" {spark}"
+        if exceeds_200k and (visible_len(ctx_line) + 5 <= width):
+            ctx_line += f" {C_BOLD}{C_RED}>200k{C_RESET}"
+        cat1_rows.append(format_line(ctx_line, width))
+
+        # Row 4: Tokens (Input / Output Tokens)
+        in_k = format_token_k(telem["in_tokens"])
+        out_k = format_token_k(telem["out_tokens"])
+        tok_line = f" {C_WHITE}↑{in_k}{C_RESET} {C_COMMENT}·{C_RESET} {C_GREEN}↓{out_k}{C_RESET}"
+        cat1_rows.append(format_line(tok_line, width))
+
+        # Row 5: Workspace & Git
+        proj = resolve_sidebar_project_dir(state, root_cid)
+        folder_name = os.path.basename(os.path.normpath(proj)) if proj != "/" else ""
+        folder_display = folder_name if folder_name else "/ (root)"
+
+        vcs = state.get("vcs") or {}
+        branch = vcs.get("branch") or state.get("fallback_git_branch")
+        dirty = "*" if (vcs.get("dirty") or state.get("fallback_git_dirty")) else ""
+        if not branch and proj and os.path.exists(proj):
+            try:
+                res = subprocess.run(
+                    ["git", "-C", proj, "rev-parse", "--abbrev-ref", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    timeout=0.25,
+                    check=False,
+                )
+                if res.returncode == 0:
+                    b = res.stdout.strip()
+                    if b and b != "HEAD":
+                        branch = b
+            except Exception:
+                pass
+
+        git_diff = state.get("git_diff")
+        if git_diff and isinstance(git_diff, dict):
+            ins = int(git_diff.get("ins") or 0)
+            del_ = int(git_diff.get("del") or 0)
+        else:
+            _, ins, del_ = get_git_diff_stat(proj)
+
+        diff_items = []
+        if ins > 0:
+            diff_items.append(f"{C_GREEN}+{ins}{C_RESET}")
+        if del_ > 0:
+            diff_items.append(f"{C_RED}-{del_}{C_RESET}")
+        diff_str = (" " + " ".join(diff_items)) if diff_items else ""
+
+        # Last-turn diff isolator (Turn +X -Y)
+        git_diff_turn = state.get("git_diff_turn")
+        if isinstance(git_diff_turn, dict):
+            t_ins = int(git_diff_turn.get("ins") or 0)
+            t_del = int(git_diff_turn.get("del") or 0)
+            if t_ins > 0 or t_del > 0:
+                turn_parts = []
+                if t_ins > 0:
+                    turn_parts.append(f"{C_GREEN}+{t_ins}{C_RESET}")
+                if t_del > 0:
+                    turn_parts.append(f"{C_RED}-{t_del}{C_RESET}")
+                diff_str += f" {C_COMMENT}(Turn {' '.join(turn_parts)}{C_COMMENT}){C_RESET}"
+
+        if branch:
+            single_repo_line = f" {C_PURPLE} {folder_display}{C_RESET} {C_PINK} {branch}{dirty}{C_RESET}{diff_str}"
+            if visible_len(single_repo_line) <= width:
+                cat1_rows.append(format_line(single_repo_line, width))
+            else:
+                cat1_rows.append(format_line(f" {C_PURPLE} {folder_display}{C_RESET}", width))
+                cat1_rows.append(format_line(f" {C_PINK} {branch}{dirty}{C_RESET}{diff_str}", width))
+        else:
+            cat1_rows.append(format_line(f" {C_PURPLE} {folder_display}{C_RESET}", width))
+
+        # Git Worktrees Discovery
+        worktrees = state.get("git_worktrees") or get_git_worktrees(proj)
+        extra_wts = [wt for wt in worktrees if isinstance(wt, dict) and not wt.get("is_main", False)]
+        if extra_wts:
+            wt_names = [wt.get("short") or wt.get("branch") or "wt" for wt in extra_wts]
+            wt_str = f"{C_CYAN} {wt_names[0]}{C_RESET}"
+            if len(extra_wts) > 1:
+                wt_str += f" {C_COMMENT}(+{len(extra_wts)-1}){C_RESET}"
+            cat1_rows.append(format_line(f" {wt_str}", width))
+
+        cat1_rows = fit_category_rows(cat1_rows, cat1_budget, width)
+    else:
+        proj = resolve_sidebar_project_dir(state, root_cid)
+
+    # -------------------------------------------------------------------------
+    # 3. MCP SERVERS (2-Column Tabular Grid, Zero Truncation)
+    # -------------------------------------------------------------------------
+    mcp_active, mcp_disabled = resolve_mcp_server_states()
+
+    mcp_hdr_title = f"MCP ({len(mcp_active)} active)" if mcp_active else "MCP"
+    sec3_hdr = section_header(mcp_hdr_title, width, folded=3 in folded)
+
+    cat3_rows: list[str] = []
+    if 3 not in folded:
+        mcp_calls = get_mcp_call_counts(root_cid)
+        if not mcp_active and not mcp_disabled:
+            cat3_rows.append(format_line(f" {C_COMMENT}No MCP servers{C_RESET}", width))
+        else:
+            tokens: list[str] = []
+            name_map = {
+                "codex_knowledge": "codex_kb",
+                "context_health": "ctx_health",
+                "browseros-neo": "browseros",
+                "minimalist-gemini": "minimalist",
+            }
+            for srv in sorted(mcp_active.keys()):
+                tool_dir = os.path.join(MCP_TOOLS_DIR, srv)
+                tool_files = glob.glob(os.path.join(tool_dir, "*.json"))
+                num_tools = len(tool_files)
+                num_calls = mcp_calls.get(srv, 0)
+                disp_name = name_map.get(srv, srv)
+                call_tag = f"·{num_calls}c" if num_calls > 0 else ""
+                tokens.append(f" {C_GREEN}●{C_RESET} {C_WHITE}{disp_name}{C_RESET} {C_COMMENT}({num_tools}{call_tag}){C_RESET}")
+
+            if width >= 32 and len(tokens) > 2:
+                col1_w = width // 2
+                col2_w = width - col1_w
+                for i in range(0, len(tokens), 2):
+                    t1 = tokens[i]
+                    t2 = tokens[i + 1] if (i + 1 < len(tokens)) else ""
+                    row_s = format_line(t1, col1_w, pad_right=True) + format_line(t2, col2_w)
+                    cat3_rows.append(row_s)
+            else:
+                for t in tokens:
+                    cat3_rows.append(format_line(t, width))
+
+            if mcp_disabled and term_rows >= 36:
+                cat3_rows.append(format_line(f" {C_COMMENT}○ {len(mcp_disabled)} off{C_RESET}", width))
+
+        cat3_rows = fit_category_rows(cat3_rows, cat3_budget, width)
+
+    # -------------------------------------------------------------------------
+    # 4. CODE INTEL (LSP & LST, Tabular Grid)
+    # -------------------------------------------------------------------------
+    sec4_hdr = section_header("CODE INTEL", width, folded=4 in folded)
+
+    cat4_rows: list[str] = []
+    if 4 not in folded:
+        proj_langs = detect_project_languages(proj)
+        running_cmds = get_running_process_cmdlines()
+
+        intel_tokens: list[str] = []
+        for label, bin_names in LSP_CANDIDATES:
+            matched_cmds = [cmd for cmd in running_cmds if any(b in cmd for b in bin_names)]
+            if matched_cmds:
+                intel_tokens.append(f" {C_GREEN}●{C_RESET} {C_WHITE}{label}{C_RESET}")
+            elif label in proj_langs and is_binary_installed(bin_names, proj):
+                intel_tokens.append(f" {C_CYAN}◐{C_RESET} {C_WHITE}{label}{C_RESET}")
+
+        has_cg_dir = os.path.exists(os.path.join(proj, ".codegraph"))
+        has_cg_cache = os.path.exists(os.path.expanduser("~/.cache/codegraph"))
+        is_cg_mcp = ("codegraph" in mcp_active) or ("codegraph" in (state.get("mcp_servers") or {}))
+        has_ast_grep = is_binary_installed(("ast-grep", "sg"))
+
+        if is_cg_mcp or has_cg_dir:
+            intel_tokens.append(f" {C_GREEN}●{C_RESET} {C_WHITE}codegraph{C_RESET}")
+        elif has_cg_cache:
+            intel_tokens.append(f" {C_CYAN}◐{C_RESET} {C_WHITE}codegraph{C_RESET}")
+
+        if has_ast_grep:
+            intel_tokens.append(f" {C_GREEN}●{C_RESET} {C_WHITE}ast-grep{C_RESET}")
+
+        if not intel_tokens:
+            cat4_rows.append(format_line(f" {C_COMMENT}none active{C_RESET}", width))
+        elif len(intel_tokens) <= 2 or width < 26:
+            for it in intel_tokens:
+                cat4_rows.append(format_line(it, width))
+        else:
+            col1_w = width // 2
+            col2_w = width - col1_w
+            for i in range(0, len(intel_tokens), 2):
+                t1 = intel_tokens[i]
+                t2 = intel_tokens[i + 1] if (i + 1 < len(intel_tokens)) else ""
+                row_s = format_line(t1, col1_w, pad_right=True) + format_line(t2, col2_w)
+                cat4_rows.append(row_s)
+
+        cat4_rows = fit_category_rows(cat4_rows, cat4_budget, width)
+
+    # -------------------------------------------------------------------------
+    # 5. QUOTA (6-char Aligned Keys, Never Truncates Countdowns)
+    # -------------------------------------------------------------------------
+    cat5_rows: list[str] = []
+    if 5 not in folded:
+        quota_targets = [
+            ("Gem 5h", "gemini-5h"),
+            ("Gem Wk", "gemini-weekly"),
+            ("Cld 5h", "3p-5h"),
+            ("Cld Wk", "3p-weekly"),
+        ]
+        for short_lbl, key in quota_targets:
+            bucket = quota_map.get(key) or {}
+            frac = bucket.get("remaining_fraction")
+            amt = bucket.get("remaining_amount")
+            cd_str = format_countdown_short(bucket) if (is_narrow or is_compact_reflow or width < 32) else format_countdown(bucket)
+            cd_badge = f"  {C_COMMENT}{cd_str}{C_RESET}" if cd_str else ""
+
+            if frac is not None:
+                pct = float(frac) * 100.0
+                gauge_str = render_smooth_gauge(pct, cells=5, style="smooth", invert_colors=True)
+                q_line = f" {C_COMMENT}{short_lbl:<6}{C_RESET} {gauge_str} {round(pct):>3}%{cd_badge}"
+            elif amt is not None:
+                q_line = f" {C_COMMENT}{short_lbl:<6}{C_RESET} {C_YELLOW}{amt}{C_RESET}{cd_badge}"
+            else:
+                gauge_str = render_smooth_gauge(0.0, cells=5, style="smooth", invert_colors=True)
+                q_line = f" {C_COMMENT}{short_lbl:<6}{C_RESET} {gauge_str}  --%{cd_badge}"
+
+            cat5_rows.append(format_line(q_line, width))
+
+        cat5_rows = fit_category_rows(cat5_rows, cat5_budget, width)
+
+    sec5_hdr = section_header("QUOTA", width, folded=5 in folded)
+
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Compute WORKFLOW budget from actual fitted rows of sections 1, 3, 4, 5
+    # -------------------------------------------------------------------------
+    non_workflow_used = (
+        len(sec0_lines)
+        + 5  # Section 1..5 headers
+        + sep12 + sep23 + sep34 + sep45  # Fixed separators
+        + len(cat1_rows)
+        + len(cat3_rows)
+        + len(cat4_rows)
+        + len(cat5_rows)
+        + footer_rows
+    )
+    if 2 not in folded:
+        cat2_budget = max(1, usable_rows - non_workflow_used)
+    else:
+        cat2_budget = 0
+
+    # 2. WORKFLOW (Smart Idle Collapse & Priority Subagents)
+    # -------------------------------------------------------------------------
+    sec2_hdr = section_header("WORKFLOW", width, folded=2 in folded)
+
+    cat2_rows: list[str] = []
+    cat2_sub_map: list[int | None] = []
+    state_subs = [s for s in (state.get("subagents") or []) if isinstance(s, dict)]
+    brain_subs = discover_brain_subagents(root_cid) if root_cid else []
+    all_subs = merge_and_dedup_subagents(state_subs, brain_subs) if brain_subs else state_subs
+
+    brain_tasks = discover_brain_tasks(root_cid) if root_cid else []
+    running_brain_tasks = [t for t in brain_tasks if t.get("status") == "running"]
+    task_count = max(len(running_brain_tasks), int(state.get("task_count") or 0))
+    enriched_subs = enrich_subagents(all_subs, root_cid, proj, now) if 2 not in folded else []
+
+    if 2 not in folded:
+        active_subs = [s for s in enriched_subs if s["state"] in ("blocked", "healing", "active", "waiting")]
+        done_subs = [s for s in enriched_subs if s["state"] in ("done", "idle")]
+        blocked_count = sum(1 for s in enriched_subs if s["state"] == "blocked")
+        sub_count = len(active_subs)
+        done_count = len(done_subs)
+
+        art_count = int(state.get("artifact_count") or 0)
+        if art_count == 0 and root_cid:
+            root_brain = os.path.join(BRAIN_DIR, root_cid)
+            if os.path.isdir(root_brain):
+                try:
+                    art_count = len(glob.glob(os.path.join(root_brain, "*.md")))
+                except Exception:
+                    pass
+
+        done_tasks, total_tasks = get_task_progress(root_cid, proj)
+        is_healing_active, healing_proc = get_self_healing_status()
+
+        # Smart Idle Collapse: when everything is idle, collapse into 1 serene line!
+        if total_tasks == 0 and task_count == 0 and not enriched_subs and not is_healing_active:
+            if art_count > 0:
+                cat2_rows.append(format_line(f" {C_COMMENT}○ Idle{C_RESET} {C_COMMENT}·{C_RESET} {C_CYAN}{art_count} artifacts{C_RESET}", width))
+            else:
+                cat2_rows.append(format_line(f" {C_COMMENT}○ Idle · Ready{C_RESET}", width))
+            cat2_sub_map.append(None)
+        else:
+            if total_tasks > 0:
+                ratio = done_tasks / total_tasks
+                pct = ratio * 100.0
+                gauge_str = render_smooth_gauge(pct, cells=5, style="smooth", invert_colors=True)
+                gauge = f"{gauge_str} {done_tasks}/{total_tasks}"
+                bg_suffix = f" {C_YELLOW}({task_count} bg){C_RESET}" if task_count > 0 else ""
+                cat2_rows.append(format_line(f" {gauge}{bg_suffix}", width))
+                cat2_sub_map.append(None)
+            elif task_count > 0:
+                cat2_rows.append(format_line(f" {C_YELLOW}{task_count} active{C_RESET}", width))
+                cat2_sub_map.append(None)
+
+            # Agents summary line
+            parts = []
+            if sub_count > 0 and blocked_count > 0:
+                parts.append(f"{C_PURPLE}{sub_count} run{C_RESET} {C_ORANGE}{C_BOLD}(⚠ {blocked_count} blk){C_RESET}")
+            elif sub_count > 0:
+                parts.append(f"{C_PURPLE}{sub_count} run{C_RESET}" + (f" {C_COMMENT}({done_count}✓){C_RESET}" if done_count > 0 else ""))
+            elif done_count > 0:
+                parts.append(f"{C_COMMENT}0 run ({done_count}✓){C_RESET}")
+
+            if art_count > 0 and width >= 32:
+                parts.append(f"{C_CYAN}{art_count} arts{C_RESET}")
+            if parts:
+                cat2_rows.append(format_line(f" {' · '.join(parts)}", width))
+                cat2_sub_map.append(None)
+
+            if is_healing_active:
+                cat2_rows.append(format_line(f"  └─ {C_YELLOW}🩹 {healing_proc} (healing){C_RESET}", width))
+                cat2_sub_map.append(None)
+
+            # Render active background tasks
+            raw_tasks = state.get("tasks") or state.get("background_tasks") or []
+            if brain_tasks:
+                seen_tids = {t.get("id") for t in raw_tasks if isinstance(t, dict) and t.get("id")}
+                for bt in brain_tasks:
+                    if bt.get("id") not in seen_tids:
+                        raw_tasks.append(bt)
+            if isinstance(raw_tasks, list) and raw_tasks:
+                for t in raw_tasks[:2]:
+                    if isinstance(t, dict):
+                        cmd_val = t.get("command") or t.get("CommandLine") or t.get("id") or "task"
+                        short_cmd = os.path.basename(str(cmd_val).split()[0]) if cmd_val else "task"
+                        st_val = t.get("status") or "running"
+                        cat2_rows.append(format_line(f"  └─ {C_CYAN}⚙ {short_cmd}{C_RESET} {C_COMMENT}({st_val}){C_RESET}", width))
+                        cat2_sub_map.append(None)
+                    elif isinstance(t, str):
+                        cat2_rows.append(format_line(f"  └─ {C_CYAN}⚙ {t}{C_RESET}", width))
+                        cat2_sub_map.append(None)
+
+            # Render subagents with sliding window around selected_idx
+            wf_base_count = len(cat2_rows)
+            max_sub_rows = max(1, cat2_budget - wf_base_count)
+            if len(enriched_subs) > max_sub_rows:
+                half = max_sub_rows // 2
+                start_idx = max(0, min(selected_idx - half, len(enriched_subs) - max_sub_rows))
+                end_idx = min(len(enriched_subs), start_idx + max_sub_rows)
+                sub_slice = list(enumerate(enriched_subs))[start_idx:end_idx]
+            else:
+                sub_slice = list(enumerate(enriched_subs))
+
+            for item_idx, sub in sub_slice:
+                icon, _ = format_state_badge(sub["state"], tick=now, compact=is_narrow)
+                lbl = sub["label"]
+                detail = sub["state_detail"]
+                started_at = sub["started_at"]
+                step_count = sub["step_count"]
+                is_active_sub = sub["state"] in ("active", "blocked", "healing", "waiting")
+
+                raw_ws = str(sub.get("workspace") or "").strip()
+                if raw_ws.startswith("file://"):
+                    raw_ws = raw_ws[7:]
+                raw_ws = raw_ws.rstrip("/")
+                wt_badge = ""
+                if raw_ws and raw_ws not in ("inherit", "/"):
+                    wt_short = os.path.basename(raw_ws)
+                    if wt_short and wt_short != os.path.basename(proj.rstrip("/")):
+                        wt_badge = f" {C_CYAN} wt:{wt_short}{C_RESET}"
+
+                base_w = visible_len(f"  └─ {icon} @{lbl}") + (visible_len(wt_badge) if wt_badge else 0)
+
+                elapsed_badge = ""
+                if is_active_sub and started_at and float(started_at) > 0:
+                    elapsed = max(0, int(now - float(started_at)))
+                    t_str = f"{elapsed}s" if elapsed < 60 else (f"{elapsed // 60}m" if is_narrow or elapsed >= 600 else f"{elapsed // 60}m{elapsed % 60:02d}s")
+                    step_str = f"·#{step_count}" if step_count > 0 else ""
+                    c_time = C_RED if elapsed > 120 else (C_YELLOW if elapsed > 60 else C_COMMENT)
+                    if base_w + visible_len(f" {t_str}{step_str}") <= width:
+                        elapsed_badge = f" {c_time}{t_str}{step_str}{C_RESET}"
+                    elif base_w + visible_len(f" {t_str}") <= width:
+                        elapsed_badge = f" {c_time}{t_str}{C_RESET}"
+                    else:
+                        elapsed_badge = ""
+
+                detail_str = ""
+                if is_active_sub and detail:
+                    current_w = base_w + (visible_len(elapsed_badge) if elapsed_badge else 0)
+                    rem_cols = width - current_w - 3
+                    if rem_cols >= 8:
+                        clean_detail = re.sub(r"\s+", " ", str(detail)).strip()
+                        if len(clean_detail) > rem_cols:
+                            truncated = clean_detail[:rem_cols].rsplit(" ", 1)[0]
+                            clean_detail = truncated if truncated else clean_detail[:rem_cols]
+                        detail_str = f" {C_COMMENT}· {clean_detail}{C_RESET}"
+
+                is_selected = show_footer and (item_idx == selected_idx)
+
+                if is_selected:
+                    prefix = f"{C_SURFACE}{C_PURPLE}{C_BOLD}▎{C_RESET}{C_SURFACE}"
+                    row_body = f" └─ {icon} {C_PURPLE}@{lbl}{C_RESET}{C_SURFACE}{detail_str}{wt_badge}{elapsed_badge}"
+                    vlen = visible_len(prefix + row_body)
+                    if vlen < width:
+                        full_row = f"{prefix}{row_body}{' ' * (width - vlen)}{C_RESET}"
+                    else:
+                        full_row = format_line(f"{prefix}{row_body}", width) + C_RESET
+                    cat2_rows.append(full_row)
+                elif sub.get("state") == "blocked":
+                    prefix = f"{C_ORANGE}{C_BOLD}▎{C_RESET}"
+                    row_body = f" └─ {icon} {C_PURPLE}@{lbl}{C_RESET}{detail_str}{wt_badge}{elapsed_badge}"
+                    cat2_rows.append(format_line(f"{prefix}{row_body}", width))
+                else:
+                    row_content = f"  └─ {icon} {C_PURPLE}@{lbl}{C_RESET}{detail_str}{wt_badge}{elapsed_badge}"
+                    cat2_rows.append(format_line(row_content, width))
+                cat2_sub_map.append(item_idx)
+
+        cat2_rows = fit_category_rows(cat2_rows, cat2_budget, width)
+        cat2_sub_map = cat2_sub_map[:len(cat2_rows)]
+
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Anchored Viewport Grid Assembly
+    # -------------------------------------------------------------------------
+    _LAST_SUBAGENT_ROWS.clear()
+    frame_lines = list(sec0_lines)
+    frame_lines.append(sec1_hdr)
+    if 1 not in folded:
+        frame_lines.extend(cat1_rows)
+
+    if sep12:
+        frame_lines.append("")
+    frame_lines.append(sec2_hdr)
+    sec2_body_start = len(frame_lines)
+    if 2 not in folded:
+        frame_lines.extend(cat2_rows)
+        for offset, s_idx in enumerate(cat2_sub_map[:len(cat2_rows)]):
+            if s_idx is not None:
+                _LAST_SUBAGENT_ROWS[sec2_body_start + offset] = s_idx
+
+    if sep23:
+        frame_lines.append("")
+    frame_lines.append(sec3_hdr)
+    if 3 not in folded:
+        frame_lines.extend(cat3_rows)
+
+    if sep34:
+        frame_lines.append("")
+    frame_lines.append(sec4_hdr)
+    if 4 not in folded:
+        frame_lines.extend(cat4_rows)
+
+    if sep45:
+        frame_lines.append("")
+    frame_lines.append(sec5_hdr)
+    if 5 not in folded:
+        frame_lines.extend(cat5_rows)
+
+    # Interactive footer legend
+    footer_lines = []
+    if show_footer and width >= 20:
+        if width >= 32:
+            legend = f"{C_COMMENT}j/k/🖱:Nav ⏎:View 1-5:Fold p:Cmd d:Diff t:Tree c:Rail{C_RESET}"
+        elif width >= 24:
+            legend = f"{C_COMMENT}j/k:Nav ⏎:View p:Cmd c:Rail{C_RESET}"
+        else:
+            legend = f"{C_COMMENT}j/k:Nav ⏎:View{C_RESET}"
+        footer_lines.append(format_line(legend, width))
+
+    # Pad remaining space so footer is anchored at the bottom
+    if footer_lines:
+        if len(frame_lines) + len(footer_lines) < usable_rows:
+            frame_lines.extend([""] * (usable_rows - len(footer_lines) - len(frame_lines)))
+        frame_lines.extend(footer_lines)
+    elif len(frame_lines) < usable_rows:
+        frame_lines.extend([""] * (usable_rows - len(frame_lines)))
+
+    # Guarantee bottom blank rows to avoid jumping
+    if bottom_reserve > 0:
+        frame_lines.extend([""] * bottom_reserve)
+
+    out_lines = frame_lines[:term_rows]
+    for k in list(_LAST_SUBAGENT_ROWS.keys()):
+        if k >= len(out_lines):
+            del _LAST_SUBAGENT_ROWS[k]
+    return out_lines
+
+
+def cleanup() -> None:
+    global orig_termios, _GLOBAL_WATCHER
+    if _GLOBAL_WATCHER is not None:
+        try:
+            _GLOBAL_WATCHER.close()
+        except Exception:
+            pass
+        _GLOBAL_WATCHER = None
+    if orig_termios is not None:
+        try:
+            import termios
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSAFLUSH, orig_termios)
+            orig_termios = None
+        except Exception:
+            pass
+    try:
+        sys.stdout.write("\033[?1000l\033[?1006l\033[?7h\033[?25h\033[?1049l")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
+def sig_handler(signum, frame) -> None:
+    cleanup()
+    sys.exit(0)
+
+
+def sigwinch_handler(signum, frame) -> None:
+    global _RESIZE_FLAG
+    _RESIZE_FLAG = True
+
+
+def is_dnd_or_muted() -> tuple[bool, bool]:
+    """
+    Returns (dnd_active, sounds_muted).
+    Checks DBus Inhibited property, plasmanotifyrc, and kdeglobals sound settings.
+    """
+    dnd_active = False
+    sounds_muted = False
+
+    # 1. Check org.freedesktop.Notifications DBus property Inhibited
+    try:
+        res = subprocess.run(
+            [
+                "qdbus6",
+                "org.freedesktop.Notifications",
+                "/org/freedesktop/Notifications",
+                "org.freedesktop.DBus.Properties.Get",
+                "org.freedesktop.Notifications",
+                "Inhibited",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=0.3,
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip().lower() == "true":
+            dnd_active = True
+    except Exception:
+        pass
+
+    # 2. Check ~/.config/plasmanotifyrc [DoNotDisturb]
+    try:
+        notifyrc = os.path.expanduser("~/.config/plasmanotifyrc")
+        if os.path.isfile(notifyrc):
+            with open(notifyrc, "r", encoding="utf-8") as f:
+                content = f.read()
+            m_until = re.search(r"Until=(\d+)", content)
+            if m_until:
+                until_ts = int(m_until.group(1))
+                if until_ts > time.time():
+                    dnd_active = True
+            if "NotificationSoundsMuted=true" in content:
+                sounds_muted = True
+    except Exception:
+        pass
+
+    # 3. Check ~/.config/kdeglobals [Sounds] Enable=false
+    try:
+        kdeglobals = os.path.expanduser("~/.config/kdeglobals")
+        if os.path.isfile(kdeglobals):
+            with open(kdeglobals, "r", encoding="utf-8") as f:
+                content = f.read()
+            m_sounds = re.search(r"\[Sounds\][^\[]*?Enable=(false|0)", content, re.IGNORECASE)
+            if m_sounds:
+                sounds_muted = True
+    except Exception:
+        pass
+
+    return dnd_active, sounds_muted
+
+
+# -----------------------------------------------------------------------------
+# 11. Event-Driven Main Loop
+# -----------------------------------------------------------------------------
+def main() -> None:
+    global orig_termios
+
+    if "--reset-state" in sys.argv:
+        idx = sys.argv.index("--reset-state")
+        target_dir = sys.argv[idx + 1] if len(sys.argv) > idx + 1 and not sys.argv[idx + 1].startswith("-") else None
+        reset_live_state(target_dir)
+        sys.exit(0)
+
+    if "--once" in sys.argv:
+        cols = get_terminal_width(fallback=32)
+        term_rows = get_terminal_height(fallback=42)
+        if "--width" in sys.argv:
+            idx = sys.argv.index("--width")
+            if idx + 1 < len(sys.argv) and sys.argv[idx + 1].isdigit():
+                cols = int(sys.argv[idx + 1])
+        if "--lines" in sys.argv:
+            idx = sys.argv.index("--lines")
+            if idx + 1 < len(sys.argv) and sys.argv[idx + 1].isdigit():
+                term_rows = int(sys.argv[idx + 1])
+        rail = ("--rail" in sys.argv) or (cols <= 10)
+        for line in render_sidebar(cols, term_lines=term_rows, rail_mode=rail):
+            print(line)
+        sys.exit(0)
+
+    # Self-enforce width in tmux if launched as a pane (8 for rail, 16% / 30-34 for full)
+    rail_mode = ("--rail" in sys.argv) or (get_sidebar_mode() == "rail")
+    tmux_pane = os.environ.get("TMUX_PANE")
+    if tmux_pane and os.environ.get("HERDR_ENV") != "1":
+        try:
+            if rail_mode:
+                target_cols = 8
+            else:
+                win_res = subprocess.run(
+                    ["tmux", "display-message", "-p", "#{window_width}"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                raw_w = win_res.stdout.strip()
+                win_width = int(raw_w) if raw_w.isdigit() else 0
+                target_cols = min(34, max(30, round(win_width * 0.16))) if win_width > 0 else 32
+            subprocess.run(
+                ["tmux", "resize-pane", "-t", tmux_pane, "-x", str(target_cols)],
+                capture_output=True,
+                check=False,
+            )
+        except Exception:
+            subprocess.run(
+                ["tmux", "resize-pane", "-t", tmux_pane, "-x", "8" if rail_mode else "32"],
+                capture_output=True,
+                check=False,
+            )
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGWINCH, sigwinch_handler)
+    atexit.register(cleanup)
+
+    # Alternate screen buffer + hide cursor + disable auto-wrap + enable SGR mouse reporting
+    sys.stdout.write("\033[?1049h\033[?25l\033[?7l\033[?1000h\033[?1006h")
+    sys.stdout.flush()
+
+    is_interactive = sys.stdin.isatty() and ("--once" not in sys.argv)
+    if is_interactive:
+        try:
+            import termios
+            import tty
+            orig_termios = termios.tcgetattr(sys.stdin.fileno())
+            tty.setcbreak(sys.stdin.fileno())
+        except Exception:
+            pass
+
+    # Linux Inotify Watcher + select.poll()
+    global _GLOBAL_WATCHER
+    watcher = InotifyWatcher()
+    _GLOBAL_WATCHER = watcher
+    for watch_path in (LIVE_STATE_PATH, PRESENCE_DIR):
+        try:
+            watcher.add_path(watch_path)
+        except Exception:
+            pass
+
+    poller = select.poll()
+    if watcher.fd >= 0:
+        poller.register(watcher.fd, select.POLLIN)
+    if is_interactive:
+        poller.register(sys.stdin.fileno(), select.POLLIN)
+
+    # State tracking
+    last_active_count = 0
+    zero_active_since = 0.0
+    completion_pending = False
+    last_notify_ts = 0.0
+    prev_blocked_count = 0
+    last_blocked_notify_ts = 0.0
+    last_tmux_check_ts = 0.0
+    last_render_ts = 0.0
+
+    selected_idx = 0
+    folded_sections: set[int] = set()
+
+    # Virtual Line-Buffer Diffing state
+    prev_frame_lines: list[str] = []
+    prev_cols = 0
+    prev_rows = 0
+
+    try:
+        script_mtime = os.path.getmtime(__file__)
+    except Exception:
+        script_mtime = 0.0
+
+    while True:
+        now = time.time()
+
+        # Tmux single-pane watchdog
+        if tmux_pane and (now - last_tmux_check_ts >= 10.0):
+            last_tmux_check_ts = now
+            try:
+                res = subprocess.run(
+                    ["tmux", "list-panes", "-t", tmux_pane, "-F", "#{pane_id}"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if res.returncode != 0:
+                    break
+                panes = [p.strip() for p in res.stdout.strip().splitlines() if p.strip()]
+                if len(panes) <= 1:
+                    break
+            except Exception:
+                break
+
+        # Self-reload on script update
+        try:
+            curr_mtime = os.path.getmtime(__file__)
+            if script_mtime > 0.0 and curr_mtime != script_mtime:
+                cleanup()
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception:
+            pass
+
+        state = read_live_state()
+        subagents = state.get("subagents") or []
+        root_cid = resolve_root_conversation_id(state.get("conversation_id"))
+        proj_dir = resolve_sidebar_project_dir(state, root_cid)
+        enriched = enrich_subagents(list(subagents), root_cid, proj_dir, now)
+
+        active_subs = [s for s in enriched if s["state"] in ("blocked", "healing", "active", "waiting")]
+        blocked_subs = [s for s in enriched if s["state"] == "blocked"]
+        blocked_count = len(blocked_subs)
+        sub_count = len(active_subs)
+        task_count = int(state.get("task_count") or 0)
+        curr_active_count = sub_count + task_count
+
+        # Desktop Notification on Blocked State (0 -> >0 transition)
+        if prev_blocked_count == 0 and blocked_count > 0:
+            if now - last_blocked_notify_ts >= 15.0:
+                last_blocked_notify_ts = now
+                dnd_active, sounds_muted = is_dnd_or_muted()
+                if not dnd_active:
+                    try:
+                        subprocess.Popen(
+                            [
+                                "notify-send",
+                                "-u",
+                                "normal",
+                                "-a",
+                                "Antigravity",
+                                "⚠ Antigravity Agent Blocked",
+                                "An agent is waiting for your input/approval.",
+                            ],
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+                    except Exception:
+                        pass
+
+                    if not sounds_muted:
+                        sound_files = [
+                            "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga",
+                            "/usr/share/sounds/freedesktop/stereo/bell.oga",
+                            "/usr/share/sounds/freedesktop/stereo/complete.oga",
+                        ]
+                        if shutil.which("paplay"):
+                            for sf in sound_files:
+                                if os.path.isfile(sf):
+                                    try:
+                                        subprocess.Popen(
+                                            ["paplay", sf],
+                                            stdin=subprocess.DEVNULL,
+                                            stdout=subprocess.DEVNULL,
+                                            stderr=subprocess.DEVNULL,
+                                        )
+                                        break
+                                    except Exception:
+                                        pass
+        prev_blocked_count = blocked_count
+
+        # Task completion notification with hysteresis
+        if curr_active_count > 0:
+            completion_pending = True
+            zero_active_since = 0.0
+        elif completion_pending and curr_active_count == 0:
+            if zero_active_since == 0.0:
+                zero_active_since = now
+            has_db_running = any(bool(s.get("raw_sub", {}).get("db_running")) for s in enriched)
+            if (now - zero_active_since >= 1.5) or not has_db_running:
+                completion_pending = False
+                zero_active_since = 0.0
+                if now - last_notify_ts >= 15.0:
+                    last_notify_ts = now
+                    dnd_active, sounds_muted = is_dnd_or_muted()
+                    if not dnd_active:
+                        try:
+                            subprocess.Popen(
+                                [
+                                    "notify-send",
+                                    "-a",
+                                    "Antigravity",
+                                    "-t",
+                                    "4000",
+                                    "✓ Antigravity Tasks Complete",
+                                    "All active subagents and background tasks finished.",
+                                ],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        except Exception:
+                            pass
+
+                        if not sounds_muted:
+                            sound_file = "/usr/share/sounds/freedesktop/stereo/complete.oga"
+                            if shutil.which("paplay") and os.path.isfile(sound_file):
+                                try:
+                                    subprocess.Popen(
+                                        ["paplay", sound_file],
+                                        stdin=subprocess.DEVNULL,
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL,
+                                    )
+                                except Exception:
+                                    pass
+        last_active_count = curr_active_count
+
+        # ---------------------------------------------------------------------
+        # Virtual Line-Buffer Diffing Render Pass
+        # ---------------------------------------------------------------------
+        cols = get_terminal_width(fallback=32)
+        term_rows = get_terminal_height(fallback=42)
+
+        # Clear screen on terminal resize
+        if cols != prev_cols or term_rows != prev_rows or _RESIZE_FLAG:
+            sys.stdout.write("\033[2J\033[H")
+            sys.stdout.flush()
+            prev_frame_lines = []
+            prev_cols = cols
+            prev_rows = term_rows
+            _RESIZE_FLAG = False
+
+        frame_lines = render_sidebar(
+            cols,
+            term_lines=term_rows,
+            selected_idx=selected_idx,
+            folded_sections=folded_sections,
+            rail_mode=get_sidebar_mode() == "rail",
+            show_footer=is_interactive and cols >= 20,
+        )
+        frame_lines = frame_lines[:term_rows]
+
+        # Emit dirty-line diffs wrapped in synchronized output escapes \033[?2026h ... \033[?2026l
+        if not prev_frame_lines:
+            # First frame full write
+            full_out = "\033[?2026h\033[H" + "\n".join(f"{l}\033[K" for l in frame_lines) + "\033[J\033[?2026l"
+            sys.stdout.write(full_out)
+            sys.stdout.flush()
+        else:
+            diff_ops = []
+            max_r = max(len(frame_lines), len(prev_frame_lines))
+            for r_idx in range(max_r):
+                c_line = frame_lines[r_idx] if r_idx < len(frame_lines) else ""
+                p_line = prev_frame_lines[r_idx] if r_idx < len(prev_frame_lines) else None
+                if c_line != p_line:
+                    diff_ops.append(f"\033[{r_idx + 1};1H{c_line}\033[K")
+            if diff_ops:
+                sys.stdout.write("\033[?2026h" + "".join(diff_ops) + "\033[?2026l")
+                sys.stdout.flush()
+
+        prev_frame_lines = list(frame_lines)
+        last_render_ts = time.time()
+
+        # ---------------------------------------------------------------------
+        # Event Polling (250ms when active, 2000ms when idle)
+        # ---------------------------------------------------------------------
+        poll_timeout = 250 if (curr_active_count > 0 or blocked_count > 0) else 2000
+        try:
+            events = poller.poll(poll_timeout)
+        except (InterruptedError, OSError):
+            continue
+
+        has_stdin = False
+        has_watcher = False
+        for fd, evt in events:
+            if is_interactive and fd == sys.stdin.fileno():
+                has_stdin = True
+            elif watcher.fd >= 0 and fd == watcher.fd:
+                has_watcher = True
+
+        # Inotify Storm Protection: enforce minimum 0.20s debounce between non-interactive redraws
+        time_since_render = time.time() - last_render_ts
+        if has_watcher and not has_stdin and time_since_render < 0.20:
+            rem_ms = max(1, int((0.20 - time_since_render) * 1000))
+            try:
+                extra_events = poller.poll(rem_ms)
+                for fd, evt in extra_events:
+                    if is_interactive and fd == sys.stdin.fileno():
+                        events.append((fd, evt))
+                    elif watcher.fd >= 0 and fd == watcher.fd:
+                        pass
+            except (InterruptedError, OSError):
+                pass
+
+        for fd, evt in events:
+            if evt & (select.POLLHUP | select.POLLERR | select.POLLNVAL):
+                if is_interactive and fd == sys.stdin.fileno():
+                    cleanup()
+                    sys.exit(0)
+            if watcher.fd >= 0 and fd == watcher.fd:
+                watcher.drain()
+            elif is_interactive and fd == sys.stdin.fileno():
+                try:
+                    raw_in = os.read(sys.stdin.fileno(), 128)
+                    if not raw_in:
+                        cleanup()
+                        sys.exit(0)
+                    in_str = raw_in.decode("utf-8", errors="ignore")
+
+                    # Handle SGR mouse sequences
+                    for m_mouse in re.finditer(r"\x1b\[<(\d+);(\d+);(\d+)([Mm])", in_str):
+                        btn = int(m_mouse.group(1))
+                        row_s = m_mouse.group(3)
+                        action = m_mouse.group(4)
+                        if btn == 64:  # Wheel up
+                            selected_idx = max(0, selected_idx - 1)
+                        elif btn == 65:  # Wheel down
+                            selected_idx = min(max(0, len(enriched) - 1), selected_idx + 1)
+                        elif btn == 0 and action == "M":  # Left click press
+                            row_idx = int(row_s) - 1
+                            if 0 <= row_idx < len(prev_frame_lines):
+                                raw_line = strip_ansi(prev_frame_lines[row_idx]).strip()
+                                if raw_line.startswith("◆ SESSION"):
+                                    folded_sections.symmetric_difference_update({1})
+                                elif raw_line.startswith("◆ WORKFLOW"):
+                                    folded_sections.symmetric_difference_update({2})
+                                elif raw_line.startswith("◆ MCP"):
+                                    folded_sections.symmetric_difference_update({3})
+                                elif raw_line.startswith("◆ CODE INTEL"):
+                                    folded_sections.symmetric_difference_update({4})
+                                elif raw_line.startswith("◆ QUOTA"):
+                                    folded_sections.symmetric_difference_update({5})
+                                elif "@" in raw_line and ("└─" in raw_line or "▎" in raw_line):
+                                    target_s_idx = _LAST_SUBAGENT_ROWS.get(row_idx)
+                                    if target_s_idx is not None and 0 <= target_s_idx < len(enriched):
+                                        if selected_idx == target_s_idx:
+                                            target_id = enriched[target_s_idx].get("id") or root_cid
+                                            subprocess.Popen(
+                                                [sys.executable, SQUAD_BIN, "--toggle-popup", "i", proj_dir, SQUAD_BIN, "--inspect-session", str(target_id)],
+                                                stdin=subprocess.DEVNULL,
+                                                stdout=subprocess.DEVNULL,
+                                                stderr=subprocess.DEVNULL,
+                                            )
+                                        else:
+                                            selected_idx = target_s_idx
+
+                    # Tokenize remaining input character-by-character and ANSI escape sequences
+                    rem_str = re.sub(r"\x1b\[<(?:\d+);(?:\d+);(?:\d+)[Mm]", "", in_str)
+                    tokens: list[str] = []
+                    ti = 0
+                    while ti < len(rem_str):
+                        if rem_str[ti:ti+3] in ("\x1b[A", "\x1b[B", "\x1b[C", "\x1b[D"):
+                            tokens.append(rem_str[ti:ti+3])
+                            ti += 3
+                        elif rem_str[ti] == "\x1b" and ti + 1 < len(rem_str) and rem_str[ti+1] == "[":
+                            m_esc = re.match(r"\x1b\[[0-9;]*[a-zA-Z]", rem_str[ti:])
+                            if m_esc:
+                                tokens.append(m_esc.group(0))
+                                ti += len(m_esc.group(0))
+                            else:
+                                tokens.append(rem_str[ti])
+                                ti += 1
+                        else:
+                            tokens.append(rem_str[ti])
+                            ti += 1
+
+                    for tok in tokens:
+                        if tok in ("j", "\x1b[B"):  # Down
+                            selected_idx = min(len(enriched) - 1, selected_idx + 1) if enriched else 0
+                        elif tok in ("k", "\x1b[A"):  # Up
+                            selected_idx = max(0, selected_idx - 1)
+                        elif tok in ("\r", "\n"):
+                            if enriched and 0 <= selected_idx < len(enriched):
+                                target_id = enriched[selected_idx].get("id") or root_cid
+                                subprocess.Popen(
+                                    [sys.executable, SQUAD_BIN, "--toggle-popup", "i", proj_dir, SQUAD_BIN, "--inspect-session", str(target_id)],
+                                    stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                )
+                            else:
+                                subprocess.Popen(
+                                    [sys.executable, SQUAD_BIN, "--toggle-popup", "t", proj_dir, SQUAD_BIN, "--tree-popup"],
+                                    stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                )
+                        elif tok == "t":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--toggle-popup", "t", proj_dir, SQUAD_BIN, "--tree-popup"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "p":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--toggle-popup", "p", proj_dir, SQUAD_BIN, "--command-palette"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "o":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--toggle-popup", "o", proj_dir, SQUAD_BIN, "--jump-attention"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "d":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--toggle-popup", "d", proj_dir, SQUAD_BIN, "--diff-popup"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "g":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--toggle-popup", "g", proj_dir, "lazygit"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "y":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--toggle-popup", "y", proj_dir, "yazi"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "c":
+                            subprocess.Popen(
+                                [sys.executable, SQUAD_BIN, "--sidebar-rail"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                        elif tok == "r":  # Force sync
+                            trigger_background_quota_refresh(0.0)
+                        elif tok in ("1", "2", "3", "4", "5"):  # Section toggle fold
+                            folded_sections.symmetric_difference_update({int(tok)})
+                        elif tok in ("q", "\x03"):  # Quit
+                            cleanup()
+                            sys.exit(0)
+                except Exception:
+                    pass
+
+    cleanup()
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

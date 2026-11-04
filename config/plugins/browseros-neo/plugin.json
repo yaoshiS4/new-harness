@@ -1,0 +1,6 @@
+{
+  "name": "browseros-neo",
+  "version": "1.0.0",
+  "description": "BrowserOS Neo logged-in agent browser MCP bundle",
+  "disabled": true
+}

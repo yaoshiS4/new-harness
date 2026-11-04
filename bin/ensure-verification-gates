@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT="$HOME/.gemini/antigravity/scripts/ensure-verification-gates.py"
+if [ ! -f "$SCRIPT" ]; then
+  REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+  SCRIPT="$REPO_DIR/antigravity/scripts/ensure-verification-gates.py"
+fi
+exec python3 "$SCRIPT" "$@"

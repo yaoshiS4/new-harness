@@ -1,0 +1,69 @@
+{
+  "herdr": {
+    "SessionStart": [
+      {
+        "command": "bash '/home/heocop/.gemini/config/hooks/herdr-agent-state.sh' session",
+        "timeout": 10,
+        "type": "command"
+      }
+    ],
+    "enabled": true
+  },
+  "intake-grounding-gate": {
+    "PreInvocation": [
+      {
+        "command": "python3 /home/heocop/.gemini/config/hooks/pre_invocation_hook.py",
+        "timeout": 3,
+        "type": "command"
+      }
+    ],
+    "SessionStart": [
+      {
+        "command": "python3 /home/heocop/.gemini/config/hooks/pre_invocation_hook.py --session-start",
+        "timeout": 3,
+        "type": "command"
+      }
+    ],
+    "enabled": true
+  },
+  "safety-and-loop-gate": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "python3 /home/heocop/.gemini/config/hooks/pre_tool_use_hook.py",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "run_command|view_file|read_file|list_dir|manage_task|manage_subagents|schedule|run_workflow|define_subagent|write_to_file|write_file|replace_file_content|multi_replace_file_content|edit_file|invoke_subagent|call_mcp_tool|mcp_.*|send_message"
+      }
+    ],
+    "enabled": true
+  },
+  "syntax-smoke-gate": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "python3 /home/heocop/.gemini/config/hooks/post_tool_use_hook.py",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "replace_file_content|write_to_file|multi_replace_file_content|write_file|edit_file|run_command|call_mcp_tool|mcp_.*"
+      }
+    ],
+    "enabled": true
+  },
+  "teardown-audit-gate": {
+    "Stop": [
+      {
+        "command": "python3 /home/heocop/.gemini/config/hooks/stop_hook.py",
+        "timeout": 5,
+        "type": "command"
+      }
+    ],
+    "enabled": true
+  }
+}

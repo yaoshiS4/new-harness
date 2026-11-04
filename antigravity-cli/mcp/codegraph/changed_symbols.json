@@ -1,0 +1,1 @@
+{"name":"changed_symbols","description":"Extract symbol-like names from a diff with fast LRU caching.","parameters":{"properties":{"diff_text":{"title":"Diff Text","type":"string"}},"required":["diff_text"],"title":"changed_symbolsArguments","type":"object"}}

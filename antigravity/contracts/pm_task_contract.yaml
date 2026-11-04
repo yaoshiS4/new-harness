@@ -1,0 +1,21 @@
+# Routing contract emitted by pm. Consumers: guardrails/pm-no-implementation.md,
+# AGENTS.md, skills/routing-thresholds, skills/spawn-governance.
+# Uses 3-Tier Adaptive Routing Protocol & 8-Stage Pipeline.
+contract_type: pm_task_contract
+validated_user_intent: ""
+user_validation_status: blocked_waiting_for_user   # approved | blocked_waiting_for_user
+routing_path: ""           # path_1 (Quick Route <= 3 files) | path_2 (Normal Route 4-10 files) | path_3 (Long-Horizon Route > 10 files)
+pipeline_stage: ""         # stage_1 (Intake) | stage_2 (Enrichment) | stage_3 (Clarification) | stage_4 (PM Contract) | stage_5 (Disjoint Builders) | stage_6 (Implementation) | stage_7 (Two-Stage QC) | stage_8 (Independent Oracle Audit)
+task_type: ""              # atomic | medium | epic | exploratory | debugging | config | docs
+complexity: ""             # low (<=3 files) | medium (4-10 files) | high (>10 files)
+selected_topology: ""      # single-builder (Path 1) | disjoint-specialists (Path 2) | wave-isolated (Path 3)
+allowed_files: []
+required_tests: []
+scope_drift_budget_percent: 5
+validation_target: ""      # command or gate proving completion (project-regression run, tests, etc.)
+shard_template:
+  shard_id: ""
+  owner_role: ""
+  allowed_files: []
+  oracle_custody_lease: "NONE | UPDATE_ASSERTIONS"
+  verification_cmd: ""

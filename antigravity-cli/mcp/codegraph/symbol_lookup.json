@@ -1,0 +1,1 @@
+{"name":"symbol_lookup","description":"Find likely symbol definitions and references in a project using incremental index and PageRank.","parameters":{"properties":{"limit":{"default":20,"title":"Limit","type":"integer"},"query":{"title":"Query","type":"string"},"root":{"title":"Root","type":"string"}},"required":["root","query"],"title":"symbol_lookupArguments","type":"object"}}

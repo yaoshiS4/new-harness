@@ -1,0 +1,1 @@
+{"name":"vault_write","description":"","parameters":{"properties":{"content":{"title":"Content","type":"string"},"relative_path":{"title":"Relative Path","type":"string"},"slug":{"title":"Slug","type":"string"}},"required":["slug","relative_path","content"],"title":"vault_writeArguments","type":"object"}}

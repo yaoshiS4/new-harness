@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Test and coverage caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Ephemeral databases & logs (Cleanliness Invariant)
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+*.db-*
+*.log
+*.log.*
+
+# OS and Editor metadata & backups
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+*.bak
+backups/
+
+# Secrets and local credentials
+.env
+.env.*
+.stitch_key
+*.pem
+*.key
+
+# Claude Code harness: personal/local state never belongs in the snapshot
+.claude/settings.local.json
+.claude/harness/*.sqlite*
+.claude/skills/**/node_modules/

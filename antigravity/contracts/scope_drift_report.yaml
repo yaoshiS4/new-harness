@@ -1,0 +1,9 @@
+# Drift accounting. Consumers: skills/scope-drift-control (compare actual vs planned),
+# contracts/pm_task_contract.yaml, coordination/context_budget/policy.md.
+contract_type: scope_drift_report
+gate_id: ""
+planned_files: []
+actual_files: []
+drift_percent: 0
+budget_percent: 5          # default from contracts/pm_task_contract.yaml unless task contract overrides
+decision: pass             # pass | stop (stop when drift_percent exceeds budget_percent)

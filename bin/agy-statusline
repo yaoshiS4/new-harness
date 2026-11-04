@@ -1,0 +1,1107 @@
+#!/usr/bin/env python3
+import fcntl
+import json
+import os
+import re
+import shutil
+import sqlite3
+import sys
+import time
+from datetime import datetime, timezone
+
+_REPO_LIB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
+_LOCAL_LIB = os.path.expanduser("~/.local/lib")
+for p in (_LOCAL_LIB, _REPO_LIB):
+    if p not in sys.path and os.path.isdir(p):
+        sys.path.insert(0, p)
+from agy_tui_core import (
+    LIVE_STATE_PATH,
+    CACHE_PATH,
+    PERSISTENT_CACHE_PATH,
+    CACHE_PATHS,
+    LOCK_PATH,
+    PRESENCE_DIR,
+    DB_PATH,
+    BRAIN_DIR,
+    C_COMMENT,
+    C_CYAN,
+    C_GREEN,
+    C_ORANGE,
+    C_PINK,
+    C_PURPLE,
+    C_RED,
+    C_YELLOW,
+    C_WHITE,
+    C_ROSEWATER,
+    C_RESET,
+    C_BOLD,
+    ANSI_RE,
+    visible_len,
+    classify_agent_state,
+    get_git_worktrees,
+    get_locked_conversation_ids,
+    connect_db_ro,
+    read_live_state,
+    get_current_session_key,
+    update_live_state_atomic,
+    get_sidebar_mode,
+    resolve_root_conversation_id,
+    get_git_diff_stat,
+    read_quota_cache,
+    write_quota_cache,
+    refresh_quota_cache_now,
+    trigger_background_quota_refresh,
+    resolve_quota_pair,
+    compute_cache_hit_pct,
+    format_token_k,
+    resolve_session_token_telemetry,
+    format_countdown,
+    format_countdown_short,
+    discover_brain_subagents,
+    discover_brain_tasks,
+    discover_cycle_mode,
+    merge_and_dedup_subagents,
+    render_gradient_gauge,
+    render_braille_sparkline,
+)
+
+AGY_BIN = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
+REFRESH_INTERVAL_SEC = 300
+LOCK_STALE_SEC = 20
+
+
+def format_active_subagent_pill(running_subs: list[dict]) -> str:
+    """Format active subagent stateDetail pill."""
+    for s in running_subs:
+        detail = str(s.get("stateDetail") or s.get("toolAction") or s.get("toolSummary") or "").strip()
+        role = str(s.get("role") or s.get("name") or "agent").strip()
+        if detail:
+            clean_detail = re.sub(r"\s+", " ", detail)[:24]
+            return f"{C_PURPLE}⚡ @{role}:{C_RESET} {C_WHITE}{clean_detail}{C_RESET}"
+    return ""
+
+
+def resolve_quota_map(stdin_quota: dict) -> dict:
+    state = read_quota_cache()
+    cached_quota = state.get("quota") or {}
+    last_ts = float(state.get("ts") or 0)
+
+    if not cached_quota and not stdin_quota:
+        state = refresh_quota_cache_now(timeout_sec=4)
+        cached_quota = state.get("quota") or {}
+        last_ts = float(state.get("ts") or 0)
+    elif not cached_quota and stdin_quota:
+        cached_quota = dict(stdin_quota)
+        state["quota"] = cached_quota
+        write_quota_cache(state)
+    elif cached_quota and stdin_quota:
+        updated = False
+        for k, v in stdin_quota.items():
+            if not isinstance(v, dict) or v.get("remaining_fraction") is None:
+                continue
+            cur = cached_quota.get(k)
+            if not isinstance(cur, dict) or cur.get("remaining_fraction") is None:
+                cached_quota[k] = v
+                updated = True
+            elif (
+                v.get("reset_time") == cur.get("reset_time")
+                and float(v["remaining_fraction"]) < float(cur["remaining_fraction"]) - 1e-6
+            ):
+                cached_quota[k] = v
+                updated = True
+        if updated:
+            state["quota"] = cached_quota
+            write_quota_cache(state)
+
+    trigger_background_quota_refresh(last_ts)
+    return cached_quota or stdin_quota
+
+
+def resolve_conversation_id(d: dict, live_st: dict | None = None, cur_dir: str = "") -> str:
+    cid = (
+        d.get("conversation_id")
+        or d.get("session_id")
+        or (d.get("conversation") or {}).get("id")
+        or d.get("id")
+    )
+    if cid:
+        return resolve_root_conversation_id(str(cid))
+
+    # Incoming stdin payload check: if input/output tokens are 0 and no conv_id, treat as reset/fresh session
+    ctx_obj = d.get("context_window") if isinstance(d.get("context_window"), dict) else {}
+    usage_obj = d.get("usage") if isinstance(d.get("usage"), dict) else {}
+    in_tok = int(ctx_obj.get("total_input_tokens") or usage_obj.get("input_tokens") or 0)
+    out_tok = int(ctx_obj.get("total_output_tokens") or usage_obj.get("output_tokens") or 0)
+    if in_tok == 0 and out_tok == 0 and (ctx_obj.get("used_percentage") is None or float(ctx_obj.get("used_percentage") or 0.0) == 0.0):
+        return ""
+
+    # Check live_st
+    if live_st and isinstance(live_st, dict):
+        if live_st.get("conversation_id") == "":
+            return ""
+        st_cid = str(live_st.get("conversation_id") or "")
+        if st_cid:
+            st_ws = live_st.get("workspace") if isinstance(live_st.get("workspace"), dict) else {}
+            st_dir = st_ws.get("project_dir") or st_ws.get("current_dir") or live_st.get("git_cached_proj") or ""
+            if not cur_dir or not st_dir or os.path.abspath(cur_dir) == os.path.abspath(st_dir):
+                return resolve_root_conversation_id(st_cid)
+
+    if os.path.exists(LIVE_STATE_PATH):
+        try:
+            with open(LIVE_STATE_PATH, "r", encoding="utf-8") as f:
+                st = json.load(f)
+            if isinstance(st, dict) and st.get("conversation_id"):
+                st_cid = str(st["conversation_id"])
+                st_ws = st.get("workspace") if isinstance(st.get("workspace"), dict) else {}
+                st_dir = st_ws.get("project_dir") or st_ws.get("current_dir") or st.get("git_cached_proj") or ""
+                if not cur_dir or not st_dir or os.path.abspath(cur_dir) == os.path.abspath(st_dir):
+                    return resolve_root_conversation_id(st_cid)
+        except Exception:
+            pass
+    return ""
+
+
+def is_sidebar_active(live_st: dict) -> bool:
+    if live_st.get("sidebar_hidden") is True:
+        return False
+
+    now = time.time()
+    cache_ts = float(live_st.get("sidebar_check_ts") or 0.0)
+    if cache_ts > now:
+        cache_ts = 0.0
+
+    if "sidebar_running" in live_st and (now - cache_ts <= 3.0):
+        return bool(live_st.get("sidebar_running"))
+
+    running = False
+    is_herdr = os.environ.get("HERDR_ENV") == "1" or bool(os.environ.get("HERDR_SOCKET_PATH"))
+    if is_herdr:
+        try:
+            import subprocess
+            target_tab = os.environ.get("HERDR_TAB_ID") or os.environ.get("HERDR_ACTIVE_TAB_ID")
+            res = subprocess.run(
+                ["herdr", "pane", "list"],
+                capture_output=True,
+                text=True,
+                timeout=0.2,
+                check=False,
+            )
+            if res.returncode == 0 and res.stdout:
+                try:
+                    panes = json.loads(res.stdout).get("result", {}).get("panes", [])
+                    if any(
+                        ((p.get("label") or p.get("title") or "") == "agy-sidebar" or "agy-sidebar" in (p.get("command") or ""))
+                        and (not target_tab or p.get("tab_id") == target_tab)
+                        for p in panes
+                    ):
+                        running = True
+                except Exception:
+                    if not target_tab and "agy-sidebar" in res.stdout:
+                        running = True
+        except Exception:
+            pass
+    elif os.environ.get("TMUX"):
+        try:
+            import subprocess
+            res = subprocess.run(
+                ["tmux", "list-panes", "-F", "#{pane_current_command} #{pane_start_command}"],
+                capture_output=True,
+                text=True,
+                timeout=0.08,
+                check=False,
+            )
+            if res.returncode == 0 and "agy-sidebar" in res.stdout:
+                running = True
+        except Exception:
+            pass
+
+    live_st["sidebar_running"] = running
+    live_st["sidebar_check_ts"] = now
+    return running
+
+
+def sanitize_subagents(raw_subs: list) -> tuple[list[dict], int, int]:
+    if not isinstance(raw_subs, list):
+        return ([], 0, 0)
+    sanitized_list: list[dict] = []
+    running_count = 0
+    for sub in raw_subs:
+        if not isinstance(sub, dict):
+            continue
+        conv_sub_id = str(
+            sub.get("id")
+            or sub.get("session_id")
+            or sub.get("conversationId")
+            or sub.get("conversation_id")
+            or ""
+        ).strip()
+        state_detail = str(
+            sub.get("stateDetail")
+            or sub.get("toolAction")
+            or sub.get("toolSummary")
+            or sub.get("detail")
+            or ""
+        ).strip()
+        tool_action = str(sub.get("toolAction") or "").strip()
+        tool_summary = str(sub.get("toolSummary") or "").strip()
+        workspace = sub.get("workspace") or "inherit"
+        started_at = sub.get("started_at") or sub.get("created_at") or 0.0
+        step_count = int(
+            sub.get("step_count")
+            or sub.get("step_index")
+            or sub.get("steps")
+            or 0
+        )
+        raw_st = str(sub.get("status") or sub.get("state") or "running").strip().lower()
+        is_healing = bool(
+            sub.get("is_healing")
+            or ("healing" in state_detail.lower())
+            or ("round " in state_detail.lower())
+            or ("retry" in state_detail.lower())
+        )
+        classified_st = classify_agent_state(
+            raw_st,
+            state_detail=state_detail,
+            is_healing=is_healing,
+        )
+
+        role = sub.get("role")
+        name = str(sub.get("name") or sub.get("typeName") or "agent").strip()
+        if isinstance(role, str) and len(role.strip()) <= 28 and "\n" not in role:
+            lbl = role.strip()
+        else:
+            first_line = str(role or "").splitlines()[0].strip() if role else ""
+            lbl = ""
+            if first_line:
+                m_shard = re.search(r"\b(Shard\s*\d+)\b", first_line, re.IGNORECASE)
+                if m_shard:
+                    lbl = m_shard.group(1).title()
+                else:
+                    cleaned = re.sub(
+                        r"^(Execute(\s+this)?|Conduct(\s+a)?|Run(\s+the)?|Audit(\s+all|\s+the)?)\s+",
+                        "",
+                        first_line,
+                        flags=re.IGNORECASE,
+                    ).strip()
+                    cleaned = re.sub(r":.*$", "", cleaned).strip()
+                    if cleaned and len(cleaned) <= 24:
+                        lbl = cleaned
+            if not lbl:
+                lbl = name or "agent"
+
+        lbl = re.sub(r"\s+", " ", lbl).strip()[:24]
+        if not lbl:
+            lbl = name[:20] or "agent"
+
+        sanitized_list.append({
+            "id": conv_sub_id,
+            "conversationId": conv_sub_id,
+            "name": name[:20],
+            "role": lbl,
+            "status": classified_st,
+            "raw_status": raw_st,
+            "stateDetail": state_detail,
+            "toolAction": tool_action,
+            "toolSummary": tool_summary,
+            "workspace": workspace,
+            "started_at": started_at,
+            "step_count": step_count,
+        })
+        if classified_st in ("active", "blocked", "healing", "waiting"):
+            running_count += 1
+
+    completed_count = len(sanitized_list) - running_count
+    return (sanitized_list, running_count, completed_count)
+
+
+def _prune_stale_sessions(
+    sessions: dict,
+    active_key: str = "",
+    max_age_sec: float = 86400.0,
+    max_entries: int = 32,
+) -> dict:
+    """Evicts expired (>24h), dead-PID (>600s without /proc/<pid>), and excess (>32) session entries."""
+    if not isinstance(sessions, dict):
+        return {}
+    now = time.time()
+    has_proc = os.path.isdir("/proc")
+    survivors: list[tuple[float, str, dict]] = []
+    active_entry: dict | None = None
+
+    for sk, sv in sessions.items():
+        if not isinstance(sv, dict):
+            continue
+        sk_str = str(sk)
+        if active_key and sk_str == active_key:
+            active_entry = sv
+            continue
+
+        raw_ts = sv.get("updated_at")
+        try:
+            ts = float(raw_ts) if raw_ts is not None else 0.0
+        except (ValueError, TypeError):
+            ts = 0.0
+
+        if ts > 0.0:
+            age = now - ts
+            if age > max_age_sec:
+                continue
+            if sk_str.startswith("agy-") and sk_str[4:].isdigit() and age > 600.0:
+                if has_proc and not os.path.exists(f"/proc/{sk_str[4:]}"):
+                    continue
+        elif sk_str.startswith("agy-") and sk_str[4:].isdigit():
+            if has_proc and not os.path.exists(f"/proc/{sk_str[4:]}"):
+                continue
+
+        survivors.append((ts, sk_str, sv))
+
+    cap = max(1, int(max_entries))
+    other_cap = max(0, cap - 1) if (active_key and active_entry is not None) else cap
+    survivors.sort(key=lambda item: item[0], reverse=True)
+
+    pruned: dict[str, dict] = {}
+    if active_key and active_entry is not None:
+        pruned[active_key] = active_entry
+    for _, sk_str, sv in survivors[:other_cap]:
+        pruned[sk_str] = sv
+    return pruned
+
+
+def persist_live_state(
+    d: dict,
+    git_diff: dict,
+    cache_hit_pct: int,
+    conv_id: str,
+    git_cache_ts: float = 0.0,
+    proj_dir: str = "",
+    fallback_branch: str | None = None,
+    fallback_dirty: bool | None = None,
+    live_state: dict | None = None,
+    turn_start: float = 0.0,
+    sanitized_subs: list[dict] | None = None,
+    running_count: int | None = None,
+    completed_count: int | None = None,
+) -> None:
+    try:
+        os.makedirs(os.path.dirname(LIVE_STATE_PATH), exist_ok=True)
+        disk_st = read_live_state()
+
+        art_val = d.get("artifact_count")
+        if art_val is not None:
+            art_count = int(art_val)
+        else:
+            arts = d.get("artifacts")
+            if isinstance(arts, list) and arts:
+                art_count = len(arts)
+            elif conv_id:
+                brain_cid_dir = os.path.join(BRAIN_DIR, conv_id)
+                if os.path.isdir(brain_cid_dir):
+                    try:
+                        with os.scandir(brain_cid_dir) as it:
+                            art_count = sum(1 for e in it if e.name.endswith(".md") and not e.name.startswith("."))
+                    except Exception:
+                        art_count = 0
+                else:
+                    art_count = 0
+            else:
+                art_count = 0
+
+        raw_subs = d.get("subagents") or []
+        if sanitized_subs is None:
+            if isinstance(raw_subs, list) and raw_subs:
+                sanitized_subs, r_cnt, c_cnt = sanitize_subagents(raw_subs)
+            elif isinstance(raw_subs, list):
+                sanitized_subs = []
+                r_cnt = int(d.get("subagent_count") or 0)
+                c_cnt = int(d.get("subagent_completed_count") or 0)
+            else:
+                sanitized_subs = []
+                r_cnt = int(d.get("subagent_count") or (int(raw_subs) if str(raw_subs).isdigit() else 0))
+                c_cnt = int(d.get("subagent_completed_count") or 0)
+            if running_count is None:
+                running_count = r_cnt
+            if completed_count is None:
+                completed_count = c_cnt
+        else:
+            if running_count is None:
+                running_count = sum(1 for s in sanitized_subs if s.get("status") in ("active", "blocked", "healing", "waiting"))
+            if completed_count is None:
+                completed_count = len(sanitized_subs) - running_count
+
+        # Last-turn diff isolator (git_diff_turn vs git_diff)
+        base = {}
+        if live_state and isinstance(live_state, dict):
+            prev_conv = live_state.get("git_diff_baseline_conv") or live_state.get("conversation_id")
+            prev_proj = live_state.get("git_diff_baseline_proj") or live_state.get("git_cached_proj")
+            if prev_conv == conv_id and prev_proj == proj_dir:
+                base = live_state.get("git_diff_baseline") or {}
+
+        files = int(git_diff.get("files") or 0)
+        ins = int(git_diff.get("ins") or 0)
+        del_ = int(git_diff.get("del") or 0)
+
+        if not base:
+            base = {"files": files, "ins": ins, "del": del_}
+        else:
+            base_files = int(base.get("files") or 0)
+            base_ins = int(base.get("ins") or 0)
+            base_del = int(base.get("del") or 0)
+            if files < base_files or ins < base_ins or del_ < base_del:
+                base = {"files": files, "ins": ins, "del": del_}
+
+        base_files = int(base.get("files") or 0)
+        base_ins = int(base.get("ins") or 0)
+        base_del = int(base.get("del") or 0)
+
+        git_diff_turn = {
+            "files": max(0, files - base_files),
+            "ins": max(0, ins - base_ins),
+            "del": max(0, del_ - base_del),
+        }
+
+        # Git worktrees
+        git_worktrees = get_git_worktrees(proj_dir)
+
+        # Blocked count
+        blocked_count = sum(1 for s in sanitized_subs if s.get("status") == "blocked")
+        if blocked_count == 0 and "blocked_count" in d:
+            try:
+                blocked_count = int(d.get("blocked_count") or 0)
+            except Exception:
+                pass
+
+        # Turn duration & token velocity
+        ctx_obj = d.get("context_window") or {}
+        usage = d.get("usage") or {}
+        in_tok = int(
+            ctx_obj.get("total_input_tokens")
+            or usage.get("input_tokens")
+            or usage.get("prompt_tokens")
+            or ctx_obj.get("input_tokens")
+            or 0
+        )
+        out_tok = int(
+            ctx_obj.get("total_output_tokens")
+            or usage.get("output_tokens")
+            or usage.get("candidates_token_count")
+            or ctx_obj.get("output_tokens")
+            or 0
+        )
+        curr_tokens = in_tok + out_tok
+
+        locked_cids = get_locked_conversation_ids()
+        is_active_conv = bool(conv_id and conv_id in locked_cids)
+
+        turn_duration_sec = 0.0
+        if d.get("turn_duration_sec") is not None:
+            try:
+                turn_duration_sec = float(d["turn_duration_sec"])
+            except Exception:
+                pass
+        elif d.get("turn_duration") is not None:
+            try:
+                turn_duration_sec = float(d["turn_duration"])
+            except Exception:
+                pass
+        elif is_active_conv:
+            if live_state and live_state.get("turn_start_ts") and live_state.get("conversation_id") == conv_id:
+                turn_duration_sec = max(0.0, time.time() - float(live_state["turn_start_ts"]))
+            elif turn_start > 0:
+                turn_duration_sec = max(0.0, time.time() - turn_start)
+        elif live_state and live_state.get("turn_duration_sec"):
+            turn_duration_sec = float(live_state.get("turn_duration_sec") or 0.0)
+
+        turn_start_ts_to_save = None
+        if is_active_conv:
+            if live_state and live_state.get("conversation_id") == conv_id and live_state.get("turn_start_ts"):
+                turn_start_ts_to_save = float(live_state["turn_start_ts"])
+            elif turn_start > 0:
+                turn_start_ts_to_save = turn_start
+
+        tok_per_min = 0
+        if d.get("tok_per_min") is not None:
+            try:
+                tok_per_min = int(d["tok_per_min"])
+            except Exception:
+                pass
+        elif live_state and isinstance(live_state, dict):
+            prev_ts = float(live_state.get("ts") or 0.0)
+            prev_ctx = live_state.get("context_window") or {}
+            prev_tokens = int(prev_ctx.get("total_input_tokens") or 0) + int(prev_ctx.get("total_output_tokens") or 0)
+            delta_tok = max(0, curr_tokens - prev_tokens)
+            delta_sec = time.time() - prev_ts
+            prev_tok_per_min = min(500000, max(0, int(live_state.get("tok_per_min") or 0)))
+            if delta_sec >= 1.5 and delta_tok > 0 and delta_sec < 300.0:
+                raw_rate = (delta_tok / delta_sec) * 60.0
+                clamped_rate = min(500000.0, raw_rate)
+                if prev_tok_per_min > 0:
+                    tok_per_min = round(0.6 * clamped_rate + 0.4 * prev_tok_per_min)
+                else:
+                    tok_per_min = round(clamped_rate)
+            elif delta_sec < 1.5:
+                tok_per_min = prev_tok_per_min
+            elif (time.time() - prev_ts < 30.0) and prev_tok_per_min:
+                tok_per_min = prev_tok_per_min
+
+        # Background tasks
+        raw_tasks = d.get("tasks") or d.get("background_tasks") or []
+        tasks = raw_tasks if isinstance(raw_tasks, list) and raw_tasks else []
+        if not tasks and conv_id:
+            tasks = discover_brain_tasks(conv_id)
+        task_count = len(tasks) if tasks else int(d.get("task_count") or 0)
+
+        # Cycle mode
+        cycle_mode = discover_cycle_mode(str(d.get("cycle_mode") or d.get("mode") or ""), conv_id)
+
+        # Per-session workspace isolation
+        sessions_dict = {}
+        if disk_st and isinstance(disk_st.get("sessions"), dict):
+            sessions_dict.update(disk_st["sessions"])
+        elif live_state and isinstance(live_state.get("sessions"), dict):
+            sessions_dict.update(live_state["sessions"])
+
+        prev_conv = (live_state.get("conversation_id") if live_state else None) or (disk_st.get("conversation_id") if disk_st else None)
+        same_conv = bool(conv_id and prev_conv == conv_id)
+
+        session_key = get_current_session_key()
+
+        if session_key:
+            root_c = resolve_root_conversation_id(conv_id) if conv_id else ""
+            eff_conv_id = root_c or conv_id
+            prev_sess = disk_st.get("sessions", {}).get(session_key, {}) if disk_st else {}
+            prev_sess_cid = prev_sess.get("conversation_id") or ""
+            same_sess_conv = bool(conv_id and prev_sess_cid == conv_id)
+
+            m_val = d.get("model") or (prev_sess.get("model") if same_sess_conv else {}) or (live_state.get("model") if live_state and same_conv else {}) or {}
+            ctx_val = d.get("context_window") or (prev_sess.get("context_window") if same_sess_conv else {}) or (live_state.get("context_window") if live_state and same_conv else {}) or {}
+            cache_val = cache_hit_pct or d.get("cache_hit_pct") or (prev_sess.get("cache_hit_pct") if same_sess_conv else 0) or (live_state.get("cache_hit_pct") if live_state and same_conv else 0) or 0
+            subs_val = sanitized_subs if sanitized_subs else ((prev_sess.get("subagents") if same_sess_conv else []) or (live_state.get("subagents") if live_state and same_conv else []) or [])
+            sub_cnt_val = running_count if running_count is not None else ((prev_sess.get("subagent_count") if same_sess_conv else 0) or (live_state.get("subagent_count") if live_state and same_conv else 0) or 0)
+            sub_comp_val = completed_count if completed_count is not None else ((prev_sess.get("subagent_completed_count") if same_sess_conv else 0) or (live_state.get("subagent_completed_count") if live_state and same_conv else 0) or 0)
+            blk_cnt_val = blocked_count if blocked_count is not None else ((prev_sess.get("blocked_count") if same_sess_conv else 0) or (live_state.get("blocked_count") if live_state and same_conv else 0) or 0)
+            task_cnt_val = task_count if task_count is not None else ((prev_sess.get("task_count") if same_sess_conv else 0) or (live_state.get("task_count") if live_state and same_conv else 0) or 0)
+
+            sessions_dict[session_key] = {
+                "workspace": d.get("workspace") or {},
+                "vcs": d.get("vcs") or {},
+                "git_diff": git_diff,
+                "git_diff_turn": git_diff_turn,
+                "conversation_id": eff_conv_id,
+                "model": m_val,
+                "context_window": ctx_val,
+                "cache_hit_pct": cache_val,
+                "subagents": subs_val,
+                "subagent_count": sub_cnt_val,
+                "subagent_completed_count": sub_comp_val,
+                "blocked_count": blk_cnt_val,
+                "task_count": task_cnt_val,
+                "sidebar_mode": (prev_sess.get("sidebar_mode")) or disk_st.get("sidebar_mode") or "full",
+                "updated_at": time.time(),
+            }
+
+        # Rolling context and velocity telemetry
+        used_pct = ctx_obj.get("used_percentage")
+        if used_pct is None:
+            used_pct = d.get("used_percentage")
+        if used_pct is None and curr_tokens > 0:
+            ctx_size = int(ctx_obj.get("context_window_size") or d.get("context_window_size") or 0)
+            if ctx_size > 0:
+                used_pct = (curr_tokens / ctx_size) * 100.0
+
+        prev_ctx_hist = []
+        if same_conv:
+            if live_state and isinstance(live_state.get("ctx_history"), list):
+                prev_ctx_hist = list(live_state["ctx_history"])
+            elif disk_st and isinstance(disk_st.get("ctx_history"), list):
+                prev_ctx_hist = list(disk_st["ctx_history"])
+
+        last_ctx_sample_ts = float((live_state.get("last_ctx_sample_ts") if live_state else None) or (disk_st.get("last_ctx_sample_ts") if disk_st else None) or 0.0)
+
+        ctx_history = list(prev_ctx_hist)
+        new_sample_ts = last_ctx_sample_ts
+        if used_pct is not None:
+            val = round(float(used_pct), 1)
+            time_since_sample = time.time() - last_ctx_sample_ts
+            if not ctx_history or ctx_history[-1] != val or time_since_sample > 5.0:
+                ctx_history.append(val)
+                if len(ctx_history) > 12:
+                    ctx_history = ctx_history[-12:]
+                new_sample_ts = time.time()
+
+        prev_vel_hist = []
+        if same_conv:
+            if live_state and isinstance(live_state.get("vel_history"), list):
+                prev_vel_hist = list(live_state["vel_history"])
+            elif disk_st and isinstance(disk_st.get("vel_history"), list):
+                prev_vel_hist = list(disk_st["vel_history"])
+
+        vel_history = list(prev_vel_hist)
+        if tok_per_min is not None and same_conv:
+            vel_history.append(int(tok_per_min))
+            if len(vel_history) > 12:
+                vel_history = vel_history[-12:]
+
+        snapshot = {
+            "ts": time.time(),
+            "conversation_id": conv_id,
+            "workspace": d.get("workspace") or {},
+            "vcs": d.get("vcs") or {},
+            "git_diff": git_diff,
+            "git_diff_turn": git_diff_turn,
+            "git_diff_baseline": base,
+            "git_diff_baseline_conv": conv_id,
+            "git_diff_baseline_proj": proj_dir,
+            "git_worktrees": git_worktrees,
+            "git_cache_ts": git_cache_ts,
+            "git_cached_proj": proj_dir,
+            "fallback_git_branch": fallback_branch,
+            "fallback_git_dirty": fallback_dirty,
+            "cache_hit_pct": cache_hit_pct,
+            "model": d.get("model") or {},
+            "context_window": d.get("context_window") or {},
+            "cycle_mode": cycle_mode,
+            "subagents": sanitized_subs,
+            "subagent_count": running_count,
+            "subagent_completed_count": completed_count,
+            "blocked_count": blocked_count,
+            "turn_duration_sec": turn_duration_sec,
+            "turn_start_ts": turn_start_ts_to_save,
+            "is_active_conv": is_active_conv,
+            "tok_per_min": tok_per_min,
+            "ctx_history": ctx_history,
+            "vel_history": vel_history,
+            "last_ctx_sample_ts": new_sample_ts,
+            "tasks": tasks,
+            "task_count": task_count,
+            "artifact_count": art_count,
+            "cost": d.get("cost") or {},
+            "agent": d.get("agent") or {},
+            "vim": d.get("vim") or {},
+            "quota": d.get("quota") or {},
+            "sessions": sessions_dict,
+        }
+        def mutator(disk_data: dict) -> dict:
+            nonlocal sessions_dict, snapshot
+            sessions = disk_data.setdefault("sessions", {})
+            if not isinstance(sessions, dict):
+                sessions = {}
+                disk_data["sessions"] = sessions
+
+            # Existing sidebar mode
+            existing_mode = (
+                disk_data.get("sessions", {}).get(session_key, {}).get("sidebar_mode")
+                or disk_data.get("sidebar_mode")
+                or (live_state.get("sidebar_mode") if live_state else None)
+                or get_sidebar_mode(disk_data)
+                or "full"
+            )
+
+            # Update sessions dictionary
+            for sk, sv in sessions_dict.items():
+                s_entry = sessions.setdefault(sk, {})
+                if isinstance(s_entry, dict):
+                    s_entry.update(sv)
+                    if not s_entry.get("sidebar_mode"):
+                        s_entry["sidebar_mode"] = existing_mode
+            if session_key and session_key in sessions:
+                sessions[session_key]["sidebar_mode"] = existing_mode
+
+            sessions = _prune_stale_sessions(sessions, active_key=session_key)
+            disk_data["sessions"] = sessions
+            snapshot["sessions"] = sessions
+            snapshot["sidebar_mode"] = existing_mode
+
+            # Preserve sidebar flags
+            for k in ("sidebar_hidden", "sidebar_mode", "sidebar_running", "sidebar_check_ts", "sidebar_toggle_ts"):
+                if k in disk_data and disk_data[k] is not None:
+                    snapshot[k] = disk_data[k]
+                elif live_state and k in live_state and live_state[k] is not None:
+                    snapshot[k] = live_state[k]
+
+            # Preserve rich telemetry if incoming snapshot has empty context/model/cache ONLY if same conversation!
+            same_disk_conv = bool(conv_id and disk_data.get("conversation_id") == conv_id)
+            if same_disk_conv:
+                for k in ("context_window", "usage"):
+                    if (not snapshot.get(k)) and disk_data.get(k):
+                        snapshot[k] = disk_data[k]
+                if (not snapshot.get("cache_hit_pct")) and disk_data.get("cache_hit_pct"):
+                    snapshot["cache_hit_pct"] = disk_data["cache_hit_pct"]
+            if (not snapshot.get("model")) and disk_data.get("model"):
+                snapshot["model"] = disk_data["model"]
+
+            disk_data.update(snapshot)
+            return disk_data
+
+        update_live_state_atomic(mutator)
+    except Exception:
+        pass
+
+
+def handle_tab_bar() -> None:
+    live_state = read_live_state()
+    sidebar_active = is_sidebar_active(live_state)
+
+    # Workspace folder & git info
+    ws = live_state.get("workspace") or {}
+    proj = ws.get("project_dir") or ws.get("current_dir") or live_state.get("git_cached_proj") or os.getcwd()
+    basename = os.path.basename(os.path.normpath(proj)) or proj
+
+    vcs = live_state.get("vcs") or {}
+    branch = vcs.get("branch") or live_state.get("fallback_git_branch") or ""
+    dirty = vcs.get("dirty") if vcs.get("dirty") is not None else live_state.get("fallback_git_dirty")
+    dirty_flag = "*" if dirty else ""
+
+    git_diff = live_state.get("git_diff") or {}
+    ins = int(git_diff.get("ins") or 0)
+    del_ = int(git_diff.get("del") or 0)
+    diff_items = []
+    if ins > 0:
+        diff_items.append(f"{C_GREEN}+{ins}{C_RESET}")
+    if del_ > 0:
+        diff_items.append(f"{C_RED}-{del_}{C_RESET}")
+    diff_badge = (" " + " ".join(diff_items)) if diff_items else ""
+
+    raw_subs = [s for s in (live_state.get("subagents") or []) if isinstance(s, dict)]
+    conv_id = str(live_state.get("conversation_id") or "")
+    if conv_id:
+        all_subs = merge_and_dedup_subagents(raw_subs, conv_id)
+    else:
+        all_subs = raw_subs
+
+    locked_ids = get_locked_conversation_ids()
+    blocked_subs = [s for s in all_subs if s.get("status") == "blocked"]
+    blocked_count = len(blocked_subs) or int(live_state.get("blocked_count") or 0)
+
+    running_subs = []
+    for s in all_subs:
+        st = str(s.get("status") or "").strip().lower()
+        if st not in ("active", "running", "healing", "waiting"):
+            continue
+        cid = str(s.get("id") or s.get("conversationId") or s.get("session_id") or s.get("conversation_id") or "").strip()
+        if cid:
+            if cid in locked_ids:
+                running_subs.append(s)
+        else:
+            if conv_id and conv_id in locked_ids:
+                running_subs.append(s)
+
+    sub_pill = format_active_subagent_pill(running_subs)
+
+    done_count = (len(all_subs) - len(running_subs)) if all_subs else int(live_state.get("subagent_completed_count") or 0)
+    sub_count = len(running_subs)
+
+    # Activity status
+    if blocked_count > 0:
+        act_status = f"{C_BOLD}{C_ORANGE}⚠ {blocked_count} BLOCKED{C_RESET}"
+    elif sub_pill:
+        act_status = sub_pill
+    elif sub_count > 0:
+        act_status = f"{C_PURPLE}@{sub_count} run{C_RESET}"
+    elif done_count > 0:
+        act_status = f"{C_COMMENT}0 run ({done_count}✓){C_RESET}"
+    else:
+        act_status = f"{C_GREEN}✓ Ready{C_RESET}"
+
+    telem = resolve_session_token_telemetry(live_state, conv_id)
+    in_tok = telem["in_tokens"]
+    out_tok = telem["out_tokens"]
+    pct = telem["used_pct"]
+    cache_hit_pct = telem["cache_hit_pct"]
+
+    if sidebar_active:
+        # Deduplicated: sidebar active, omit project/git and output concise turn/agent status
+        items = []
+        if in_tok > 0 or out_tok > 0:
+            in_k = format_token_k(in_tok)
+            out_k = format_token_k(out_tok)
+            items.append(f"{C_COMMENT}↑{in_k} ↓{out_k}{C_RESET}")
+        items.append(act_status)
+        line = f" {C_COMMENT}·{C_RESET} ".join(items)
+        print(line)
+        return
+
+    # Sidebar inactive: include project/git and full telemetry
+    git_item = f"{C_PURPLE} {basename}{C_RESET}"
+    if branch:
+        git_item += f" · {C_PINK} {branch}{dirty_flag}{C_RESET}{diff_badge}"
+
+    model_obj = live_state.get("model") or {}
+    m_name = model_obj.get("display_name") or model_obj.get("id") or "Gemini 4 Argon"
+    effort = (model_obj.get("effort") or "").capitalize()
+    m_clean = re.sub(r"\s*\((Low|Medium|High|XHigh)\)", "", m_name, flags=re.IGNORECASE).strip()
+    if not effort:
+        m = re.search(r"\((Low|Medium|High|XHigh)\)", m_name, flags=re.IGNORECASE)
+        if m:
+            effort = m.group(1).capitalize()
+    effort_str = f" [{effort}]" if effort else ""
+    model_str = f"{C_ROSEWATER}{m_clean}{C_RESET}{C_COMMENT}{effort_str}{C_RESET}"
+
+    c_ctx = C_RED if pct >= 85.0 else (C_YELLOW if pct >= 60.0 else C_GREEN)
+    ctx_str = f"{c_ctx}{round(pct)}%{C_RESET}"
+
+    cache_str = f"{C_CYAN}⚡{cache_hit_pct}%{C_RESET}" if (cache_hit_pct and cache_hit_pct > 0) else ""
+
+    items = [git_item, model_str, ctx_str]
+    if cache_str:
+        items.append(cache_str)
+    if in_tok > 0 or out_tok > 0:
+        in_k = format_token_k(in_tok)
+        out_k = format_token_k(out_tok)
+        items.append(f"{C_COMMENT}↑{in_k} ↓{out_k}{C_RESET}")
+    items.append(act_status)
+    line = f" {C_COMMENT}·{C_RESET} ".join(items)
+    print(line)
+
+
+def main() -> None:
+    if "--refresh-cache" in sys.argv:
+        refresh_quota_cache_now()
+        return
+
+    if "--tab-bar" in sys.argv or sys.stdin.isatty():
+        handle_tab_bar()
+        return
+
+    turn_start = time.time()
+    try:
+        d = json.load(sys.stdin)
+    except Exception:
+        sys.exit(0)
+
+    live_state = read_live_state()
+
+    # Project directory & git diff
+    ws = d.get("workspace") or {}
+    proj = (
+        ws.get("project_dir")
+        or ws.get("current_dir")
+        or d.get("project_dir")
+        or d.get("current_dir")
+        or os.getcwd()
+    )
+    basename = os.path.basename(os.path.normpath(proj)) or proj
+    badge_folder = f"{C_PURPLE} {basename}{C_RESET}"
+
+    now = time.time()
+    cached_proj = live_state.get("git_cached_proj") or ""
+    git_cache_ts = float(live_state.get("git_cache_ts") or 0.0)
+    git_cache_valid = (proj == cached_proj) and ((now - git_cache_ts) <= 3.0)
+
+    git_diff_in = d.get("git_diff")
+    if git_diff_in and isinstance(git_diff_in, dict) and (git_diff_in.get("ins") is not None or git_diff_in.get("del") is not None):
+        ins = int(git_diff_in.get("ins") or 0)
+        del_ = int(git_diff_in.get("del") or 0)
+        git_files = int(git_diff_in.get("files") or 0)
+        git_diff = {"files": git_files, "ins": ins, "del": del_}
+    elif git_cache_valid and "git_diff" in live_state and isinstance(live_state["git_diff"], dict):
+        git_diff = live_state["git_diff"]
+        git_files = int(git_diff.get("files") or 0)
+        ins = int(git_diff.get("ins") or 0)
+        del_ = int(git_diff.get("del") or 0)
+    else:
+        git_files, ins, del_ = get_git_diff_stat(proj)
+        git_diff = {"files": git_files, "ins": ins, "del": del_}
+        git_cache_ts = now
+
+    usage = d.get("usage") or {}
+    ctx_obj = d.get("context_window") or {}
+    curr_in, cache_read, cache_hit_pct = compute_cache_hit_pct(d, ctx_obj)
+
+    # Line 1 Left: Project folder, Git branch + dirty + diff stat, sandbox
+    vcs = d.get("vcs") or {}
+    branch = vcs.get("branch")
+    dirty = vcs.get("dirty")
+    if not branch:
+        if git_cache_valid and live_state.get("fallback_git_branch") is not None:
+            branch = live_state.get("fallback_git_branch")
+            if dirty is None:
+                dirty = live_state.get("fallback_git_dirty")
+        else:
+            try:
+                import subprocess
+                cmd = ["git", "-C", proj, "rev-parse", "--abbrev-ref", "HEAD"] if (proj and os.path.exists(proj)) else ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+                res = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=0.25,
+                    check=False,
+                )
+                if res.returncode == 0:
+                    b_out = res.stdout.strip()
+                    if b_out and b_out != "HEAD":
+                        branch = b_out
+            except Exception:
+                branch = None
+            git_cache_ts = now
+
+    sidebar_active = is_sidebar_active(live_state)
+
+    conv_id = resolve_conversation_id(d, live_state)
+
+    raw_subs = d.get("subagents") or []
+    if not isinstance(raw_subs, list):
+        raw_subs = []
+
+    raw_subs = merge_and_dedup_subagents(raw_subs, conv_id)
+
+    sanitized_subs, running_count, completed_count = sanitize_subagents(raw_subs)
+    blocked_count = sum(1 for s in sanitized_subs if s.get("status") == "blocked")
+    if blocked_count == 0 and "blocked_count" in d:
+        try:
+            blocked_count = int(d.get("blocked_count") or 0)
+        except Exception:
+            pass
+
+    running_subs = [
+        s for s in sanitized_subs
+        if s.get("status") in ("active", "running", "healing", "waiting")
+    ]
+    sub_pill = format_active_subagent_pill(running_subs)
+
+    persist_live_state(
+        d,
+        git_diff,
+        cache_hit_pct,
+        conv_id,
+        git_cache_ts=git_cache_ts,
+        proj_dir=proj,
+        fallback_branch=branch,
+        fallback_dirty=dirty,
+        live_state=live_state,
+        turn_start=turn_start,
+        sanitized_subs=sanitized_subs,
+        running_count=running_count,
+        completed_count=completed_count,
+    )
+
+    diff_items = []
+    if ins > 0:
+        diff_items.append(f"{C_GREEN}+{ins}{C_RESET}")
+    if del_ > 0:
+        diff_items.append(f"{C_RED}-{del_}{C_RESET}")
+    diff_badge = (" " + " ".join(diff_items)) if diff_items else ""
+
+    # Left: Vim mode badge + shortcuts
+    vim_mode = ((d.get("vim") or {}).get("mode") or "").upper().strip()
+    vim_badge = ""
+    if vim_mode:
+        if vim_mode == "NORMAL":
+            vim_badge = f"{C_BOLD}{C_PURPLE}[NORMAL]{C_RESET} "
+        elif vim_mode == "INSERT":
+            vim_badge = f"{C_BOLD}{C_GREEN}[INSERT]{C_RESET} "
+        elif "VISUAL" in vim_mode or vim_mode.startswith("V-"):
+            vim_badge = f"{C_BOLD}{C_ORANGE}[VISUAL]{C_RESET} "
+        else:
+            vim_badge = f"{C_BOLD}{C_CYAN}[{vim_mode}]{C_RESET} "
+
+    if sidebar_active:
+        shortcuts_text = f"{C_COMMENT}? help · ⇧Tab mode · /diff · /compact{C_RESET}"
+    else:
+        shortcuts_text = f"{C_COMMENT}? shortcuts · ⇧Tab mode · /diff · /compact{C_RESET}"
+    line_left = f"  {vim_badge}{shortcuts_text}"
+
+    right_items = []
+    used_pct = ctx_obj.get("used_percentage")
+    exceeds_200k = bool(ctx_obj.get("exceeds_200k_tokens"))
+
+    if sidebar_active:
+        # Token flow: In:Xk Out:Yk
+        in_tok = int(
+            ctx_obj.get("total_input_tokens")
+            or usage.get("input_tokens")
+            or usage.get("prompt_tokens")
+            or ctx_obj.get("input_tokens")
+            or 0
+        )
+        out_tok = int(
+            ctx_obj.get("total_output_tokens")
+            or usage.get("output_tokens")
+            or usage.get("candidates_token_count")
+            or ctx_obj.get("output_tokens")
+            or 0
+        )
+        in_k = format_token_k(in_tok)
+        out_k = format_token_k(out_tok)
+        tok_metric = f"{C_COMMENT}↑{in_k} ↓{out_k}{C_RESET}"
+        right_items.append(tok_metric)
+
+        if exceeds_200k:
+            right_items.append(f"{C_BOLD}{C_RED}[>200k!]{C_RESET}")
+
+        # Note: Deduplicated! sub_pill, blocked_count, Ctx:% and ⚡Cache:% are omitted because the sidebar prominently displays them.
+    else:
+        # Fallback when sidebar is toggled OFF (Alt+b)
+        proj_badge = f"{C_PURPLE} {basename}{C_RESET}"
+        dirty_flag = "*" if dirty else ""
+        if branch:
+            git_badge = f" {C_PINK} {branch}{dirty_flag}{C_RESET}{diff_badge}"
+        elif diff_badge:
+            git_badge = f" {C_PINK} HEAD{C_RESET}{diff_badge}"
+        else:
+            git_badge = ""
+        right_items.append(f"{proj_badge}{git_badge}".rstrip())
+
+        if blocked_count > 0:
+            right_items.append(f"{C_BOLD}{C_ORANGE}⚠ {blocked_count} BLOCKED{C_RESET}")
+
+        if sub_pill:
+            right_items.append(sub_pill)
+
+        model = d.get("model") or {}
+        m_id = model.get("id") or ""
+        m_name = model.get("display_name") or m_id or "Gemini 4 Argon"
+        effort = model.get("effort") or ""
+        if effort:
+            effort_cap = effort.capitalize() if effort.islower() else effort
+            model_str = f"{C_ROSEWATER}{m_name}{C_RESET} {C_COMMENT}[{effort_cap}]{C_RESET}"
+        else:
+            model_str = f"{C_ROSEWATER}{m_name}{C_RESET}"
+        right_items.append(model_str)
+
+        if used_pct is not None:
+            pct = float(used_pct)
+            gauge = render_gradient_gauge(pct, cells=5, invert=False)
+            right_items.append(f"{gauge} {round(pct)}%")
+        else:
+            gauge = render_gradient_gauge(0.0, cells=5, invert=False)
+            right_items.append(f"{gauge} 0%")
+
+        if exceeds_200k:
+            right_items.append(f"{C_BOLD}{C_RED}[>200k!]{C_RESET}")
+
+        quota_map = resolve_quota_map(d.get("quota") or {})
+        b_5h, _, _ = resolve_quota_pair(quota_map, m_id, m_name)
+        frac_5h = b_5h.get("remaining_fraction") if isinstance(b_5h, dict) else None
+        amt_5h = b_5h.get("remaining_amount") if isinstance(b_5h, dict) else None
+        if frac_5h is not None:
+            p_5h = round(float(frac_5h) * 100.0)
+            c_5h = C_RED if p_5h <= 15 else (C_YELLOW if p_5h <= 40 else C_GREEN)
+            right_items.append(f"{c_5h}5h:{p_5h}%{C_RESET}")
+        elif amt_5h is not None:
+            right_items.append(f"{C_YELLOW}5h:{amt_5h}{C_RESET}")
+        else:
+            right_items.append(f"{C_COMMENT}5h:--%{C_RESET}")
+    line_right = f" {C_COMMENT}·{C_RESET} ".join(right_items) + "  "
+
+    width = int(d.get("terminal_width") or 100)
+    pad = width - visible_len(line_left) - visible_len(line_right)
+    if pad < 1:
+        line_left = f"  {vim_badge}{C_COMMENT}? shortcuts · ⇧Tab · /diff · /compact{C_RESET}"
+        pad = width - visible_len(line_left) - visible_len(line_right)
+    if pad < 1:
+        line_left = f"  {vim_badge}{C_COMMENT}? help · /diff · /compact{C_RESET}"
+        pad = width - visible_len(line_left) - visible_len(line_right)
+    if pad < 1:
+        line_left = f"  {vim_badge}{C_COMMENT}? help · /diff{C_RESET}"
+        pad = width - visible_len(line_left) - visible_len(line_right)
+    if pad < 1:
+        line_left = f"  {vim_badge}".rstrip()
+        pad = max(1, width - visible_len(line_left) - visible_len(line_right))
+
+    line = f"{line_left}{' ' * pad}{line_right}"
+    print(line)
+
+
+if __name__ == "__main__":
+    main()

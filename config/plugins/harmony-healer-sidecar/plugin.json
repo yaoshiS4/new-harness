@@ -1,0 +1,6 @@
+{
+  "name": "harmony-healer-sidecar",
+  "version": "1.0.0",
+  "description": "Out-of-band Level-3 Self-Healing & Dream Replay Sidecar Daemon",
+  "disabled": true
+}

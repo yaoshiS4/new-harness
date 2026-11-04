@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "StitchMCP": {
+      "command": "/home/heocop/.gemini/config/scripts/launch-stitch-mcp.sh"
+    }
+  }
+}

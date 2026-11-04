@@ -1,0 +1,1 @@
+{"name":"summarize_path","description":"Summarize structural metrics for a file or directory with fast persistent SQLite caching.","parameters":{"properties":{"limit":{"default":50,"title":"Limit","type":"integer"},"path":{"title":"Path","type":"string"}},"required":["path"],"title":"summarize_pathArguments","type":"object"}}

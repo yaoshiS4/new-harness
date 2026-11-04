@@ -1,0 +1,53 @@
+# CachyOS Blue/Emerald Dark Theme for Yazi
+
+[mgr]
+cwd = { fg = "#60a5fa" }
+hovered = { fg = "#ecf0f4", bg = "#20252d", bold = true }
+preview_hovered = { underline = true }
+find_keyword = { fg = "#f7eb95", bold = true, italic = true, underline = true }
+find_position = { fg = "#60a5fa", bg = "#20252d", bold = true }
+marker_copied = { fg = "#27ae60", bg = "#27ae60" }
+marker_cut = { fg = "#eb606b", bg = "#eb606b" }
+marker_marked = { fg = "#3b82f6", bg = "#3b82f6" }
+marker_selected = { fg = "#60a5fa", bg = "#60a5fa" }
+tab_active = { fg = "#12151a", bg = "#3b82f6", bold = true }
+tab_inactive = { fg = "#949ca6", bg = "#20252d" }
+count_copied = { fg = "#12151a", bg = "#27ae60" }
+count_cut = { fg = "#12151a", bg = "#eb606b" }
+count_selected = { fg = "#12151a", bg = "#60a5fa" }
+border = { fg = "#20252d" }
+
+[status]
+separator_open = ""
+separator_close = ""
+separator_style = { fg = "#20252d", bg = "#20252d" }
+mode_normal = { fg = "#12151a", bg = "#3b82f6", bold = true }
+mode_select = { fg = "#12151a", bg = "#27ae60", bold = true }
+mode_unset = { fg = "#12151a", bg = "#eb606b", bold = true }
+progress_label = { fg = "#ecf0f4", bold = true }
+progress_normal = { fg = "#3b82f6", bg = "#20252d" }
+progress_error = { fg = "#eb606b", bg = "#20252d" }
+permissions_t = { fg = "#3b82f6" }
+permissions_r = { fg = "#f7eb95" }
+permissions_w = { fg = "#eb606b" }
+permissions_x = { fg = "#27ae60" }
+permissions_s = { fg = "#949ca6" }
+
+[input]
+border = { fg = "#3b82f6" }
+title = { fg = "#ecf0f4" }
+value = { fg = "#ecf0f4" }
+selected = { reversed = true }
+
+[select]
+border = { fg = "#3b82f6" }
+active = { fg = "#60a5fa", bold = true }
+inactive = { fg = "#949ca6" }
+
+[which]
+mask = { bg = "#20252d" }
+cand = { fg = "#60a5fa" }
+rest = { fg = "#949ca6" }
+desc = { fg = "#ecf0f4" }
+separator = "  "
+separator_style = { fg = "#6c7686" }

@@ -1,0 +1,1 @@
+{"name":"cancel_run","description":"Request cancellation of an in-flight run started by start_run.","parameters":{"additionalProperties":false,"properties":{"runId":{"description":"Run id returned by start_run.","type":"string"}},"required":["runId"],"type":"object"}}

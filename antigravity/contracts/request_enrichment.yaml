@@ -1,0 +1,6 @@
+# Enriched intake. Consumer: workflows/standard-dev.md Stage 2; pm loads before routing.
+contract_type: request_enrichment
+original_user_request: ""
+enriched_request: ""
+ambiguity_questions: []    # empty only when nothing changes scope
+needs_user_validation: true

@@ -1,0 +1,36 @@
+name: verify-claude-harness
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Install ripgrep and PyYAML
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update && sudo apt-get install -y ripgrep; else brew install ripgrep; fi
+          python3 -m pip install --quiet pyyaml
+      - name: Create MCP server environments
+        run: |
+          for srv in codegraph codex_knowledge context_health; do
+            uv venv --python 3.12 "antigravity/mcp_servers/$srv/.venv"
+            uv pip install --python "antigravity/mcp_servers/$srv/.venv/bin/python3" -e "antigravity/mcp_servers/$srv" pytest anyio
+          done
+      - name: Verification gate (strict MCP)
+        run: STRICT_MCP=1 bash scripts/verify-claude-harness.sh
+      - name: Legacy Antigravity hook suite (informational)
+        continue-on-error: true
+        run: python3 -m unittest discover -s config/hooks/tests -p "test_*.py" 2>&1 | tail -n 5
