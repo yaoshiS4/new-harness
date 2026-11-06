@@ -1034,8 +1034,68 @@ def _check_recon_precondition(target_norm: str, payload: dict) -> Optional[dict]
     )
 
 
-def _check_suppression_injection(target_norm: str, tool_name: str, tool_input: dict) -> Optional[dict]:
+def _suppression_reference_entries(target_norm: str, ws: str) -> list:
+    """Union of `suppression_reference_roots` from the workspace policy and every guardrails.json walking up from the target."""
+    sources = [H.guardrail_policy(ws)]
+    cur = os.path.dirname(target_norm)
+    while True:
+        data = H.atomic_json_read(os.path.join(cur, ".claude", "harness", "guardrails.json"), default=None)
+        if isinstance(data, dict):
+            sources.append(data)
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    entries = []
+    for src in sources:
+        roots = src.get("suppression_reference_roots") if isinstance(src, dict) else None
+        if isinstance(roots, list):
+            entries.extend(e for e in roots if isinstance(e, dict))
+    return entries
+
+
+def _suppression_matches_reference(target_norm: str, tool_name: str, tool_input: dict, ws: str) -> Optional[bool]:
+    """None: no usable reference original (deny as today). True: every suppression line is a verbatim copy. False: not."""
+    try:
+        ref = None
+        for entry in _suppression_reference_entries(target_norm, ws):
+            regex, root = entry.get("target_root_regex"), entry.get("reference_root")
+            if not isinstance(regex, str) or not isinstance(root, str) or not os.path.isabs(root):
+                continue
+            try:
+                m = re.match(regex, target_norm)
+            except re.error:
+                continue
+            if m:
+                ref = root + target_norm[m.end():]
+                break
+        if not ref or not os.path.isfile(ref):
+            return None
+        if tool_name == "Write":
+            result = str(tool_input.get("content") or "")
+        elif tool_name in ("Edit", "MultiEdit"):
+            with open(target_norm, "r", encoding="utf-8", errors="ignore") as f:
+                result = f.read()
+            for old, new, replace_all in _edits_of(tool_name, tool_input):
+                if not old or old not in result:
+                    return None
+                result = result.replace(old, new) if replace_all else result.replace(old, new, 1)
+        else:
+            return None
+        with open(ref, "r", encoding="utf-8", errors="ignore") as f:
+            ref_lines = [l.strip() for l in f.read().splitlines()]
+        res_lines = [l.strip() for l in result.splitlines()]
+        for line in set(l for l in res_lines if _SUPPRESSION_RE.search(l)):
+            if res_lines.count(line) > ref_lines.count(line):
+                return False
+        return True
+    except Exception:
+        return None
+
+
+def _check_suppression_injection(target_norm: str, tool_name: str, tool_input: dict, ws: str = "") -> Optional[dict]:
     name = os.path.basename(target_norm)
+    msg = "Specification-Gaming Lock: injecting linter/type-checker suppressions (@ts-ignore, type: ignore, eslint-disable, noqa) is forbidden in `%s`." % name
     if tool_name == "Write":
         new_content = str(tool_input.get("content") or "")
         try:
@@ -1043,16 +1103,21 @@ def _check_suppression_injection(target_norm: str, tool_name: str, tool_input: d
                 disk = f.read()
         except Exception:
             return None
-        if len(_SUPPRESSION_RE.findall(new_content)) > len(_SUPPRESSION_RE.findall(disk)):
-            return _deny("Specification-Gaming Lock: injecting linter/type-checker suppressions (@ts-ignore, type: ignore, eslint-disable, noqa) is forbidden in `%s`." % name)
+        violates = len(_SUPPRESSION_RE.findall(new_content)) > len(_SUPPRESSION_RE.findall(disk))
+    else:
+        tot_old = tot_new = 0
+        for old, new, _ in _edits_of(tool_name, tool_input):
+            tot_old += len(_SUPPRESSION_RE.findall(old))
+            tot_new += len(_SUPPRESSION_RE.findall(new))
+        violates = tot_new > tot_old
+    if not violates:
         return None
-    tot_old = tot_new = 0
-    for old, new, _ in _edits_of(tool_name, tool_input):
-        tot_old += len(_SUPPRESSION_RE.findall(old))
-        tot_new += len(_SUPPRESSION_RE.findall(new))
-    if tot_new > tot_old:
-        return _deny("Specification-Gaming Lock: injecting linter/type-checker suppressions (@ts-ignore, type: ignore, eslint-disable, noqa) is forbidden in `%s`." % name)
-    return None
+    verdict = _suppression_matches_reference(target_norm, tool_name, tool_input, ws)
+    if verdict is True:
+        return None
+    if verdict is False:
+        return _deny(msg + " Only lines copied verbatim from the reference original are allowed.")
+    return _deny(msg)
 
 
 def _extract_literal_assertions(text: str) -> list:
@@ -1324,7 +1389,7 @@ def handle_mutation(tool_name: str, tool_input: dict, payload: dict, policy: dic
 
     is_md_like = low.endswith((".md", ".txt", ".markdown"))
     if os.path.isfile(norm) and role in ("dev-fe", "dev-be") and not is_md_like:
-        supp = _check_suppression_injection(norm, tool_name, tool_input)
+        supp = _check_suppression_injection(norm, tool_name, tool_input, ws)
         if supp:
             return supp
     if os.path.isfile(norm) and H.is_test_file(norm):

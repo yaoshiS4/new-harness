@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -598,6 +599,63 @@ class TestMutationGate(HarnessCase):
         out = self.pre("Edit", {"file_path": p, "old_string": "const a", "new_string": "// @ts-ignore\nconst a"}, agent_id="f1", agent_type="dev-fe")
         self.assertEqual(decision(out), "deny")
         self.assertIn("Specification-Gaming", reason(out))
+
+    _SUPP_LINE = "    // eslint-disable-next-line react-hooks/exhaustive-deps\n"
+    _SUPP_STMT = "    useEffect(() => {}, []);\n"
+
+    def _supp_tree(self, guard_rel=".claude/harness/guardrails.json") -> str:
+        self.write("orig/src/app.ts", "function f() {\n" + self._SUPP_LINE + self._SUPP_STMT + "}\n")
+        if guard_rel:
+            entry = {"target_root_regex": re.escape(os.path.join(self.ws, "rebuild") + "/"), "reference_root": os.path.join(self.ws, "orig") + "/", "_note": "x"}
+            self.write(guard_rel, json.dumps({"suppression_reference_roots": [entry]}))
+        return self.write("rebuild/src/app.ts", "function f() {\n" + self._SUPP_STMT + "}\n")
+
+    def _supp_edit(self, p: str, new_string: str) -> dict:
+        return self.pre("Edit", {"file_path": p, "old_string": self._SUPP_STMT, "new_string": new_string}, agent_id="f1", agent_type="dev-fe")
+
+    def test_suppression_reference_verbatim_allowed(self):
+        p = self._supp_tree()
+        out = self._supp_edit(p, self._SUPP_LINE + self._SUPP_STMT)
+        self.assertNotEqual(decision(out), "deny")
+
+    def test_suppression_reference_other_rule_denied(self):
+        p = self._supp_tree()
+        out = self._supp_edit(p, "    // eslint-disable-next-line no-console\n" + self._SUPP_STMT)
+        self.assertEqual(decision(out), "deny")
+        self.assertIn("Specification-Gaming", reason(out))
+        self.assertIn("verbatim from the reference original", reason(out))
+
+    def test_suppression_reference_count_exceeded_denied(self):
+        p = self._supp_tree()
+        out = self._supp_edit(p, self._SUPP_LINE + self._SUPP_LINE + self._SUPP_STMT)
+        self.assertEqual(decision(out), "deny")
+        self.assertIn("verbatim from the reference original", reason(out))
+
+    def test_suppression_reference_no_entry_or_missing_ref_denied(self):
+        p = self._supp_tree(guard_rel=None)
+        out = self._supp_edit(p, self._SUPP_LINE + self._SUPP_STMT)
+        self.assertEqual(decision(out), "deny")
+        self.assertIn("Specification-Gaming", reason(out))
+        self._supp_tree()
+        q = self.write("rebuild/src/other.ts", "function f() {\n" + self._SUPP_STMT + "}\n")
+        out2 = self._supp_edit(q, self._SUPP_LINE + self._SUPP_STMT)
+        self.assertEqual(decision(out2), "deny")
+        self.assertIn("Specification-Gaming", reason(out2))
+
+    def test_suppression_reference_walkup_allowed(self):
+        self.assertNotIn("suppression_reference_roots", H.guardrail_policy(self.ws))
+        p = self._supp_tree(guard_rel="rebuild/.claude/harness/guardrails.json")
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".claude", "harness", "guardrails.json")))
+        out = self._supp_edit(p, self._SUPP_LINE + self._SUPP_STMT)
+        self.assertNotEqual(decision(out), "deny")
+
+    def test_suppression_reference_write_allowed_and_denied(self):
+        p = self._supp_tree()
+        ok = self.pre("Write", {"file_path": p, "content": "function f() {\n" + self._SUPP_LINE + self._SUPP_STMT + "}\n"}, agent_id="f1", agent_type="dev-fe")
+        self.assertNotEqual(decision(ok), "deny")
+        bad = self.pre("Write", {"file_path": p, "content": "function f() {\n    // @ts-ignore\n" + self._SUPP_STMT + "}\n"}, agent_id="f1", agent_type="dev-fe")
+        self.assertEqual(decision(bad), "deny")
+        self.assertIn("verbatim from the reference original", reason(bad))
 
     def test_hook_immunity(self):
         hook = os.path.join(self.ws, ".claude", "hooks", "pre_tool_use.py")
