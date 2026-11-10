@@ -53,5 +53,3 @@ backups/
 .claude/skills/**/node_modules/
 .ruff_cache/
 
-# Yaobet product repo (own git history, nested)
-yaobet/
