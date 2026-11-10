@@ -1,0 +1,369 @@
+<section>
+<h2 id="m-messages">m-messages — /tin-nhan and MessageCenter</h2>
+
+<h3 id="m-route-tin-nhan">Route /tin-nhan</h3>
+<dl>
+<dt>Page file</dt><dd><code>src/app/(member)/tin-nhan/page.tsx</code> (async Server Component), <code>loading.tsx</code>. No page CSS module.</dd>
+<dt>Metadata</dt><dd><code>title: "Tin nhắn — Yaobet"</code></dd>
+<dt>Auth</dt><dd>Client-side in MessageCenter (guest branch).</dd>
+<dt>Data</dt><dd><code>getMessages()</code> → <code>initial</code>.</dd>
+</dl>
+<pre><code class="lang-txt">section aria-label="Tin nhắn"   (no class)
+└─ MessageCenter initial</code></pre>
+<p>Composition: single panel in the member column at every width; header actions wrap under the title when narrow (flex-wrap).</p>
+<p><strong>Loading</strong>: <code>section aria-busy="true" aria-label="Đang tải tin nhắn"</code> → Skeleton block 100%×56 → <code>div</code> with INLINE style <code>display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-5)</code> → three Skeleton block 100%×84.</p>
+<div class="callout warn">The loading file uses an inline <code>style</code> object (the only inline layout style in this track) instead of a module class.</div>
+
+<h3 id="m-message-center">MessageCenter</h3>
+<p><strong>1. Purpose</strong> — an inbox panel: title with unread count, "mark all read", "delete all", a filter dropdown, and a list of message cards; tapping an unread card marks it read. <strong>2. Source</strong> — <code>src/components/messages/MessageCenter.tsx</code> (with inner <code>MessageItem</code>), <code>MessageCenter.module.css</code>.</p>
+<pre><code class="lang-txt">Card variant=default className=.panel
+├─ div.header
+│  ├─ div.titleRow
+│  │  ├─ Icon message 24 .titleIcon
+│  │  └─ div.titleText → h2.title "Tin nhắn" + span.subtitle {unread&gt;0 ? "{n} tin nhắn chưa đọc" : "Đã đọc tất cả"}
+│  └─ [items.length&gt;0] div.actions
+│     ├─ [unread&gt;0] Button ghost sm icon=check .markAll  "Đánh dấu đã đọc tất cả"  → all read
+│     ├─ Button ghost sm icon=close .deleteAll "Xóa tất cả"  → items = []
+│     └─ Dropdown label="Lọc tin nhắn" placement="bottom-end"
+│        trigger: button.filterTrigger → span {FILTER_LABEL[filter]} + Icon chevronDown 16
+│        panel:   ul.filterMenu → li ×3 → button.filterOption[.filterOptionActive] role=menuitem aria-current={active||undefined}
+│                 "Tất cả" | "Chưa đọc" | "Đã đọc"
+└─ body (exactly one):
+   !allowed        → EmptyState icon=message title="Đăng nhập để xem tin nhắn của bạn." message={Button primary sm "Đăng nhập"}
+   items empty     → EmptyState icon=message title="Chưa có tin nhắn" message="Các tin nhắn mới sẽ xuất hiện tại đây."
+   filtered empty  → EmptyState variant=filtered onReset=filter→all   (default title "Không có kết quả", button "Đặt lại bộ lọc")
+   else ul.list → MessageItem ×filtered
+
+MessageItem (read):
+li.item → div.itemInner
+          ├─ div.itemHead → span.subjectRead {subject} + span.time {relativeTime(at)}
+          └─ p.body {body}
+MessageItem (unread):
+li.item.itemUnread  (::before 3px gold edge)
+└─ button.itemInner.itemButton type=button aria-label="Đánh dấu đã đọc: {subject}" onClick=markRead(id)
+   ├─ div.itemHead → span.subject {subject} + span.time + span.unreadDot aria-hidden
+   └─ p.body {body}</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody><tr><td>initial</td><td><code>Message[] { id, subject, body, read, at }</code></td><td>required</td><td>seed of local state <code>items</code></td></tr></tbody>
+</table>
+<p><strong>Data</strong> (<code>getMessages()</code>; relative time via <code>relativeTime</code>: &lt;1 min "Vừa xong", &lt;60 "{n} phút trước", &lt;24 h "{n} giờ trước" (hours rounded), else "{n} ngày trước"):</p>
+<table>
+<thead><tr><th>id</th><th>subject</th><th>body</th><th>read</th><th>age</th><th>time label</th></tr></thead>
+<tbody>
+<tr><td>m1</td><td>Chào mừng đến với Yaobet</td><td>Cảm ơn bạn đã tham gia. Hoàn tất xác minh để mở khóa rút tiền.</td><td>false</td><td>60 min</td><td>1 giờ trước</td></tr>
+<tr><td>m2</td><td>Hoàn trả tuần đã sẵn sàng</td><td>Hoàn trả tuần này của bạn đã có thể nhận tại mục Hoàn trả.</td><td>false</td><td>720 min</td><td>12 giờ trước</td></tr>
+<tr><td>m3</td><td>Cập nhật điều khoản dịch vụ</td><td>Chúng tôi đã cập nhật điều khoản. Vui lòng xem chi tiết.</td><td>true</td><td>4320 min</td><td>3 ngày trước</td></tr>
+</tbody>
+</table>
+<p>Initial subtitle "2 tin nhắn chưa đọc". Order = fixture order (no sort).</p>
+<p><strong>Styles</strong></p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.panel</td><td>flex column; gap 24px; padding 24px</td></tr>
+<tr><td>.header</td><td>flex; align center; justify space-between; gap 12px; flex-wrap wrap</td></tr>
+<tr><td>.titleRow / .titleIcon / .titleText</td><td>flex flex-start gap 8px min-width 0 / #d4af37 margin-top 2px / flex column gap 4px</td></tr>
+<tr><td>.title / .subtitle</td><td>24px 600 #f2f0e4 / 14px #888888</td></tr>
+<tr><td>.actions</td><td>inline-flex; center; gap 8px; margin-left auto; flex-wrap wrap</td></tr>
+<tr><td>.markAll / .deleteAll</td><td>color #d4af37 / color <span class="tok">--brand-cta-accent</span> #f53f55 (on top of Button ghost)</td></tr>
+<tr><td>.filterTrigger</td><td>inline-flex; center; gap 4px; min-height 44px; padding 0 12px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius pill; #f2f0e4; font inherit; 14px; 600; pointer; transition background/border-color/transform 200ms</td></tr>
+<tr><td>.filterTrigger:hover</td><td>bg #262626; border rgba(212,175,55,0.55); scale(1.05); its svg scale(1.1)</td></tr>
+<tr><td>.filterMenu</td><td>flex column; gap 4px; no list styling</td></tr>
+<tr><td>.filterOption</td><td>block; width 100%; min-height 44px; padding 8px 12px; left; transparent; border 0; radius 8px; #d6d3c7; 14px; hover bg <span class="tok">--tint</span>; focus outline 2px #6ea8ff offset −2px</td></tr>
+<tr><td>.filterOptionActive</td><td>#d4af37; 600</td></tr>
+<tr><td>.list</td><td>flex column; gap 12px</td></tr>
+<tr><td>.item</td><td>relative; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 12px; overflow hidden</td></tr>
+<tr><td>.itemUnread</td><td>bg <code>color-mix(in srgb, #d4af37 6%, #1a1a1a)</code></td></tr>
+<tr><td>.itemUnread::before</td><td>content ""; absolute; left 0; top 8px; bottom 8px; width 3px; radius pill; bg #d4af37</td></tr>
+<tr><td>.itemInner</td><td>flex column; gap 4px; width 100%; min-height 44px; padding 16px</td></tr>
+<tr><td>.itemButton</td><td>transparent; border 0; left; font/color inherit; pointer; transition background 200ms; hover bg #262626 (no scale); focus outline 2px #6ea8ff offset −2px</td></tr>
+<tr><td>.itemHead</td><td>flex; center; gap 8px</td></tr>
+<tr><td>.subject / .subjectRead</td><td>16px 600 #f2f0e4 lh 1.3 / 16px 400 #d6d3c7 lh 1.3</td></tr>
+<tr><td>.time</td><td>margin-left auto; 12px; #888888; nowrap; flex none</td></tr>
+<tr><td>.unreadDot</td><td>flex none; 8×8px; radius pill; bg #d4af37</td></tr>
+<tr><td>.body</td><td>14px; #888888; lh 1.3</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/messages/MessageCenter.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * MessageCenter — "/tin-nhan" inbox panel. Tokens only (lint A2: never a raw
+ * ramp/hex literal — the unread gold wash is a color-mix on --brand-accent).
+ * Outer panel ports SecurityCenter .panel/.titleRow; the unread cue (gold dot +
+ * faint wash + 3px left accent edge) ports NotificationBell .rowUnread/.unreadDot.
+ * Mobile-first @375: the header actions cluster wraps below the title.
+ * Reduced-motion safe (no required animation).
+ * ==========================================================================*/
+
+/* ---- outer panel (ported from SecurityCenter .panel) -------------------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--card-pad); /* J9 spacious card 24px */
+}
+
+/* ---- header row --------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.titleIcon {
+  color: var(--brand-accent);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.titleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.title {
+  font-size: var(--t-h1); /* J9 section title 24/600 */
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.subtitle {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* ---- header actions cluster (right-pinned; wraps below title @375) ------ */
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* quiet pills — NOT loud gold CTAs. mark-all-read = accent text on a subtle
+ * chip; delete-all = the scarce/danger accent token (red is CTA/destructive
+ * only, never an outcome). Button's ghost variant supplies the chip; we only
+ * tint the label here. */
+.markAll {
+  color: var(--brand-accent);
+}
+.deleteAll {
+  color: var(--brand-cta-accent);
+}
+
+/* ---- filter dropdown trigger (ghost pill + trailing chevron) ------------ */
+.filterTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-hi);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+/* uniform hover — 1.05 on the button, 1.10 on its chevron */
+.filterTrigger:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent-hairline);
+  transform: scale(1.05);
+}
+.filterTrigger svg {
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.filterTrigger:hover svg {
+  transform: scale(1.1);
+}
+.filterTrigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* dropdown panel children (role=menu list of options) */
+.filterMenu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.filterOption {
+  display: block;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+.filterOption:hover {
+  background: var(--tint);
+}
+.filterOption:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.filterOptionActive {
+  color: var(--brand-accent);
+  font-weight: var(--weight-semi);
+}
+
+/* ---- message list ------------------------------------------------------- */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* One message card on the --surface-2 sub-surface.
+ *
+ * The hairline is LOAD-BEARING, not decoration: --surface-2 #1a1a1a on the
+ * panel's --surface #141414 measures 1.14:1, and the flat system bans the two
+ * other separation mechanisms (shadow, card gradient). Without this border the
+ * card had no edge at all. --border is the locked gold-tinted hairline and
+ * clears the WCAG 1.4.11 3:1 non-text floor on its own. */
+.item {
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* UNREAD cue (dual-encoded): faint gold wash + 3px left accent edge. The wash
+ * is a color-mix on --brand-accent (NOT a raw rgba), so it tracks the token.
+ *
+ * VERIFIED against the "blue means focus and ONLY focus" rule: unread is
+ * --brand-accent here, not --focus-ring. A member standing on a row with the
+ * keyboard must stay distinguishable from a row that merely has not been read;
+ * sharing the hue would erase that. Same for .unreadDot below. */
+.itemUnread {
+  background: color-mix(in srgb, var(--brand-accent) 6%, var(--surface-2));
+}
+.itemUnread::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+}
+
+/* inner padding container — shared by the read &lt;div&gt; and the unread &lt;button&gt; */
+.itemInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--card-pad-sm); /* ~16px */
+}
+
+/* the unread card is a button: strip the native chrome, keep it a full target */
+.itemButton {
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+/* Colour shift only — NO hover scale. This button is the full bleed of .item,
+ * which clips (overflow:hidden) to keep the unread accent edge inside the radius;
+ * a scaled child would be cropped by its own parent. Every row — read or unread,
+ * first or last — answers identically, which is what "uniform hover" protects. */
+.itemButton:hover {
+  background: var(--surface-hover);
+}
+.itemButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.itemHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.subject {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+  min-width: 0;
+}
+/* read subject de-emphasizes (mirror NotificationBell .rowRead .rowTitle) */
+.subjectRead {
+  font-size: var(--t-body);
+  font-weight: var(--weight-reg);
+  color: var(--text);
+  line-height: var(--lh-tight);
+  min-width: 0;
+}
+.time {
+  margin-left: auto;
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  white-space: nowrap;
+  flex: none;
+}
+.unreadDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent);
+}
+.body {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filterTrigger,
+  .filterTrigger svg,
+  .itemButton {
+    transition: none;
+  }
+  /* absent, not instant */
+  .filterTrigger:hover,
+  .filterTrigger:hover svg {
+    transform: none;
+  }
+}
+</code></pre>
+</details>
+<p><strong>States</strong>: unread card (wash + 3px gold edge + dot + bold subject, interactive) → read card (plain div, regular subject) after click. Mark all read → all cards read, button disappears, subtitle "Đã đọc tất cả". Delete all → empty EmptyState; actions vanish (hasItems false). Filtered empty → filtered EmptyState with reset. Reduced motion: transitions removed, hover transforms none.</p>
+<p><strong>Behaviour</strong>: all mutations are local React state (lost on navigation). The filter Dropdown is uncontrolled: choosing an option changes the filter but does NOT close the panel (ui/Dropdown closes only on trigger click, Esc or outside click — see <a href="#f-ui-dropdown">#f-ui-dropdown</a>).</p>
+<p><strong>Copy</strong>: Tin nhắn (Messages) · {n} tin nhắn chưa đọc ({n} unread messages) · Đã đọc tất cả (All read) · Đánh dấu đã đọc tất cả (Mark all as read) · Xóa tất cả (Delete all) · Lọc tin nhắn (Filter messages, panel label) · Tất cả / Chưa đọc / Đã đọc (All / Unread / Read) · Đánh dấu đã đọc: {subject} (Mark as read: …, aria-label) · Đăng nhập để xem tin nhắn của bạn. · Đăng nhập · Chưa có tin nhắn (No messages yet) · Các tin nhắn mới sẽ xuất hiện tại đây. (New messages will appear here.) · Không có kết quả / Đặt lại bộ lọc (EmptyState defaults).</p>
+<div class="callout warn">For a GUEST the header still renders the unread subtitle and the whole actions cluster (the gate is <code>items.length &gt; 0</code>, not auth), contradicting the comment "suppressed … for guests". "Xóa tất cả" deletes without confirmation (Logout, by contrast, confirms). The sidebar unread dot (fixture <code>unreadMessages</code>) is not tied to this list. <code>Icon … aria-hidden="true"</code> is passed as a prop the Icon component does not accept (it is aria-hidden by default anyway).</div>
+</section>
+

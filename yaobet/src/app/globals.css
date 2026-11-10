@@ -1,0 +1,59 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../styles/reset.css" layer(base);
+@import "../styles/tokens.css" layer(base);
+@import "../styles/themes.css" layer(base);
+@import "../styles/brands.css" layer(base);
+@import "../styles/typography.css" layer(base);
+@import "../styles/motion.css" layer(base);
+@import "../styles/keyframes.css";
+@import "../styles/tw-theme.css";
+@import "../styles/stub.css";
+@source "../";
+@custom-variant hover (&:hover);
+@custom-variant hover-fine {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+@custom-variant touch {
+  @media (hover: none) {
+    @slot;
+  }
+}
+@custom-variant max-420 {
+  @media (max-width: 420px) {
+    @slot;
+  }
+}
+@custom-variant max-639 {
+  @media (max-width: 639px) {
+    @slot;
+  }
+}
+@custom-variant max-900 {
+  @media (max-width: 900px) {
+    @slot;
+  }
+}
+@layer base {
+  /* globals.css own rules, verbatim from 01-06-f-reset.html#f-reset-order */
+  html { height: 100%; background: var(--shell); color-scheme: dark; overflow-x: hidden; }
+  body { min-height: 100%; background: var(--canvas); color: var(--text-hi); font-family: var(--brand-font-body); font-size: var(--t-body); line-height: var(--lh-body); overflow-x: hidden; }
+  h1, h2, h3, h4, h5, h6 { font-weight: var(--weight-bold); line-height: var(--lh-tight); }
+  small { font-size: var(--t-sm); color: var(--text-mid); }
+}
+@import "../ui/ui.css" layer(components);
+@import "../styles/areas/shell.css" layer(components);
+@import "../styles/areas/home.css" layer(components);
+@import "../styles/areas/vertical.css" layer(components);
+@import "../styles/areas/promo.css" layer(components);
+@import "../styles/areas/auth.css" layer(components);
+@import "../styles/areas/member.css" layer(components);
+@import "../styles/areas/vip.css" layer(components);
+@import "../styles/areas/store.css" layer(components);
+@import "../styles/areas/lottery.css" layer(components);
+@import "../styles/areas/collection.css" layer(components);

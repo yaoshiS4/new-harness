@@ -1,0 +1,19 @@
+<section>
+<h2 id="i-runtime">Runtime and mock auth</h2>
+<p>Session state is mock and in memory: <code>MockAuthProvider</code> in <code>src/lib/auth/session.tsx</code> holds one of three states, <code>guest</code> (signed out), <code>level-0</code> (registered, no tier) and <code>tiered</code> (member with a VIP tier). The provider's own default is <code>guest</code>, but <code>src/app/providers.tsx</code> mounts it as <code>&lt;MockAuthProvider initialState="tiered"&gt;</code>, so <strong>every page load starts signed in as the tiered member</strong>. Nothing is persisted, so a full reload always returns to <code>tiered</code>. The rebuild must keep this behaviour, because several screens render different content per state.</p>
+<ul>
+<li><strong>Register</strong> in the auth modal signs the user in as <code>level-0</code>; <strong>log in</strong> signs them in as <code>tiered</code>.</li>
+<li>In development only, the home page shows a <code>DEV</code> floating button (aria-label <code>Mở bảng chuyển trạng thái đăng nhập (dev)</code>). It opens a panel whose cycle button steps <code>guest → level-0 → tiered → guest</code>, labelled <code>Khách</code>, <code>Cấp 0</code>, <code>Hội viên</code>. In production builds it renders nothing.</li>
+<li>To see signed-out or <code>level-0</code> screens, cycle the state on the home page, then navigate client-side (links or router push). A typed URL reloads the page and puts you back in <code>tiered</code>.</li>
+</ul>
+<h3 id="i-scripts">Package scripts</h3>
+<div class="tw"><table><thead><tr><th>Script</th><th>Command</th></tr></thead><tbody>
+<tr><td><code>dev</code></td><td><code>next dev</code></td></tr>
+<tr><td><code>build</code></td><td><code>next build</code></td></tr>
+<tr><td><code>start</code></td><td><code>next start</code></td></tr>
+<tr><td><code>lint</code></td><td><code>eslint</code></td></tr>
+<tr><td><code>lint:tokens</code></td><td><code>node scripts/token-lint.mjs</code></td></tr>
+<tr><td><code>lint:tokens:self-test</code></td><td><code>node scripts/token-lint.mjs --self-test</code></td></tr>
+</tbody></table></div>
+</section>
+

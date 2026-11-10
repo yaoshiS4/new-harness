@@ -1,0 +1,254 @@
+{
+  "primitive": {
+    "$description": "Yaobet overlay, primitive tier. Exactly one new hex, allowed by D-DS5 (the single exception to D-DS2). Nothing else in this overlay is a literal.",
+    "color": {
+      "red": {
+        "300": {
+          "$value": "#F2968E",
+          "$type": "color",
+          "$description": "D-DS5 loss red. Same hue as red.400 (#EF7B71, 4.8 deg, saturation 0.79), lighter step, so it sits above 400 in the ramp. Relative luminance 0.426 vs green.400 0.425: 0.2% apart (TOKENS.md rule 4.1, <= 5%). Contrast: 7.88 page, 7.17 surface.1, 6.47 surface.2, 5.68 surface.3, 6.98 on feedback.tint.danger. 1.23 against red.400, so loss and validation-red differ in lightness, not in hue."
+        }
+      }
+    }
+  },
+  "semantic": {
+    "$description": "Yaobet overlay, semantic tier (approved 2026-11-07, D-DS6). Merged over the delivered DS: a path that already exists is re-pointed, a new path is added. Every $value is a {ref} to a token that exists in docs/design/wine-gold/*.json or earlier in this overlay. The only new hex is primitive.color.red.300 (D-DS5). Contrast = WCAG 2 ratio computed from the resolved primitives.",
+    "color": {
+      "text": {
+        "muted-raised": {
+          "$value": "{primitive.color.neutral.300}",
+          "$type": "color",
+          "$description": "Fixes review defect 1 (High). Muted text on surface.3 (modal, toast, tooltip) and wine surfaces. text.muted (neutral.400) measures 4.11 on surface.3 and 4.25 on wine.panel. neutral.300: 5.83 on surface.3, 6.03 on wine.panel, 6.90 on wine.header, 7.73 on wine.deep, 7.36 on surface.1."
+        }
+      },
+      "feedback": {
+        "loss": {
+          "$value": "{primitive.color.red.300}",
+          "$type": "color",
+          "$description": "Fixes defect 3 (High), D-DS5. Re-points DS feedback.loss (was feedback.danger = red.400: L 0.337 vs win 0.425, 20.8% apart, loss quieter). red.300 L 0.426, 0.2% from green.400, so a loss is exactly as loud as a win. Contrast: 7.88 page, 7.17 surface.1, 6.47 surface.2, 5.68 surface.3. feedback.danger stays red.400 for validation and destructive actions."
+        },
+        "paused": {
+          "$value": "{semantic.color.text.secondary}",
+          "$type": "color",
+          "$description": "Fixes defect 5 (High). The 'tam dung' status foreground, distinct from danger and from loss. neutral.300: 5.66 on feedback.tint.paused, 5.83 on surface.3, 8.08 on page."
+        },
+        "tint": {
+          "paused": {
+            "$value": "{primitive.color.neutral.700}",
+            "$type": "color",
+            "$description": "Fixes defect 5 (High). Paused pill fill. Pill vs page 1.43 (decorative fill; the label carries the state, never the fill alone). Text on it: feedback.paused 5.66."
+          }
+        }
+      },
+      "action": {
+        "secondary": {
+          "text": {
+            "$value": "{semantic.color.text.accent}",
+            "$type": "color",
+            "$description": "Restores the pruned action.secondary.text (defect 4). gold.300 label on the transparent secondary button: 10.71 page, 9.75 surface.1, 8.80 surface.2, 7.99 wine.panel. Gold as text and line, never a fill (TOKENS.md 4.2)."
+          }
+        }
+      }
+    },
+    "spacing": {
+      "space": {
+        "1": { "$value": "{primitive.spacing.scale.4}", "$type": "dimension", "$description": "Defect 6: semantic step alias; replaces tokens.css --space-1 (4px, unchanged)." },
+        "2": { "$value": "{primitive.spacing.scale.8}", "$type": "dimension", "$description": "Defect 6: replaces --space-2 (8px, unchanged)." },
+        "3": { "$value": "{primitive.spacing.scale.12}", "$type": "dimension", "$description": "Defect 6: replaces --space-3 (12px, unchanged)." },
+        "4": { "$value": "{primitive.spacing.scale.16}", "$type": "dimension", "$description": "Defect 6: replaces --space-4 (16px, unchanged)." },
+        "5": { "$value": "{primitive.spacing.scale.24}", "$type": "dimension", "$description": "Defect 6: replaces --space-5 (24px, unchanged; note TOKENS.md 3.5 lists space-5 as 20, the repo value is 24)." },
+        "6": { "$value": "{primitive.spacing.scale.32}", "$type": "dimension", "$description": "Defect 6: replaces --space-6 (32px, unchanged). Also absorbs --space-7 (40px, off the DS scale, 3 call sites)." },
+        "8": { "$value": "{primitive.spacing.scale.48}", "$type": "dimension", "$description": "Defect 6: replaces --space-8 (48px, unchanged)." }
+      },
+      "gutter": { "$value": "{primitive.spacing.scale.16}", "$type": "dimension", "$description": "Defect 6: page horizontal gutter, replaces --gutter (16px, unchanged)." },
+      "gap": {
+        "xs": { "$value": "{primitive.spacing.scale.4}", "$type": "dimension", "$description": "Defect 6: label/icon pairs, replaces --gap-xs (4px)." },
+        "sm": { "$value": "{primitive.spacing.scale.8}", "$type": "dimension", "$description": "Defect 6: chip rows and dense tile clusters, replaces --gap-sm (8px)." },
+        "md": { "$value": "{primitive.spacing.scale.16}", "$type": "dimension", "$description": "Defect 6: grid and rail gap, replaces --gap (16px)." }
+      },
+      "band": { "$value": "{primitive.spacing.scale.16}", "$type": "dimension", "$description": "Defect 6: gap between home bands, replaces --band-gap (16px, kept: it was the dead-space fix). Owner may move it to scale.32 (TOKENS.md 3.5 --space-section)." },
+      "inset": {
+        "sm": { "$value": "{primitive.spacing.scale.16}", "$type": "dimension", "$description": "Defect 6: standard card padding, replaces --card-pad-sm (16px)." },
+        "md": { "$value": "{primitive.spacing.scale.24}", "$type": "dimension", "$description": "Defect 6: spacious module padding, replaces --card-pad (24px)." }
+      },
+      "field": { "$value": "{primitive.spacing.scale.24}", "$type": "dimension", "$description": "Defect 6: vertical rhythm between form fields, replaces --field-rhythm (24px)." },
+      "touch": {
+        "gap": { "$value": "{primitive.spacing.scale.8}", "$type": "dimension", "$description": "Defect 10: minimum gap between adjacent touch targets (TOKENS.md 3.11 --size-hit-gap 8px)." }
+      },
+      "icon": {
+        "sm": { "$value": "{primitive.spacing.scale.16}", "$type": "dimension", "$description": "Defect 10: icon size small (TOKENS.md 3.11, 16px)." },
+        "lg": { "$value": "{primitive.spacing.scale.24}", "$type": "dimension", "$description": "Defect 10: icon size large (TOKENS.md 3.11, 24px). Icon md (20px) has no DS primitive and stays absent (overlay approved without it, D-DS6)." }
+      }
+    },
+    "type": {
+      "weight": {
+        "strong": {
+          "$value": "{primitive.type.weight.semibold}",
+          "$type": "fontWeight",
+          "$description": "Defect 10. The repo reads --weight-bold (700) at 128 call sites and one literal 800 (typography.css .u-label), but D-DS3 loads 400/500/600 only, so a 700 token would render as synthesized bold. Strong emphasis maps to 600."
+        }
+      },
+      "role": {
+        "display": {
+          "family": { "$value": "{primitive.type.family.display}", "$type": "fontFamily", "$description": "Defect 6: role ramp. Playfair Display, hero only." },
+          "size": { "$value": "{primitive.type.size.display}", "$type": "dimension", "$description": "36-56px fluid." },
+          "leading": { "$value": "{primitive.type.leading.heading}", "$type": "number", "$description": "1.3, not the DS leading.display 1.25: Vietnamese stacked marks need >= 1.3 on text >= 20px (multi-line hero copy)." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600: thicker hairlines keep stacked marks legible in the high-contrast serif." }
+        },
+        "h1": {
+          "family": { "$value": "{primitive.type.family.display}", "$type": "fontFamily", "$description": "Playfair Display." },
+          "size": { "$value": "{primitive.type.size.h1}", "$type": "dimension", "$description": "30-44px fluid." },
+          "leading": { "$value": "{primitive.type.leading.heading}", "$type": "number", "$description": "1.3 (Vietnamese headroom)." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600." }
+        },
+        "h2": {
+          "family": { "$value": "{primitive.type.family.display}", "$type": "fontFamily", "$description": "Playfair Display; smallest serif step (26px at 375)." },
+          "size": { "$value": "{primitive.type.size.h2}", "$type": "dimension", "$description": "26-36px fluid." },
+          "leading": { "$value": "{primitive.type.leading.heading}", "$type": "number", "$description": "1.3." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600." }
+        },
+        "h3": {
+          "family": { "$value": "{primitive.type.family.body}", "$type": "fontFamily", "$description": "Defect 13 (Medium): Be Vietnam Pro, not Playfair, below 26px so stacked marks do not thin out." },
+          "size": { "$value": "{primitive.type.size.h3}", "$type": "dimension", "$description": "22-28px fluid." },
+          "leading": { "$value": "{primitive.type.leading.heading}", "$type": "number", "$description": "1.3." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600." }
+        },
+        "h4": {
+          "family": { "$value": "{primitive.type.family.body}", "$type": "fontFamily", "$description": "Defect 13: Be Vietnam Pro at 19-22px." },
+          "size": { "$value": "{primitive.type.size.h4}", "$type": "dimension", "$description": "19-22px fluid." },
+          "leading": { "$value": "{primitive.type.leading.heading}", "$type": "number", "$description": "1.3." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600." }
+        },
+        "body-lg": {
+          "family": { "$value": "{primitive.type.family.body}", "$type": "fontFamily", "$description": "Be Vietnam Pro." },
+          "size": { "$value": "{primitive.type.size.body-lg}", "$type": "dimension", "$description": "18-19px fluid." },
+          "leading": { "$value": "{primitive.type.leading.body}", "$type": "number", "$description": "1.6." },
+          "weight": { "$value": "{primitive.type.weight.regular}", "$type": "fontWeight", "$description": "400." }
+        },
+        "body": {
+          "family": { "$value": "{primitive.type.family.body}", "$type": "fontFamily", "$description": "Be Vietnam Pro." },
+          "size": { "$value": "{primitive.type.size.body}", "$type": "dimension", "$description": "16px." },
+          "leading": { "$value": "{primitive.type.leading.body}", "$type": "number", "$description": "1.6." },
+          "weight": { "$value": "{primitive.type.weight.regular}", "$type": "fontWeight", "$description": "400." }
+        },
+        "body-sm": {
+          "family": { "$value": "{primitive.type.family.body}", "$type": "fontFamily", "$description": "Be Vietnam Pro." },
+          "size": { "$value": "{primitive.type.size.body-sm}", "$type": "dimension", "$description": "14px." },
+          "leading": { "$value": "{primitive.type.leading.body}", "$type": "number", "$description": "1.6: running text at 14px keeps full diacritic headroom." },
+          "weight": { "$value": "{primitive.type.weight.regular}", "$type": "fontWeight", "$description": "400." }
+        },
+        "caption": {
+          "family": { "$value": "{primitive.type.family.body}", "$type": "fontFamily", "$description": "Be Vietnam Pro." },
+          "size": { "$value": "{primitive.type.size.caption}", "$type": "dimension", "$description": "12px." },
+          "leading": { "$value": "{primitive.type.leading.ui}", "$type": "number", "$description": "1.4 (above the repo's 1.3 floor for <= 14px)." },
+          "weight": { "$value": "{primitive.type.weight.medium}", "$type": "fontWeight", "$description": "500 for legibility at 12px." }
+        },
+        "num-lg": {
+          "family": { "$value": "{primitive.type.family.numeric}", "$type": "fontFamily", "$description": "Inter, tabular (semantic.type.feature.tabular)." },
+          "size": { "$value": "{primitive.type.size.num-lg}", "$type": "dimension", "$description": "28-36px fluid; hero balance and hero money." },
+          "leading": { "$value": "{primitive.type.leading.display}", "$type": "number", "$description": "1.25: allowed only because numerals are single-line and carry no diacritics." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600." }
+        },
+        "num-md": {
+          "family": { "$value": "{primitive.type.family.numeric}", "$type": "fontFamily", "$description": "Inter, tabular." },
+          "size": { "$value": "{primitive.type.size.num-md}", "$type": "dimension", "$description": "20-24px fluid." },
+          "leading": { "$value": "{primitive.type.leading.display}", "$type": "number", "$description": "1.25, single-line numerals only." },
+          "weight": { "$value": "{primitive.type.weight.semibold}", "$type": "fontWeight", "$description": "600." }
+        },
+        "num-sm": {
+          "family": { "$value": "{primitive.type.family.numeric}", "$type": "fontFamily", "$description": "Inter, tabular; inline money and odds." },
+          "size": { "$value": "{primitive.type.size.num-sm}", "$type": "dimension", "$description": "16px." },
+          "leading": { "$value": "{primitive.type.leading.ui}", "$type": "number", "$description": "1.4: sits inline with body text." },
+          "weight": { "$value": "{primitive.type.weight.medium}", "$type": "fontWeight", "$description": "500." }
+        }
+      }
+    },
+    "radius": {
+      "control": { "$value": "{primitive.radius.control}", "$type": "dimension", "$description": "Defect 6: buttons, inputs, chips, tags (4px)." },
+      "surface": { "$value": "{primitive.radius.surface}", "$type": "dimension", "$description": "Defect 6 and 12: cards, sheets, modals, tiles (8px; absorbs the repo's 12px and 16px)." },
+      "pill": { "$value": "{primitive.radius.full}", "$type": "dimension", "$description": "Defect 6: pills, avatars, the bottom-bar centre button (999px)." }
+    },
+    "motion": {
+      "duration": {
+        "instant": { "$value": "{primitive.motion.duration.instant}", "$type": "duration", "$description": "Defect 6: 80ms state swaps." },
+        "fast": { "$value": "{primitive.motion.duration.fast}", "$type": "duration", "$description": "Defect 6: 150ms hover, press, focus." },
+        "base": { "$value": "{primitive.motion.duration.base}", "$type": "duration", "$description": "Defect 6: 250ms reveals, tab change, sheet enter." },
+        "exit": { "$value": "{primitive.motion.duration.fast}", "$type": "duration", "$description": "Defect 6: 150ms exits, 0.6x the 250ms entrance." },
+        "slow": { "$value": "{primitive.motion.duration.slow}", "$type": "duration", "$description": "Defect 6: 400ms page-level transitions only." },
+        "ambient": { "$value": "{primitive.motion.duration.ambient}", "$type": "duration", "$description": "Defect 6: 650ms skeleton shimmer and the single home ambient loop; static under reduced motion." }
+      },
+      "easing": {
+        "standard": { "$value": "{primitive.motion.easing.standard}", "$type": "cubicBezier", "$description": "Defect 6: colour, opacity, border shifts." },
+        "enter": { "$value": "{primitive.motion.easing.decelerate}", "$type": "cubicBezier", "$description": "Defect 6: entrances (replaces --ease-entrance)." },
+        "exit": { "$value": "{primitive.motion.easing.accelerate}", "$type": "cubicBezier", "$description": "Defect 6: exits." },
+        "ambient": { "$value": "{primitive.motion.easing.ambient}", "$type": "cubicBezier", "$description": "Defect 6: looping ambient motion." }
+      }
+    },
+    "elevation": {
+      "level": {
+        "1": { "surface": { "$value": "{semantic.color.surface.1}", "$type": "color", "$description": "Restores pruned elevation.level.1.surface (defect 6): the fill that pairs with level.1.shadow (cards). Card title on it 13.80, meta 7.36." } },
+        "2": { "surface": { "$value": "{semantic.color.surface.2}", "$type": "color", "$description": "Restores elevation.level.2.surface: menus, inputs, odds cells. Primary text 12.45." } },
+        "3": { "surface": { "$value": "{semantic.color.surface.3}", "$type": "color", "$description": "Restores elevation.level.3.surface: modal, toast, tooltip. Primary text 10.93; muted text must use text.muted-raised (5.83)." } }
+      }
+    }
+  },
+  "component": {
+    "$description": "Yaobet overlay, component tier. Each entry resolves to a semantic token. Restores the pruned tokens listed in _removed-orphans.json that Yaobet components consume, and fixes the modal/toast/tooltip edge.",
+    "color": {
+      "card": {
+        "bg": { "$value": "{semantic.color.surface.1}", "$type": "color", "$description": "Defect 4. Card fill one step above page (1.10 vs page: depth comes from the step, card.border hairline 1.30 and level.1 shadow). card.title 13.80, card.meta 7.36 on it." }
+      },
+      "button": {
+        "secondary": {
+          "text": { "$value": "{semantic.color.action.secondary.text}", "$type": "color", "$description": "Defect 4. gold.300 label: 10.71 page, 9.75 surface.1, 8.80 surface.2." }
+        }
+      },
+      "control": {
+        "checked": {
+          "mark": { "$value": "{semantic.color.text.on-action}", "$type": "color", "$description": "Defects 4 and 9. Checkbox tick, wine.700 on control.checked.bg (gold.500): 7.97. Binding rule for defect 9: checkbox = checked.bg + checked.mark; switch = checked.track (surface.3) + checked.knob (gold.300), knob on track 7.72. The knob never sits on checked.bg (gold.300 on gold.500 is 1.29)." }
+        }
+      },
+      "input": {
+        "text": { "$value": "{semantic.color.text.primary}", "$type": "color", "$description": "Defect 4. Typed value on input.bg (surface.2): 12.45." },
+        "label": { "$value": "{semantic.color.text.secondary}", "$type": "color", "$description": "Defect 4. Field label: 8.08 page, 7.36 surface.1, 5.83 surface.3 (modal)." },
+        "helper": { "$value": "{semantic.color.text.muted-raised}", "$type": "color", "$description": "Defect 4. Helper text uses muted-raised because inputs also sit in modals: text.muted would be 4.11 on surface.3. neutral.300: 8.08 page, 7.36 surface.1, 5.83 surface.3." },
+        "error": {
+          "text": { "$value": "{semantic.color.feedback.danger}", "$type": "color", "$description": "Defect 4. Validation message, red.400: 6.40 page, 5.83 surface.1, 5.26 surface.2, 4.61 surface.3." }
+        }
+      },
+      "tab": {
+        "text": {
+          "rest": { "$value": "{semantic.color.text.secondary}", "$type": "color", "$description": "Defect 4. Inactive tab label: 8.08 page, 7.36 surface.1." },
+          "active": { "$value": "{semantic.color.text.accent}", "$type": "color", "$description": "Defect 4. Active tab label in gold (active nav is a TOKENS.md 4.2 gold use): 10.71 page, 9.75 surface.1. Paired with tab.indicator, so state is not colour alone." }
+        }
+      },
+      "odds": {
+        "up": { "$value": "{semantic.color.feedback.win}", "$type": "color", "$description": "Defect 4. Odds rising, green.400: 6.46 on odds.bg (surface.2), 5.67 on odds.selected.bg (surface.3). Pair with an up arrow, never colour alone." },
+        "down": { "$value": "{semantic.color.feedback.loss}", "$type": "color", "$description": "Defect 4. Odds falling, red.300 via the overlay loss: 6.47 on surface.2, 5.68 on surface.3. Pair with a down arrow." }
+      },
+      "vip": {
+        "bg": { "$value": "{semantic.color.surface.wine.deep}", "$type": "color", "$description": "Defect 4. VIP card fill wine.700: vip.text 14.49, vip.meta 7.73, vip.title 10.24." },
+        "header": {
+          "bg": { "$value": "{semantic.color.surface.wine.header}", "$type": "color", "$description": "Defect 4. VIP header band wine.600: vip.text 12.94, vip.meta 6.90, vip.title 9.15." }
+        }
+      },
+      "modal": {
+        "border": { "$value": "{semantic.color.border.control}", "$type": "color", "$description": "Fixes defect 2 (High). Re-points DS modal.border (hairline, 1.03 on surface.3). neutral.500 on surface.3: 3.08." },
+        "meta": { "$value": "{semantic.color.text.muted-raised}", "$type": "color", "$description": "Defect 1. Secondary copy inside a modal: 5.83 on surface.3." }
+      },
+      "toast": {
+        "border": { "$value": "{semantic.color.border.control}", "$type": "color", "$description": "Defect 2. Toast edge on surface.3: 3.08." },
+        "meta": { "$value": "{semantic.color.text.muted-raised}", "$type": "color", "$description": "Defect 1. Toast secondary line: 5.83." }
+      },
+      "tooltip": {
+        "border": { "$value": "{semantic.color.border.control}", "$type": "color", "$description": "Defect 2. Tooltip edge on surface.3: 3.08." },
+        "meta": { "$value": "{semantic.color.text.muted-raised}", "$type": "color", "$description": "Defect 1. Tooltip secondary line: 5.83." }
+      },
+      "feedback": {
+        "bg": {
+          "paused": { "$value": "{semantic.color.feedback.tint.paused}", "$type": "color", "$description": "Defect 5. Paused status block or pill fill (neutral.700); text feedback.paused 5.66." }
+        }
+      }
+    }
+  }
+}

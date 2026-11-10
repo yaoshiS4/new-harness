@@ -1,0 +1,49 @@
+<section>
+<h2 id="f-motion">Motion — motion.css + duration/easing tokens</h2>
+<table><thead><tr><th>token</th><th>value</th><th>reduced-motion value</th><th>intended use (source comment)</th></tr></thead><tbody><tr><td><span class="tok">--dur-fast</span></td><td>200ms</td><td>0ms</td><td>micro-interactions — hover, focus, colour shift</td></tr><tr><td><span class="tok">--dur-base</span></td><td>200ms</td><td>0ms</td><td>THE default</td></tr><tr><td><span class="tok">--dur-slow</span></td><td>300ms</td><td>0ms</td><td>larger transforms — translate/scale/height</td></tr><tr><td><span class="tok">--dur-header</span></td><td>300ms</td><td><strong>not zeroed</strong> (never read anyway)</td><td>header height collapse/expand</td></tr><tr><td><span class="tok">--ease-standard</span></td><td><code>cubic-bezier(0.645, 0.045, 0.355, 1)</code></td><td>—</td><td>J9 ease-in-out-quad</td></tr><tr><td><span class="tok">--ease-entrance</span></td><td><code>cubic-bezier(0.23, 1, 0.32, 1)</code></td><td>—</td><td>J9 ease-out-quint</td></tr></tbody></table>
+<p><code>motion.css</code> defines no keyframes. It is only the reduced-motion contract, inside <code>@media (prefers-reduced-motion: reduce)</code>:</p>
+<ol>
+<li><code>:root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }</code></li>
+<li><code>*, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }</code></li>
+</ol>
+<p>The second rule uses <code>!important</code>, so it overrides every literal duration in components as well (e.g. Skeleton's <code>1400ms</code>, Button spinner's <code>700ms</code>). Several components also apply their own reduced-motion overrides (listed per primitive), and JS animations gate on <code>usePrefersReducedMotion()</code> from <code>src/lib/rg.ts</code>.</p>
+<h3 id="f-motion-keyframes">Every keyframe defined in src/ui (the foundation set)</h3>
+<table><thead><tr><th>@keyframes</th><th>file</th><th>frames</th><th>used by</th></tr></thead><tbody><tr><td><code>spin</code></td><td>Button.module.css</td><td><code>to { transform: rotate(360deg) }</code></td><td><code>.spinner 700ms linear infinite</code></td></tr><tr><td><code>drop</code></td><td>Dropdown.module.css</td><td><code>from { opacity:0; transform: translateY(-4px) } to { opacity:1; transform: translateY(0) }</code></td><td><code>.panel var(--dur-fast) var(--ease-entrance)</code></td></tr><tr><td><code>pop</code></td><td>Modal.module.css</td><td><code>from { opacity:0; transform: translateY(8px) scale(0.98) } to { opacity:1; transform: translateY(0) scale(1) }</code></td><td><code>.panel var(--dur-base) var(--ease-entrance)</code></td></tr><tr><td><code>fade</code></td><td>Modal.module.css, Sheet.module.css</td><td><code>from { opacity:0 } to { opacity:1 }</code></td><td><code>.scrim var(--dur-base) var(--ease-standard)</code></td></tr><tr><td><code>slideUp</code></td><td>Modal.module.css (inside @media (max-width:639px)), Sheet.module.css</td><td><code>from { transform: translateY(100%) } to { transform: translateY(0) }</code></td><td><code>.panel var(--dur-slow) var(--ease-entrance)</code></td></tr><tr><td><code>sweep</code></td><td>Skeleton.module.css</td><td><code>from { background-position: 200% 0 } to { background-position: -200% 0 }</code></td><td><code>.skeleton var(--dur-slow) linear infinite; animation-duration: 1400ms</code></td></tr><tr><td><code>tileSweep</code></td><td>TileSkeleton.module.css</td><td><code>from { background-position: 200% 0 } to { background-position: -200% 0 }</code></td><td><code>.loading 1400ms linear infinite</code></td></tr></tbody></table>
+<p>JS motion in <code>src/ui</code>: the Odometer runs a 700ms <code>requestAnimationFrame</code> tween with easeOutCubic <code>1 - (1-t)^3</code>. The Countdown ticks with a 1000ms <code>setInterval</code>. The Sheet tracks swipe-down live through an inline <code>style.transform</code>.</p>
+<div class="callout note">CSS-Module keyframe names are hashed per module, so <code>fade</code> in Modal and <code>fade</code> in Sheet are independent and never collide. A rebuild that uses global CSS must rename them.</div>
+<details><summary>Verbatim src/styles/motion.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — global motion + reduced-motion contract (SPEC-02 §7, SPEC-04 1.2)
+ * ----------------------------------------------------------------------------
+ * The single, app-wide prefers-reduced-motion implementation. Because all
+ * motion reads the --dur-* tokens, zeroing them here disables every
+ * token-obeying animation with NO per-component opt-in (LOCKED — not
+ * overridable per brand).
+ *
+ * Flat Design timing (tokens.css §7): 200ms is the default for colour /
+ * opacity / border micro-interactions and 300ms is the ceiling, reserved for
+ * larger transforms. Snappy and direct — nothing eases in slowly.
+ * ==========================================================================*/
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+
+  /* Decorative motion the duration-tokens alone don't reach: confetti,
+   * odometer reels, auto-advancing carousels, count-ups → disabled; the
+   * final truthful state is shown instantly. Components additionally gate
+   * their own JS animation on this query (SPEC-03 F5). */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</code></pre></details>
+</section>
+

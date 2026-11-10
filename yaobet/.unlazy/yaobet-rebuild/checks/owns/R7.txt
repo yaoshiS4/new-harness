@@ -1,0 +1,9 @@
+src/components/collection/CollectionApp.tsx
+src/components/collection/PackStage.tsx
+src/components/collection/CardArt.tsx
+src/components/collection/RewardCeremony.tsx
+src/components/collection/CollectionTerms.tsx
+src/components/collection/CollectionHistory.tsx
+src/app/bo-suu-tap/page.tsx
+src/app/bo-suu-tap/CollectionRoot.tsx
+src/styles/areas/collection.css

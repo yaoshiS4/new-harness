@@ -1,0 +1,49 @@
+{
+  "$description": "motion tokens: primitive -> semantic -> component. Swap the semantic tier to add a theme.",
+  "primitive": {
+    "motion": {
+      "duration": {
+        "ambient": {
+          "$value": "650ms",
+          "$type": "duration"
+        },
+        "base": {
+          "$value": "250ms",
+          "$type": "duration"
+        },
+        "fast": {
+          "$value": "150ms",
+          "$type": "duration"
+        },
+        "instant": {
+          "$value": "80ms",
+          "$type": "duration"
+        },
+        "slow": {
+          "$value": "400ms",
+          "$type": "duration"
+        }
+      },
+      "easing": {
+        "accelerate": {
+          "$value": "cubic-bezier(0.3, 0, 1, 1)",
+          "$type": "cubicBezier"
+        },
+        "ambient": {
+          "$value": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "$type": "cubicBezier"
+        },
+        "decelerate": {
+          "$value": "cubic-bezier(0, 0, 0, 1)",
+          "$type": "cubicBezier"
+        },
+        "standard": {
+          "$value": "cubic-bezier(0.2, 0, 0, 1)",
+          "$type": "cubicBezier"
+        }
+      }
+    }
+  },
+  "semantic": {},
+  "component": {}
+}

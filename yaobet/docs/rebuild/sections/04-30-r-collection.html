@@ -1,0 +1,158 @@
+<section>
+<h2 id="r-collection">R4 · Bộ sưu tập (card collection) — routes</h2>
+<h3 id="r-collection-route-main">Route /bo-suu-tap</h3>
+<table><tbody>
+<tr><th>URL / files</th><td><code>/bo-suu-tap</code> — <code>src/app/bo-suu-tap/page.tsx</code> (server shell, <code>metadata.title = "Bộ sưu tập — Yaobet"</code>) → <code>CollectionRoot.tsx</code> (client composition root) → <a href="#r-collection-app">CollectionApp</a>.</td></tr>
+<tr><th>Auth</th><td>None. Everything runs on the fixture account <code>"demo-a"</code> persisted in <code>localStorage["yaobet.collection.v1.demo-a"]</code> (in-memory Map on the server).</td></tr>
+<tr><th>Composition root</th><td><code>new FixtureCollectionAdapters("demo-a", { latencyMs: 220, readFailureRate: 0, writeFailureRate: 0 })</code>; <code>ensureSeeded(3)</code> (only if the store has no entitlements, no cards and 0 shards → fires 3 units of simulated activity and mints 3 vested opens). Dev callbacks: fire (+1 activity, mint) · completeSet (grants every card of the smallest set that is not already complete; falls back to DEMO_SETS[0]) · reset (resetDemo + ensureSeeded(3)). Each callback bumps a nonce used as <code>key</code> on CollectionApp (full remount).</td></tr>
+<tr><th>Section order</th><td>1 PackStage (full-bleed stadium, 2 icon buttons, 5 foil packs or the revealed card, CTA "MỞ", "Lượt mở còn lại: N") → 2 Zone 2 "BỘ SƯU TẬP" plate → 3 note + "Thẻ của tôi N ›" pill → 4 three set rails (order frozen at first load: least expected opens first) → 5 Demo bar (+1 lượt mở / Hoàn thành 1 bộ / Đặt lại) → overlays (terms, history, ceremony) → toast live region.</td></tr>
+<tr><th>375px</th><td>Page padding 12px 16px 88px, max-width 760px → column 311px. Stage breaks out to 100vw (375px), min-height 500px; packs 172px wide in 66px slots (overlap). Rails full column width; tiles 104px wide in a horizontal scroll strip. zone2Head reserves 56px on the right (QuickActionRail). Overlays are bottom sheets.</td></tr>
+<tr><th>768px</th><td>Column 704px; same layout; overlays become centred dialogs (≥640).</td></tr>
+<tr><th>1024px</th><td>≥900: page max-width 980px; rail padding 24px; stage min-height 560px, floor 372px, packs 210px in 84px slots, prize card 240px; stage children max-width 780px. zone2Head right reservation removed (≥1024).</td></tr>
+<tr><th>1440px</th><td>Same as 1024 (page column 980 − 32 = 948px centred).</td></tr>
+<tr><th>Loading / error</th><td>"Đang tải…" while the state read is in flight (220 ms); "Không tải được bộ sưu tập." + "Thử lại" on an error envelope (unreachable with failure rate 0).</td></tr>
+</tbody></table>
+<div class="callout warn">Full-bleed stage uses <code>width: 100vw; margin-left: calc(50% - 50vw)</code>. Between 1024 and 1599px the shell frame is asymmetric (16px left / 76px right), so the page column is not viewport-centred and the stage is shifted ~30px left of the viewport (and 100vw includes any vertical scrollbar) — inference from the shell CSS.</div>
+<h3 id="r-collection-route-mine">Route /bo-suu-tap/cua-toi</h3>
+<table><tbody>
+<tr><th>URL / files</th><td><code>/bo-suu-tap/cua-toi</code> (+ <code>?tab=lich-su</code>) — <code>cua-toi/page.tsx</code> (metadata "Thẻ của tôi — Yaobet", wraps in <code>&lt;Suspense fallback={null}&gt;</code> because the child reads <code>useSearchParams</code>) → <code>MyCardsRoot.tsx</code> (same "demo-a" adapters, latency 220, failure 0; <strong>never seeds</strong>) → <a href="#r-collection-my-cards">MyCards</a>.</td></tr>
+<tr><th>Auth</th><td>None.</td></tr>
+<tr><th>Section order</th><td>back link "← Bộ sưu tập" → h1 "Thẻ của tôi" → Tabs (Thẻ của tôi | Lịch sử) → panel: inventory (count, filter segment, sort select, grid / empty state) or history (CollectionHistory) → CardDetail overlay when a tile is opened.</td></tr>
+<tr><th>375px</th><td>Column 311px; grid auto-fill minmax(140px,1fr) gap 12px → 2 columns (~149.5px).</td></tr>
+<tr><th>768px</th><td>Column 704px → 4 columns (~167px).</td></tr>
+<tr><th>1024 / 1440px</th><td>≥900: max-width 980px; grid fixed 6 columns (948 − 60)/6 ≈ 148px.</td></tr>
+<tr><th>Empty</th><td>A first-time visitor (no prior /bo-suu-tap visit) sees "Bạn đang giữ 0 thẻ" and the empty card "Chưa có thẻ nào".</td></tr>
+</tbody></table>
+<h3 id="r-collection-route-dev">Route /dev/collection-ports</h3>
+<table><tbody>
+<tr><th>URL / files</th><td><code>/dev/collection-ports</code> — <code>src/app/dev/collection-ports/page.tsx</code> (client page, no metadata), <code>page.module.css</code>. Not linked anywhere; not gated.</td></tr>
+<tr><th>Content</th><td><code>main.page</code> (padding 16px, max-width 900px, centred, #d6d3c7): header (h1 "Collection ports — harness" 20px 700 #f2f0e4; note 14px #888888) → controls row (flex wrap gap 8px; buttons "Re-probe all 11", "Fire simulated activity", "Double-submit one key", "Clock +1 day", "Reset demo account" — min-height 44px, padding 0 12px, border rgba(212,175,55,.55), radius 8px, #1a1a1a, 14px; hover #262626; focus ring) → optional "Idempotency" row ("first → applied · second → duplicate") → 11 probe rows (grid 1fr auto, padding 12px, border, radius 8px, #141414): port name 16px 600 #f2f0e4, detail 12px #6f6f6f (JSON preview ≤140 chars), state pill 12px 600 uppercase ls .06em padding 4px 8px pill border; colours live #45c9a5, loading #6f6f6f, error #e42946, absent #f5a623.</td></tr>
+<tr><th>Behaviour</th><td>Adapters "demo-a" with DEFAULT config (latency 450ms, read failure 8%, write failure 6%, seed 20260813). On mount and on every control: probes all ports in parallel; outcome probe draws entitlement "none" (→ rejected "Không tìm thấy lượt mở." shown as absent); wallet probe credits "probe-set"; clock shows ISO + "Asia/Ho_Chi_Minh".</td></tr>
+<tr><th>Breakpoints</th><td>None.</td></tr>
+</tbody></table>
+<details><summary>Verbatim dev harness CSS</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — collection ports harness (GC-101 demonstrable proxy).
+ * Throwaway dev surface. Deleted when GC-207 lands.
+ * Reads semantic tokens only, per the token contract.
+ * ==========================================================================*/
+
+.page {
+  padding: var(--space-4);
+  max-width: 900px;
+  margin: 0 auto;
+  color: var(--text);
+}
+
+.head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-tight);
+  color: var(--text-hi);
+  margin: 0 0 var(--space-2);
+}
+
+.note {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.btn {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--surface-hover);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.port {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.portName {
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.portDetail {
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+  line-height: var(--lh-body);
+  word-break: break-word;
+}
+
+.state {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.live {
+  color: var(--win);
+}
+
+.loading {
+  color: var(--text-dim);
+}
+
+.error {
+  color: var(--error);
+}
+
+.absent {
+  color: var(--caution);
+}</code></pre></details>
+<div class="callout warn">The harness writes to the SAME persisted "demo-a" store as the player surfaces: the wallet probe logs a "reward.exchanged · probe-set" row into the player's history on every probe, "Double-submit one key" stores priorityOrder ["s1","s2"] (non-existent set ids), and "Fire simulated activity" mints real demo opens. Its note says catalogue and outcome "refuse on purpose"; both now return live data (the fixture header comment is equally stale).</div>
+</section>
+

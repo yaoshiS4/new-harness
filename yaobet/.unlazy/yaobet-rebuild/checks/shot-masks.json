@@ -1,0 +1,11 @@
+{
+  "_source": "Random or time-based regions: guide 01-09-f-lib.html (timestamps from nowIso/isoIn/isoAgo at module load); countdowns render role=timer (layout/_internal/Countdown.tsx:68) or <time> (ui/Countdown/Countdown.tsx:101, collection/CollectionHistory.tsx:132); the Next dev indicator differs between 16.2.9 and 16.4.5 (PLAN-GATE item 33).",
+  "channel_threshold": 16,
+  "max_outside_mask_pct": 0.5,
+  "_threshold_note": "LOW-CONFIDENCE ASSUMPTION: 0.5% of pixels outside masks; calibrate per PR-37 before A5 is judged.",
+  "selectors": [
+    "[role=\"timer\"]",
+    "time",
+    "nextjs-portal"
+  ]
+}

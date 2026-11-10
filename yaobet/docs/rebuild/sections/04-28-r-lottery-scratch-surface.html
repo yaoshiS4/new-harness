@@ -1,0 +1,669 @@
+<section>
+<h2 id="r-lottery-scratch-surface">ScratchSurface (canvas coating) + coverArt</h2>
+<h4>1. Purpose</h4><p>A gold struck-metal coating painted on a canvas over one section; dragging erases it; past 58% erased the rest fades and the section opens.</p>
+<h4>2. Source</h4><p><code>src/components/lottery/_internal/ScratchSurface.tsx</code>, <code>ScratchSurface.module.css</code>, <code>coverArt.ts</code></p>
+<h4>3. Structure</h4><pre><code class="lang-txt">div.host[.className] data-revealed
+  {children}                                  (real values, always in the DOM)
+  !revealed &amp;&amp; canvas.cover aria-hidden data-clearing
+      pointerdown/move/up/cancel/lostpointercapture</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>variant</td><td>"band" | "field"</td><td>brush 34px / 42px; coating chrome</td></tr>
+<tr><td>revealed</td><td>boolean</td><td>true unmounts the canvas</td></tr>
+<tr><td>onReveal</td><td>() =&gt; void</td><td>fired once at threshold (after fade)</td></tr>
+<tr><td>reduced</td><td>boolean</td><td>skip fade</td></tr>
+<tr><td>className</td><td>string?</td><td>well chrome from the parent (.bandWell / .fieldWell)</td></tr></tbody></table>
+<h4>Constants (verbatim)</h4><pre><code class="lang-tsx">/** Brush diameter in CSS px, per section. Wide enough that one sweep clears a
+ *  row; narrow enough that the coating comes off as a stroke, not a wipe. */
+const BRUSH: Record&lt;CoverVariant, number&gt; = { band: 34, field: 42 };
+/** Alpha-sampling throttle (ms). getImageData never runs on the hot path. */
+const SAMPLE_MS = 120;
+/** Downsample stride, in DEVICE px, for the coverage walk. */
+const SAMPLE_STEP = 6;
+/** A sampled pixel counts as cleared below this alpha. */
+const ALPHA_CLEAR = 24;
+/** Erased fraction at which the rest fades on its own. */
+const CLEAR_THRESHOLD = 0.58;
+/** Fade of the remaining coating (ms). Mirrors --dur-slow; JS-side only. */
+const CLEAR_MS = 320;
+/** Backing-store cap: beyond 3x the extra pixels only cost memory. */
+const MAX_DPR = 3;</code></pre>
+<h4>Pointer / canvas logic (verbatim)</h4>
+<pre><code class="lang-tsx">/** Coin centres are MEASURED from the live `[data-token]` elements rather than
+ *  recomputed from a grid formula, so the coating always lands on the values
+ *  underneath whatever the breakpoint does to the layout. */
+function readSpots(host: HTMLElement): CoinSpot[] {
+  const box = host.getBoundingClientRect();
+  const out: CoinSpot[] = [];
+  for (const el of Array.from(host.querySelectorAll&lt;HTMLElement&gt;("[data-token]"))) {
+    const r = el.getBoundingClientRect();
+    if (r.width &lt; 6 || r.height &lt; 6) continue;
+    out.push({
+      x: r.left - box.left + r.width / 2,
+      y: r.top - box.top + r.height / 2,
+      r: Math.min(r.width, r.height) / 2,
+    });
+  }
+  return out;
+}
+
+export function ScratchSurface({
+  variant,
+  revealed,
+  onReveal,
+  reduced,
+  className,
+  children,
+}: ScratchSurfaceProps) {
+  const hostRef = useRef&lt;HTMLDivElement | null&gt;(null);
+  const canvasRef = useRef&lt;HTMLCanvasElement | null&gt;(null);
+  const ctxRef = useRef&lt;CanvasRenderingContext2D | null&gt;(null);
+  /** the palette read, cached for the life of the surface (never per frame) */
+  const paletteRef = useRef&lt;CoverPalette | null&gt;(null);
+  const sizeRef = useRef({ w: 0, h: 0, dpr: 0 });
+  const lastRef = useRef&lt;Point | null&gt;(null);
+  const drawingRef = useRef(false);
+  const sampledAtRef = useRef(0);
+  /** latched the moment the threshold is crossed, so it can only fire once */
+  const doneRef = useRef(false);
+  const timerRef = useRef&lt;number | null&gt;(null);
+  /** onReveal is called from a timeout — read it through a ref, not a closure */
+  const revealRef = useRef(onReveal);
+
+  /** true only while the remainder is fading; drives the CSS opacity hand-off */
+  const [clearing, setClearing] = useState(false);
+
+  useEffect(() =&gt; {
+    revealRef.current = onReveal;
+  });
+
+  /* ---- paint + keep the backing store in step with the CSS box ---------- */
+  useEffect(() =&gt; {
+    if (revealed) return;
+    const host = hostRef.current;
+    const canvas = canvasRef.current;
+    if (!host || !canvas) return;
+
+    // willReadFrequently: the coating is painted once and its alpha is read
+    // many times, which is exactly the case this hint exists for.
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    ctxRef.current = ctx;
+    paletteRef.current ??= readCoverPalette(host);
+
+    const paint = () =&gt; {
+      const box = host.getBoundingClientRect();
+      const w = Math.round(box.width);
+      const h = Math.round(box.height);
+      if (w &lt; 8 || h &lt; 8) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const size = sizeRef.current;
+      if (size.w === w &amp;&amp; size.h === h &amp;&amp; size.dpr === dpr) return; // no-op resize
+      sizeRef.current = { w, h, dpr };
+
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      // reset the transform on every resize — setting width/height clears it,
+      // and a stale scale is what makes the stroke drift off the pointer.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      paintCover(ctx, w, h, readSpots(host), paletteRef.current!, variant);
+    };
+
+    paint();
+    const ro = new ResizeObserver(paint);
+    ro.observe(host);
+    return () =&gt; ro.disconnect();
+  }, [revealed, variant]);
+
+  /* ---- one-shot timers must not outlive the surface -------------------- */
+  useEffect(
+    () =&gt; () =&gt; {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  function settle() {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    drawingRef.current = false;
+    if (reduced) {
+      revealRef.current(); // instant: no fade, no stagger
+      return;
+    }
+    setClearing(true);
+    timerRef.current = window.setTimeout(() =&gt; {
+      timerRef.current = null;
+      revealRef.current();
+    }, CLEAR_MS);
+  }
+
+  /** Walk a stride grid of the alpha channel. Throttled — never per frame. */
+  function sample(force: boolean) {
+    const now = performance.now();
+    if (!force &amp;&amp; now - sampledAtRef.current &lt; SAMPLE_MS) return;
+    sampledAtRef.current = now;
+
+    const ctx = ctxRef.current;
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    const cw = canvas.width;
+    const ch = canvas.height;
+    if (cw &lt; 1 || ch &lt; 1) return;
+
+    const { data } = ctx.getImageData(0, 0, cw, ch);
+    let total = 0;
+    let clear = 0;
+    for (let y = 0; y &lt; ch; y += SAMPLE_STEP) {
+      const row = y * cw;
+      for (let x = 0; x &lt; cw; x += SAMPLE_STEP) {
+        total++;
+        if (data[(row + x) * 4 + 3] &lt; ALPHA_CLEAR) clear++;
+      }
+    }
+    if (total &gt; 0 &amp;&amp; clear / total &gt;= CLEAR_THRESHOLD) settle();
+  }
+
+  function localPoint(canvas: HTMLCanvasElement, clientX: number, clientY: number): Point {
+    const box = canvas.getBoundingClientRect();
+    return { x: clientX - box.left, y: clientY - box.top };
+  }
+
+  function onPointerDown(e: React.PointerEvent&lt;HTMLCanvasElement&gt;) {
+    if (doneRef.current) return;
+    const canvas = e.currentTarget;
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    // capture so the stroke survives the pointer leaving the canvas
+    canvas.setPointerCapture(e.pointerId);
+    drawingRef.current = true;
+
+    const p = localPoint(canvas, e.clientX, e.clientY);
+    lastRef.current = p;
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, BRUSH[variant] / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function onPointerMove(e: React.PointerEvent&lt;HTMLCanvasElement&gt;) {
+    if (!drawingRef.current || doneRef.current) return;
+    const ctx = ctxRef.current;
+    const last = lastRef.current;
+    if (!ctx || !last) return;
+
+    const canvas = e.currentTarget;
+    const box = canvas.getBoundingClientRect();
+    const native = e.nativeEvent;
+    // every intermediate sample the browser buffered between frames — a fast
+    // drag then erases the path it actually took, not a straight chord
+    const batch =
+      typeof native.getCoalescedEvents === "function"
+        ? native.getCoalescedEvents()
+        : [native];
+
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineWidth = BRUSH[variant];
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    let nx = last.x;
+    let ny = last.y;
+    for (const pe of batch) {
+      nx = pe.clientX - box.left;
+      ny = pe.clientY - box.top;
+      ctx.lineTo(nx, ny);
+    }
+    ctx.stroke();
+    lastRef.current = { x: nx, y: ny };
+
+    sample(false);
+  }
+
+  function onPointerEnd() {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastRef.current = null;
+    sample(true); // one guaranteed read on release, so a last sweep counts
+  }
+
+  return (
+    &lt;div
+      ref={hostRef}
+      className={[styles.host, className].filter(Boolean).join(" ")}
+      data-revealed={revealed || undefined}
+    &gt;
+      {children}
+      {!revealed &amp;&amp; (
+        &lt;canvas
+          ref={canvasRef}
+          className={styles.cover}
+          data-clearing={clearing || undefined}
+          /* decoration only: every value it hides is in the DOM above */
+          aria-hidden="true"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerEnd}
+          onPointerCancel={onPointerEnd}
+          onLostPointerCapture={onPointerEnd}
+        /&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</code></pre>
+<ul>
+<li><strong>Paint</strong>: on mount and on every ResizeObserver change of the host (no-op if w/h/dpr unchanged): backing store = round(w·dpr) × round(h·dpr), dpr = min(devicePixelRatio, 3); setTransform(dpr…); paint coating at coin centres measured from <code>[data-token]</code> elements (skip &lt; 6px). Resizing repaints a FRESH coating (erased progress is lost on resize — inference from code).</li>
+<li><strong>Erase</strong>: pointerdown → setPointerCapture, destination-out circle radius brush/2; pointermove → stroke through all coalesced events, lineWidth = brush, round caps/joins; throttled sample.</li>
+<li><strong>Coverage</strong>: getImageData of the whole canvas, sample every 6 device px in x and y; a sample is cleared if alpha &lt; 24; ≥ 58% cleared → settle. One forced sample on pointer release.</li>
+<li><strong>Settle</strong>: latch; reduced → onReveal now; else data-clearing (CSS fade, pointer-events none) and onReveal after 320 ms.</li>
+<li>Cursor grab / grabbing; <code>touch-action: none</code> so the gesture never scrolls.</li></ul>
+<h4>5. Styles (verbatim)</h4><pre><code class="lang-css">/* ScratchSurface — the coating layer. The WELL's chrome (border, radius,
+ * ground, padding) is supplied by the caller through `className`; this file
+ * only owns the stacking and the erase gesture.
+ * Semantic / --brand-* indirection tokens only (token-lint A2). */
+
+.host {
+  position: relative;
+}
+
+/* The coating. Absolutely positioned, so it covers the well's padding box and
+ * leaves the well's own gold edge visible around it. */
+.cover {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  /* the scratch gesture belongs to the card — NEVER to page scrolling */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+  opacity: 1;
+  transition: opacity var(--dur-slow) var(--ease-standard);
+}
+
+.cover:active {
+  cursor: grabbing;
+}
+
+/* threshold reached — the remainder lifts away instead of demanding that every
+ * corner be scrubbed. Pointer events stop the moment it starts fading. */
+.cover[data-clearing] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* REDUCED MOTION — mandatory. The gesture stays (it is user-driven), but the
+ * coating disappears with NO fade: an instant state change, nothing self-
+ * animating. The component additionally skips the fade in JS. */
+@media (prefers-reduced-motion: reduce) {
+  .cover {
+    transition: none;
+  }
+}
+
+:global([data-motion="off"]) .cover {
+  transition: none;
+}</code></pre>
+<h4>coverArt — the painted coating (verbatim)</h4>
+<p>Palette read once per mount via getComputedStyle: <span class="tok">--brand-accent</span> #d4af37 (accent), <span class="tok">--brand-accent-2</span> #b4952f (accent2), <span class="tok">--canvas</span> #0a0a0a (ink), <span class="tok">--text-hi</span> #f2f0e4 (light); fallback literals identical. Ground: diagonal linear gradient of accent→ink mixes (band depth 0.66, field 0.76); brushed foil diagonals every 7px (band) / 9px (field) in light@0.05 and ink@0.11; radial sheen from (18%, −15%) light@0.16→0; dashed (5,6) rounded inner rule inset 4.5px, light@0.2, radius 10 (band) / 8 (field); one medallion per coin: rim linear gradient, 44 (band) / 30 (field) knurl ticks, band second rim at r·0.9, radial body, inner bevel ring, 5-point star (outer r·0.44, inner r·0.185), specular highlight.</p>
+<details><summary>Verbatim coverArt.ts</summary><pre><code class="lang-tsx">/* ============================================================================
+ * coverArt — the scratch COATING, painted into a &lt;canvas&gt; with 2D gradients.
+ *
+ * NO IMAGE FILES, NO DEPENDENCIES. Every pixel of the cover is drawn here, so
+ * the coating re-skins with the brand instead of shipping a baked PNG of one
+ * palette that a [data-brand] switch would silently contradict.
+ *
+ * WHERE THE COLOURS COME FROM
+ *   readCoverPalette() reads the SAME custom properties the stylesheets read —
+ *   --brand-accent / --brand-accent-2 / --canvas / --text-hi — off the live
+ *   element via getComputedStyle. Nothing here hardcodes a brand hex except the
+ *   FALLBACK, which only ever applies if a token is missing entirely. Custom
+ *   properties compute with var() already substituted, so --brand-accent comes
+ *   back as the resolved literal and not as "var(--gold-500)".
+ *
+ *   The read is one getComputedStyle call per surface MOUNT. The caller caches
+ *   it in a ref; it must never run per frame (it forces style resolution).
+ *
+ * WHAT IT LOOKS LIKE
+ *   A struck-metal medallion per value — radial body, darker rim with knurling,
+ *   an inner bevel ring, a five-point star, and a specular highlight offset to
+ *   the upper-left — sitting on a brushed foil field. The field matters: with
+ *   it, erasing reads as coating coming AWAY; without it, erasing reads as
+ *   holes appearing.
+ *
+ * TWO CHROMES. `variant` separates the small precious band (winning numbers)
+ * from the main field (the 4x3 grid) — denser knurl, brighter ground and a
+ * double rim on the band — so the two sections can never be confused.
+ * ==========================================================================*/
+
+/** sRGB triple, 0–255. Alpha is applied at use-site, never carried here. */
+export type Rgb = readonly [number, number, number];
+
+export interface CoverPalette {
+  /** --brand-accent — the gold the coin body is struck from */
+  accent: Rgb;
+  /** --brand-accent-2 — the pressed/darker step, used for rim + shade */
+  accent2: Rgb;
+  /** --canvas — the deep ground everything is shaded toward */
+  ink: Rgb;
+  /** --text-hi — champagne, the specular/sheen colour */
+  light: Rgb;
+}
+
+export interface CoinSpot {
+  /** centre, in CSS px relative to the canvas box */
+  x: number;
+  y: number;
+  /** coin radius, in CSS px */
+  r: number;
+}
+
+export type CoverVariant = "band" | "field";
+
+/** Only reached if a token is absent from the cascade entirely. */
+const FALLBACK: CoverPalette = {
+  accent: [212, 175, 55],
+  accent2: [180, 149, 47],
+  ink: [10, 10, 10],
+  light: [242, 240, 228],
+};
+
+const TAU = Math.PI * 2;
+
+/* ----------------------------------------------------------------------------
+ * COLOUR — parse the token, then mix in JS.
+ * `color-mix()` is not reliably accepted by canvas fillStyle, so the blending
+ * the stylesheets do with color-mix() is done here numerically instead.
+ * --------------------------------------------------------------------------*/
+
+function clamp255(n: number): number {
+  return n &lt; 0 ? 0 : n &gt; 255 ? 255 : Math.round(n);
+}
+
+/** Accepts `#abc`, `#aabbcc(aa)`, `rgb(…)`, `rgba(…)`. Anything else → fallback. */
+function parseColor(raw: string, fallback: Rgb): Rgb {
+  const s = raw.trim();
+  if (!s) return fallback;
+
+  if (s.charCodeAt(0) === 35 /* # */) {
+    const hex = s.slice(1);
+    const short = hex.length === 3 || hex.length === 4;
+    const long = hex.length === 6 || hex.length === 8;
+    if (!short &amp;&amp; !long) return fallback;
+    const cut = (i: number) =&gt;
+      short ? hex[i] + hex[i] : hex.slice(i * 2, i * 2 + 2);
+    const rgb = [0, 1, 2].map((i) =&gt; parseInt(cut(i), 16));
+    return rgb.some(Number.isNaN) ? fallback : [rgb[0], rgb[1], rgb[2]];
+  }
+
+  // rgb()/rgba(), comma or space separated
+  const nums = s.match(/-?\d*\.?\d+/g);
+  if (nums &amp;&amp; nums.length &gt;= 3) {
+    return [clamp255(+nums[0]), clamp255(+nums[1]), clamp255(+nums[2])];
+  }
+  return fallback;
+}
+
+/** Linear blend, t=0 → a, t=1 → b. */
+function mix(a: Rgb, b: Rgb, t: number): Rgb {
+  return [
+    clamp255(a[0] + (b[0] - a[0]) * t),
+    clamp255(a[1] + (b[1] - a[1]) * t),
+    clamp255(a[2] + (b[2] - a[2]) * t),
+  ];
+}
+
+function css(c: Rgb): string {
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
+function rgba(c: Rgb, alpha: number): string {
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${alpha})`;
+}
+
+/**
+ * One getComputedStyle read of the four tokens the coating is struck from.
+ * Call ONCE per surface (on mount) and cache the result — never per frame.
+ */
+export function readCoverPalette(el: Element): CoverPalette {
+  const cs = getComputedStyle(el);
+  const read = (name: string, fb: Rgb): Rgb =&gt;
+    parseColor(cs.getPropertyValue(name), fb);
+  return {
+    accent: read("--brand-accent", FALLBACK.accent),
+    accent2: read("--brand-accent-2", FALLBACK.accent2),
+    ink: read("--canvas", FALLBACK.ink),
+    light: read("--text-hi", FALLBACK.light),
+  };
+}
+
+/* ----------------------------------------------------------------------------
+ * SHAPES
+ * --------------------------------------------------------------------------*/
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const rad = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.lineTo(x + w - rad, y);
+  ctx.arcTo(x + w, y, x + w, y + rad, rad);
+  ctx.lineTo(x + w, y + h - rad);
+  ctx.arcTo(x + w, y + h, x + w - rad, y + h, rad);
+  ctx.lineTo(x + rad, y + h);
+  ctx.arcTo(x, y + h, x, y + h - rad, rad);
+  ctx.lineTo(x, y + rad);
+  ctx.arcTo(x, y, x + rad, y, rad);
+  ctx.closePath();
+}
+
+function starPath(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  outer: number,
+  inner: number,
+  points: number,
+): void {
+  ctx.beginPath();
+  for (let i = 0; i &lt; points * 2; i++) {
+    const rad = i % 2 === 0 ? outer : inner;
+    const a = -Math.PI / 2 + (i * Math.PI) / points;
+    const px = cx + Math.cos(a) * rad;
+    const py = cy + Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+/** One struck coin: rim → knurl → bevelled body → inner ring → star → specular. */
+function paintCoin(
+  ctx: CanvasRenderingContext2D,
+  spot: CoinSpot,
+  pal: CoverPalette,
+  variant: CoverVariant,
+): void {
+  const { x, y, r } = spot;
+  if (r &lt; 4) return;
+
+  /* rim — a directional gradient so the coin has a lit side and a shaded one */
+  const rim = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  rim.addColorStop(0, css(mix(pal.accent, pal.light, 0.5)));
+  rim.addColorStop(0.45, css(pal.accent));
+  rim.addColorStop(1, css(mix(pal.accent2, pal.ink, 0.4)));
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fillStyle = rim;
+  ctx.fill();
+
+  /* knurling — short radial ticks around the rim; the band mills finer */
+  const ticks = variant === "band" ? 44 : 30;
+  ctx.strokeStyle = rgba(pal.ink, 0.26);
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  for (let i = 0; i &lt; ticks; i++) {
+    const a = (i / ticks) * TAU;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(x + c * r * 0.985, y + s * r * 0.985);
+    ctx.lineTo(x + c * r * 0.885, y + s * r * 0.885);
+    ctx.stroke();
+  }
+
+  /* the band gets a second rule inside the rim — the "more precious" chrome */
+  if (variant === "band") {
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.9, 0, TAU);
+    ctx.lineWidth = Math.max(1, r * 0.035);
+    ctx.strokeStyle = rgba(pal.light, 0.34);
+    ctx.stroke();
+  }
+
+  /* body — radial gradient with its light centre pushed to the upper-left, so
+   * the coin reads as struck metal rather than as a flat disc */
+  const body = ctx.createRadialGradient(
+    x - r * 0.34,
+    y - r * 0.4,
+    r * 0.05,
+    x,
+    y,
+    r * 0.9,
+  );
+  body.addColorStop(0, css(mix(pal.accent, pal.light, 0.66)));
+  body.addColorStop(0.4, css(pal.accent));
+  body.addColorStop(0.8, css(pal.accent2));
+  body.addColorStop(1, css(mix(pal.accent2, pal.ink, 0.45)));
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.84, 0, TAU);
+  ctx.fillStyle = body;
+  ctx.fill();
+
+  /* inner bevel: a full shade ring, then a lit arc across its top-left */
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.7, 0, TAU);
+  ctx.strokeStyle = rgba(pal.ink, 0.24);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.7, Math.PI * 1.02, Math.PI * 1.9);
+  ctx.strokeStyle = rgba(pal.light, 0.32);
+  ctx.stroke();
+
+  /* the motif */
+  starPath(ctx, x, y, r * 0.44, r * 0.185, 5);
+  const star = ctx.createLinearGradient(x, y - r * 0.46, x, y + r * 0.46);
+  star.addColorStop(0, css(mix(pal.accent, pal.light, 0.78)));
+  star.addColorStop(1, css(mix(pal.accent2, pal.ink, 0.24)));
+  ctx.fillStyle = star;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.03);
+  ctx.strokeStyle = rgba(pal.ink, 0.3);
+  ctx.stroke();
+
+  /* specular — offset toward the top-left, clipped to the coin body */
+  const spec = ctx.createRadialGradient(
+    x - r * 0.4,
+    y - r * 0.44,
+    0,
+    x - r * 0.4,
+    y - r * 0.44,
+    r * 0.62,
+  );
+  spec.addColorStop(0, rgba(pal.light, 0.5));
+  spec.addColorStop(1, rgba(pal.light, 0));
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.84, 0, TAU);
+  ctx.fillStyle = spec;
+  ctx.fill();
+}
+
+/**
+ * Paint the whole coating: brushed foil ground, sheen, a dashed inner rule as
+ * the "this comes off" affordance, then one medallion per value.
+ *
+ * `w`/`h` are CSS px — the caller has already scaled the backing store by dpr
+ * and set the transform, so everything below is authored in CSS pixels.
+ */
+export function paintCover(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  spots: readonly CoinSpot[],
+  pal: CoverPalette,
+  variant: CoverVariant,
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.clearRect(0, 0, w, h);
+
+  /* ground — a dark alloy of the accent, never flat black, so the coating
+   * still reads as metal where no coin sits */
+  const deep = variant === "band" ? 0.66 : 0.76;
+  const ground = ctx.createLinearGradient(0, 0, w, h);
+  ground.addColorStop(0, css(mix(pal.accent, pal.ink, deep - 0.08)));
+  ground.addColorStop(0.5, css(mix(pal.accent, pal.ink, deep)));
+  ground.addColorStop(1, css(mix(pal.accent2, pal.ink, deep + 0.06)));
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, 0, w, h);
+
+  /* brushed foil: paired light/dark diagonals. One-time cost at paint, and it
+   * is what makes an erased patch look like coating lifting off. */
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, w, h);
+  ctx.clip();
+  ctx.lineWidth = 1;
+  const step = variant === "band" ? 7 : 9;
+  for (let pass = 0; pass &lt; 2; pass++) {
+    ctx.strokeStyle = pass === 0 ? rgba(pal.light, 0.05) : rgba(pal.ink, 0.11);
+    const off = pass === 0 ? 0 : step / 2;
+    for (let x = -h; x &lt; w + h; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x + off, 0);
+      ctx.lineTo(x + off + h, h);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  /* sheen from the upper-left, matching the coins' light direction */
+  const sheen = ctx.createRadialGradient(
+    w * 0.18,
+    -h * 0.15,
+    0,
+    w * 0.18,
+    -h * 0.15,
+    Math.max(w, h) * 1.05,
+  );
+  sheen.addColorStop(0, rgba(pal.light, 0.16));
+  sheen.addColorStop(1, rgba(pal.light, 0));
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, w, h);
+
+  /* the affordance: a dashed rule just inside the edge */
+  ctx.setLineDash([5, 6]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = rgba(pal.light, 0.2);
+  roundRectPath(ctx, 4.5, 4.5, w - 9, h - 9, variant === "band" ? 10 : 8);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (const spot of spots) paintCoin(ctx, spot, pal, variant);
+
+  ctx.restore();
+}</code></pre></details>
+<h4>6–7. States / Motion</h4><p>coated → scratching → clearing (opacity fade 300ms, pointer-events none) → revealed (canvas removed). Reduced motion: no fade (CSS and JS).</p>
+<h4>8–10</h4><p>No copy. Canvas aria-hidden. Coin positions come from the live layout, so the coating matches every breakpoint.</p>
+</section>
+

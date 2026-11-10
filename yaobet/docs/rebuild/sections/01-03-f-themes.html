@@ -1,0 +1,95 @@
+<section>
+<h2 id="f-themes">themes.css &amp; brands.css — the two orthogonal axes</h2>
+<p><code>&lt;html&gt;</code> carries two attributes. <code>data-theme</code> is the canvas/surface axis (reserved, a no-op at v1). <code>data-brand</code> is the accent/CTA/font/logo axis. Both are set statically in <code>src/app/layout.tsx</code> as <code>&lt;html lang="vi" data-brand="yaobet" data-theme="obsidian" className={`${beVietnamPro.variable} ${montserrat.variable}`}&gt;</code>. No code ever changes them at runtime: no theme or brand switcher exists, and no other <code>data-brand</code>/<code>data-theme</code> attribute exists in <code>src</code> (verified with rg).</p>
+
+<h3 id="f-themes-theme">[data-theme="obsidian"] — themes.css</h3>
+<p>This is an empty rule (comment only). It overrides nothing. The obsidian theme is the <code>:root</code> defaults.</p>
+<pre><code class="lang-css">[data-theme="obsidian"] {
+  /* v1 Flat / Dark-Luxury == the :root defaults; no overrides needed yet. */
+}</code></pre>
+<details><summary>Verbatim src/styles/themes.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — [data-theme] hook (SPEC-02 §0)
+ * ----------------------------------------------------------------------------
+ * Yaobet ships OLED-dark only at v1. [data-theme="obsidian"] is the reserved
+ * hook for future light/alt themes. The default (no [data-theme]) IS obsidian;
+ * this selector exists so the hook is wired and any future theme re-points
+ * GROUP-A surface/text tokens here (NOT in brands.css). Brand and theme are
+ * orthogonal axes: [data-brand] re-skins accent; [data-theme] re-skins canvas.
+ *
+ * Under the Flat / Dark-Luxury re-point, "obsidian" is now literally obsidian:
+ * --canvas #0a0a0a, --surface #141414, --text-hi #f2f0e4 champagne, accent
+ * #d4af37 gold. PM ruling A1 settled the light-vs-dark contradiction in the
+ * source design system in favour of dark, so there is still exactly ONE theme
+ * and this block stays a no-op. A future light theme would re-point the
+ * GROUP-A canvas/surface/text ladder HERE — and would additionally have to
+ * re-derive --border and --text-on-gold, which are tuned for a dark ground.
+ * ==========================================================================*/
+
+[data-theme="obsidian"] {
+  /* v1 Flat / Dark-Luxury == the :root defaults; no overrides needed yet. */
+}
+</code></pre></details>
+
+<h3 id="f-themes-brand">[data-brand] blocks — brands.css</h3>
+<p>Two selectors exist. <code>[data-brand="yaobet"]</code> re-declares exactly the same aliases as <code>:root</code>, so it is an explicit default anchor and changes no pixel. <code>[data-brand="emerald"]</code> is a regression brand that nothing in the app activates. Both declare only the 12 <code>--brand-*</code> vars. Specificity: <code>[data-brand]</code> (0,1,0) on <code>&lt;html&gt;</code> beats <code>:root</code> (0,1,0) because <code>brands.css</code> is imported after <code>tokens.css</code>.</p>
+<table><thead><tr><th>--brand-* var</th><th>[data-brand="yaobet"] value</th><th>resolves to</th><th>[data-brand="emerald"] value</th></tr></thead><tbody><tr><td><span class="tok">--brand-accent</span></td><td><code>var(--gold-500)</code></td><td><code>#d4af37</code> <span class="sw" style="background:#d4af37"></span></td><td><code>#1fbf73</code> <span class="sw" style="background:#1fbf73"></span></td></tr><tr><td><span class="tok">--brand-accent-2</span></td><td><code>var(--gold-600)</code></td><td><code>#b4952f</code> <span class="sw" style="background:#b4952f"></span></td><td><code>#169a5b</code> <span class="sw" style="background:#169a5b"></span></td></tr><tr><td><span class="tok">--brand-accent-grad</span></td><td><code>var(--gold-grad)</code></td><td><code>#d4af37</code> <span class="sw" style="background:#d4af37"></span></td><td><code>linear-gradient(90deg, #1fbf73, #7ff0bf)</code> <span class="sw" style="background:linear-gradient(90deg, #1fbf73, #7ff0bf)"></span></td></tr><tr><td><span class="tok">--brand-accent-hairline</span></td><td><code>var(--gold-hairline)</code></td><td><code>rgba(212, 175, 55, 0.55)</code> <span class="sw" style="background:rgba(212, 175, 55, 0.55)"></span></td><td><code>rgba(31, 191, 115, 0.32)</code> <span class="sw" style="background:rgba(31, 191, 115, 0.32)"></span></td></tr><tr><td><span class="tok">--brand-on-accent</span></td><td><code>var(--text-on-gold)</code></td><td><code>#0a0a0a</code> <span class="sw" style="background:#0a0a0a"></span></td><td><code>#04140c</code> <span class="sw" style="background:#04140c"></span></td></tr><tr><td><span class="tok">--brand-cta</span></td><td><code>var(--cta)</code></td><td><code>#5e97c9</code> <span class="sw" style="background:#5e97c9"></span></td><td><code>#2f6bff</code> <span class="sw" style="background:#2f6bff"></span></td></tr><tr><td><span class="tok">--brand-cta-grad</span></td><td><code>var(--cta-grad)</code></td><td><code>#1e3d59</code> <span class="sw" style="background:#1e3d59"></span></td><td><code>linear-gradient(90deg, #3b7bff, #2f6bff)</code> <span class="sw" style="background:linear-gradient(90deg, #3b7bff, #2f6bff)"></span></td></tr><tr><td><span class="tok">--brand-cta-accent</span></td><td><code>var(--cta-accent)</code></td><td><code>#f53f55</code> <span class="sw" style="background:#f53f55"></span></td><td><code>#ff3d57</code> <span class="sw" style="background:#ff3d57"></span></td></tr><tr><td><span class="tok">--brand-font-body</span></td><td><code>var(--font-body)</code></td><td><code>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code> </td><td><code>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code> </td></tr><tr><td><span class="tok">--brand-font-num</span></td><td><code>var(--font-num)</code></td><td><code>var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif</code> </td><td><code>var(--font-be-vietnam), ui-monospace, "DIN Alternate", sans-serif</code> </td></tr><tr><td><span class="tok">--brand-font-head</span></td><td><code>var(--font-head)</code></td><td><code>var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code> </td><td><code>var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code> </td></tr><tr><td><span class="tok">--brand-logo</span></td><td><code>url("/assets/brand/logo.svg")</code></td><td><code>url("/assets/brand/logo.svg")</code> </td><td><code>url("/assets/brand/emerald-logo.svg")</code> </td></tr></tbody></table>
+<div class="callout warn">Brand-following tokens in the member-hub layer (<code>--page-bloom</code>, <code>--header-card-grad</code>, <code>--progress-fill</code>, <code>--progress-fill-grad</code>, <code>--progress-tag-*</code>) are declared on <code>:root</code> as <code>color-mix(… var(--brand-accent) …)</code>. A custom property's <code>var()</code> is substituted on the element where it is declared, so these resolve against <code>:root</code>'s <code>--brand-accent</code> (gold). <code>&lt;html&gt;</code> is the <code>:root</code> element and carries <code>data-brand</code> too, so under emerald they would follow emerald correctly. Moving <code>data-brand</code> onto a descendant (e.g. a <code>&lt;div data-brand&gt;</code>) would break this.</div>
+<details><summary>Verbatim src/styles/brands.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — [data-brand] OVERRIDES (SPEC-02 §2.1)
+ * ----------------------------------------------------------------------------
+ * A [data-brand="x"] block re-points ONLY the GROUP-B --brand-* indirection
+ * vars. It MUST NOT touch any GROUP-A LOCKED token (lint A1) and MUST NOT
+ * redeclare a RAW-RAMP literal (--gold-*, --cta*, --font-body/-num,
+ * --text-on-gold) — it overrides by re-pointing the --brand-* alias.
+ *
+ * --win / --loss / --error / --focus-ring are ABSENT from every block —
+ * equal-salience + AA focus are LOCKED across all brands (lint A3). So are
+ * canvas, contrast floor, spacing, radii, z-index and motion. This is the
+ * falsifiable byte-identical property Wave 1.4 verifies / Wave 1.3 lints.
+ * ==========================================================================*/
+
+/* Default brand — Yaobet. The --brand-* aliases already resolve to the Yaobet
+ * gold/CTA ramps on :root (tokens.css). This block is the explicit default
+ * anchor so [data-brand="yaobet"] is a defined selector and the override
+ * mechanism is symmetric with the alternate brand below. */
+[data-brand="yaobet"] {
+  --brand-accent:          var(--gold-500);
+  --brand-accent-2:        var(--gold-600);
+  --brand-accent-grad:     var(--gold-grad);
+  --brand-accent-hairline: var(--gold-hairline);
+  --brand-on-accent:       var(--text-on-gold);
+  --brand-cta:             var(--cta);
+  --brand-cta-grad:        var(--cta-grad);
+  --brand-cta-accent:      var(--cta-accent);
+  --brand-font-body:       var(--font-body);
+  --brand-font-num:        var(--font-num);
+  --brand-font-head:       var(--font-head);
+  --brand-logo:            url("/assets/brand/logo.svg");
+}
+
+/* Regression brand — proves the override re-skins accent/CTA/logo/font while
+ * canvas / win-loss / contrast / spacing / motion stay byte-identical. */
+[data-brand="emerald"] {
+  --brand-accent:          #1fbf73;
+  --brand-accent-2:        #169a5b;
+  --brand-accent-grad:     linear-gradient(90deg, #1fbf73, #7ff0bf);
+  --brand-accent-hairline: rgba(31, 191, 115, 0.32);
+  --brand-on-accent:       #04140c; /* ≥4.5:1 on --brand-accent — verified */
+  --brand-cta:             #2f6bff;
+  --brand-cta-grad:        linear-gradient(90deg, #3b7bff, #2f6bff);
+  --brand-cta-accent:      #ff3d57;
+  /* The faces are injected by next/font under HASHED family names, so a bare
+   * "Be Vietnam Pro" / "Montserrat" literal here would silently miss the
+   * loaded font and drop to system-ui. Reference the loader vars instead —
+   * still a --brand-* declaration, so lint A1 is unaffected. */
+  --brand-font-body:       var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --brand-font-num:        var(--font-be-vietnam), ui-monospace, "DIN Alternate", sans-serif;
+  --brand-font-head:       var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --brand-logo:            url("/assets/brand/emerald-logo.svg");
+}
+</code></pre></details>
+
+<h3 id="f-themes-vip">The /vip luxury palette</h3>
+<p>The VIP palette is defined in <code>tokens.css</code> on <code>:root</code> as the <code>--vip-*</code> tokens plus <code>--brand-font-display</code> (see <a href="#f-tokens-vip">f-tokens-vip</a>). It is not a theme or brand selector. It applies through a page wrapper class <code>.vipPalette</code> in <code>src/components/vip/VipProgram.module.css</code>, rendered by <code>VipProgram.tsx</code> as <code>&lt;div className={styles.vipPalette}&gt;</code>. Track R owns the wrapper's own styles and every VIP component.</p>
+</section>
+

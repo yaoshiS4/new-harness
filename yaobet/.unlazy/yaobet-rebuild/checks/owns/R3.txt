@@ -1,0 +1,12 @@
+src/components/vip/VipProgram.tsx
+src/components/vip/VipSectionHeading.tsx
+src/components/vip/VipHeroGuest.tsx
+src/components/vip/VipHeroMember.tsx
+src/components/vip/LevelRing.tsx
+src/components/vip/TierDeck.tsx
+src/components/vip/PrivilegeComparison.tsx
+src/components/vip/PrivilegeMatrix.tsx
+src/components/vip/LevelTable.tsx
+src/components/vip/VipFaq.tsx
+src/app/vip/**
+src/styles/areas/vip.css

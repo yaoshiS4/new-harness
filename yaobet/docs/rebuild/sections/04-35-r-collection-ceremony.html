@@ -1,0 +1,448 @@
+<section>
+<h2 id="r-collection-ceremony">RewardCeremony (exchange confirm + reveal ceremony)</h2>
+<h4>1. Purpose</h4><p>Exchange flow for a completed set: a confirmation that spells out which cards will be spent, then a short ceremony where the set's cards gather and a gold seal draws over them, ending on the receipt.</p>
+<h4>2. Source</h4><p><code>src/components/collection/RewardCeremony.tsx</code>, <code>ceremony.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">impact (confirm phase):
+Overlay(auto, labelledBy)
+  div.panel
+    p.eyebrow "Xác nhận đổi thưởng"
+    h2.setName set.name
+    p.amount formatVnd(reward)
+    p.provisional "Số liệu demo — chưa phải mức thưởng công bố."
+    div.cost
+      p.costHead "Đổi thưởng sẽ " strong "dùng hết {size} thẻ" " của bộ này. Bộ trở về " strong "0/{size}" " và bạn có thể sưu tầm lại từ đầu."
+      spare&gt;0 &amp;&amp; p.costSpare "Bạn có thẻ dự phòng cho " strong n " thẻ — những thẻ này bạn vẫn giữ lại."
+      collateral &amp;&amp; p.costWarn "Các bộ khác cũng bị ảnh hưởng:" + ul.costList li "{set} — mất " strong n " thẻ"
+    button.done   "Xác nhận · dùng {size} thẻ"  → onConfirm
+    button.cancel "Để sau"                       → onClose
+error:
+  div.panel  h2.failTitle "Chưa đổi được thưởng" · p.failBody {error} · p.failHint "Bộ sưu tập của bạn không thay đổi. Vui lòng thử lại." · button.done "Đóng"
+ceremony:
+  div.panel data-beat = gather | seal | receipt
+    div.stage aria-hidden
+      div.fan  div.card × size  style --i = i − (n−1)/2, --n = n   → CardArt
+      svg.seal 120 viewBox role=presentation
+        circle.sealRing r52 · circle.sealRingInner r44 · path.sealTick "M42 61 l13 13 l24 -26"
+    p.eyebrow "Hoàn thành bộ sưu tập"
+    h2.setName · p.count "Đủ " strong "{size}/{size}" " thẻ" · p.amount · p.provisional
+    div.receipt data-ready = settled &amp;&amp; grant
+      settled &amp;&amp; grant:
+        p.credited "Đã cộng vào " strong "ví chính"
+        ul.terms
+          li "Dùng được ngay, " strong "không kèm điều kiện cược" "."
+          li "Đã dùng " strong "{size} thẻ" " — bộ này trở về " strong "0/{size}" ", sưu tầm lại để đổi tiếp."
+          li "Đây là lần đổi thứ " strong {exchangeCount} " của bộ này."
+        p.txn "Mã giao dịch: " code txn-N
+        button.done "Xong"
+      else: p.pending "Đang chuyển vào ví…"</code></pre>
+<h4>Ceremony state machine</h4>
+<pre><code class="lang-txt">beat reducer: gather → seal → receipt (terminal)
+timers: gather 900ms → seal; seal 700ms → receipt   (useEffect on [beat, reduced])
+reduced motion (matchMedia at render) → settled immediately, no timers
+settled = reduced || beat === "receipt"; receipt content needs settled AND grant (else "Đang chuyển vào ví…")
+CSS by data-beat:
+  gather:  cards spread  translateX(i·26px) rotate(i·5deg), origin 50% 120%
+  seal/receipt: cards stack translateX(i·2px) rotate(i·0.8deg) scale(.94) (transition 780ms cubic-bezier(0.22,0.61,0.36,1));
+                seal opacity 0→1 (260ms ease), scale .86→1 (420ms); ring draws 620ms cubic-bezier(0.4,0,0.2,1);
+                tick draws 380ms after 380ms delay
+  receipt[data-ready=true]: opacity 0→1, translateY(6px)→0 over 320ms ease</code></pre>
+<h4>Keyframes and transitions (verbatim CSS)</h4>
+<pre><code class="lang-css">/* ============================================================================
+ * Yaobet — reward ceremony.
+ * ----------------------------------------------------------------------------
+ * Motion is TRANSFORM AND OPACITY ONLY, so the whole sequence stays on the
+ * compositor — a ceremony that janks on a mid-range Android is worse than none.
+ * No particle layer, no looping glow: every animation here runs once, forwards,
+ * and stops. See the component header for why this is a receipt, not a jackpot.
+ * ==========================================================================*/
+
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  text-align: center;
+  padding: var(--space-4) var(--space-3) var(--space-3);
+}
+
+/* ── the stage: the player's own cards gathering ─────────────────────────── */
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 190px;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.fan {
+  position: relative;
+  width: 120px;
+  height: 168px;
+}
+
+/* Each card starts spread by its signed index and settles to a tight stack.
+   `--i` is the signed offset from centre, so the fan is symmetric for any set
+   size — a 5-card set and an 11-card set gather the same way. */
+.card {
+  position: absolute;
+  inset: 0;
+  transform:
+    translateX(calc(var(--i) * 26px))
+    rotate(calc(var(--i) * 5deg));
+  transform-origin: 50% 120%;
+  transition:
+    transform 780ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 380ms ease;
+}
+
+/* Gathered: everything collapses onto the centre card, slightly fanned so the
+   stack still reads as several cards rather than one. */
+.panel[data-beat="seal"] .card,
+.panel[data-beat="receipt"] .card {
+  transform:
+    translateX(calc(var(--i) * 2px))
+    rotate(calc(var(--i) * 0.8deg))
+    scale(0.94);
+}
+
+.card :global(svg),
+.card img {
+  width: 100%;
+  height: 100%;
+  /* --radius-md, matching `CardArt`'s own wrap. The two were 16 and 8 and the
+     mismatch showed as a bright corner sliver on every gathered card. */
+  border-radius: var(--radius-md);
+}
+
+/* ── the seal ───────────────────────────────────────────────────────────── */
+
+.seal {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  opacity: 0;
+  transform: scale(0.86);
+  transition: opacity 260ms ease, transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  pointer-events: none;
+}
+
+.panel[data-beat="seal"] .seal,
+.panel[data-beat="receipt"] .seal {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.sealRing,
+.sealRingInner,
+.sealTick {
+  fill: none;
+  stroke: var(--brand-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sealRing { stroke-width: 2.5; opacity: 0.9; }
+.sealRingInner { stroke-width: 1; opacity: 0.4; }
+.sealTick { stroke-width: 5; }
+
+/* The ring and the tick DRAW rather than fade — the gesture of a stamp being
+   applied, which is what a completion is. */
+.sealRing,
+.sealTick {
+  stroke-dasharray: var(--len, 340);
+  stroke-dashoffset: var(--len, 340);
+}
+
+.sealTick { --len: 60; }
+
+.panel[data-beat="seal"] .sealRing,
+.panel[data-beat="receipt"] .sealRing {
+  animation: draw 620ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.panel[data-beat="seal"] .sealTick,
+.panel[data-beat="receipt"] .sealTick {
+  animation: draw 380ms cubic-bezier(0.4, 0, 0.2, 1) 380ms forwards;
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ── the statement ──────────────────────────────────────────────────────── */
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-accent);
+}
+
+.setName {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  text-wrap: balance;
+}
+
+.count {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.count strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The amount. Present from the first frame — it does NOT animate in, and it
+   does NOT count up. See the component header. */
+.amount {
+  margin: var(--space-1) 0 0;
+  font-size: var(--t-h1);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.provisional {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+}
+
+/* ── the receipt ────────────────────────────────────────────────────────── */
+
+.receipt {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+
+.receipt[data-ready="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Held open while the credit is in flight so the panel does not resize under
+   the player's thumb at the moment the button appears. */
+.pending {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-dim);
+  min-height: var(--tap-min);
+  display: grid;
+  place-items: center;
+}
+
+.credited {
+  margin: 0;
+  font-size: var(--t-body);
+  color: var(--text);
+}
+
+.credited strong { color: var(--text-hi); font-weight: var(--weight-semi); }
+
+.terms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.terms li {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+.terms strong { color: var(--text); font-weight: var(--weight-semi); }
+
+.txn {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+}
+
+.txn code {
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* `Xác nhận` / `Xong` — flat.
+   Same treatment as the pack-stage CTA, and deliberately the same numbers: a
+   solid accent plate, a hover COLOUR SHIFT to `--brand-accent-2`, the uniform
+   1.05. The confirm button on the destructive step is not given more weight
+   than the dismiss button on the receipt. */
+.done {
+  width: 100%;
+  min-height: var(--tap-min);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font-size: var(--t-body);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.done:hover { background: var(--brand-accent-2); transform: scale(1.05); }
+
+.done:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ── refusal ────────────────────────────────────────────────────────────── */
+
+.failTitle {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+
+.failBody {
+  margin: 0;
+  font-size: var(--t-body);
+  color: var(--text);
+}
+
+.failHint {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-dim);
+}
+
+/* ── reduced motion: arrive, do not perform ─────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .seal,
+  .receipt,
+  .done,
+  .cancel {
+    transition: none;
+  }
+
+  .sealRing,
+  .sealTick {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  /* The component already SKIPS to the receipt under this query (see the
+     `reduced` branch in RewardCeremony.tsx). The hover scale is dropped with
+     it — the ceremony arrives, it does not perform. */
+  .done:hover,
+  .cancel:hover { transform: none; }
+}
+
+/* ── the confirm phase: what the exchange costs ──────────────────────────── */
+
+/* A card, so it takes the gold hairline and the card radius (ruling A2). */
+.cost {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  display: grid;
+  gap: var(--space-2);
+  text-align: left;
+}
+
+.costHead {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text);
+  line-height: var(--lh-body);
+}
+
+.costHead strong { color: var(--text-hi); font-weight: var(--weight-semi); }
+
+.costSpare {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--win);
+  line-height: var(--lh-body);
+}
+
+/* Caution, not danger. The action is reversible by playing again — it is a
+   cost to disclose, not a warning to alarm with. */
+.costWarn {
+  margin: 0;
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  color: var(--caution);
+}
+
+.costList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.costList li {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+}
+
+.costList strong {
+  color: var(--caution);
+  font-variant-numeric: tabular-nums;
+}
+
+.cancel {
+  width: 100%;
+  min-height: var(--tap-min);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.cancel:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  transform: scale(1.05);
+}
+
+.cancel:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>set</td><td>CollectionSet</td><td>name, size, reward</td></tr><tr><td>cards</td><td>DemoCard[]</td><td>fan material</td></tr><tr><td>grant</td><td>RewardGrant | null</td><td>receipt</td></tr><tr><td>error</td><td>string | null</td><td>error panel</td></tr><tr><td>impact</td><td>ExchangeImpact | null</td><td>non-null = confirm phase</td></tr><tr><td>setNameOf</td><td>(id) =&gt; string</td><td>collateral names</td></tr><tr><td>exchangeCount</td><td>number</td><td>"lần đổi thứ N"</td></tr><tr><td>onConfirm / onClose</td><td>() =&gt; void</td><td>actions</td></tr></tbody></table>
+<h4>5. Styles (resolved)</h4><p>.panel grid gap 8px centred text, padding 16px 12px 12px. .stage 100% × 190px, margin-bottom 8px. .fan 120×168px. .card absolute inset 0 (CardArt 120×168, svg radius 8px). .seal absolute 132×132; strokes #d4af37 round caps; ring 2.5px @.9, inner 1px @.4, tick 5px; dasharray/offset 340 (tick 60). .eyebrow 12px ls .08em uppercase #d4af37. .setName 20px 700 #f2f0e4 text-wrap balance. .count 14px #888888 (strong #d6d3c7). .amount margin-top 4px, 24px 700 #d4af37 tabular lh 1.1. .provisional 12px #6f6f6f. .receipt full width, margin-top 8px, padding-top 12px, dashed top border, grid gap 8px. .pending 14px #6f6f6f min-height 44px. .credited 16px #d6d3c7 (strong #f2f0e4 600). .terms li 12px #888888 lh 1.5. .txn 12px #6f6f6f; code #888888. .done full width min-height 44px radius 8px #d4af37/#0a0a0a 16px 700 (hover #b4952f scale 1.05). .cost full width, margin-top 8px, padding 16px, border rgba(212,175,55,.55), radius 12px, #1a1a1a, left text. .costHead 14px #d6d3c7. .costSpare 12px #45c9a5. .costWarn 12px 600 #f5a623. .costList li 12px #888888, strong #f5a623. .cancel full width min-height 44px border radius 8px transparent #888888 14px (hover #262626 #d6d3c7 scale 1.05). .failTitle 20px 700; .failBody 16px #d6d3c7; .failHint 14px #6f6f6f.</p>
+<h4>6. States</h4><p>confirm → (Xác nhận) ceremony pending → receipt / error. Example confirm for "5 Trung vệ thép" with each card held once and all five also counted elsewhere: "dùng hết 5 thẻ … 0/5"; collateral "Đội hình Liverpool — mất 3 thẻ" (van Dijk, Konaté, Robertson) and "11 Siêu sao — mất 2 thẻ" (van Dijk, Gabriel) — only if those cards are held.</p>
+<h4>7. Motion</h4><p>As above. Reduced motion: no transitions, seal strokes drawn instantly (dashoffset 0), hover scale removed, component skips to the receipt.</p>
+<h4>8. Copy</h4><p>All strings in the structure (EN: "Confirm exchange", "Demo figures — not a published reward.", "Exchanging will use all N cards of this set. The set returns to 0/N and you can collect again.", "You have spares for N cards — you keep those.", "Other sets are affected too:", "{set} — loses N cards", "Confirm · use N cards", "Later", "Couldn't exchange", "Your collection is unchanged. Please try again.", "Collection complete", "N/N cards", "Added to main wallet", "Usable immediately, no wagering requirement.", "Used N cards — this set returns to 0/N, collect again to exchange again.", "This is exchange #N of this set.", "Transaction ID:", "Done", "Sending to wallet…").</p>
+<h4>9–10</h4><p>Overlay focus trap / Esc. Stage aria-hidden; receipt text is plain (not a live region).</p>
+<div class="callout warn"><strong>Beat timer starts during the confirm phase.</strong> RewardCeremony stays mounted from confirm to ceremony (no key change) and its timer effect does not check <code>impact</code>, so the 900 + 700 ms beats elapse while the confirm dialog is open. If the player takes &gt;1.6 s to press "Xác nhận", the gather/seal animation is skipped and the receipt appears at once (and can momentarily read "lần đổi thứ 0" before the refresh lands). Copy says the set "returns to 0/N" even when spare copies keep some cards (it returns to 0/N only if no spares).</div>
+</section>
+

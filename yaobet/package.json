@@ -1,0 +1,38 @@
+{
+  "name": "yaobet",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "lint:tokens": "node scripts/token-lint.mjs",
+    "lint:tokens:self-test": "node scripts/token-lint.mjs --self-test",
+    "lint:rules": "node scripts/rebuild-rules.mjs src",
+    "lint:rules:self-test": "node scripts/rebuild-rules.mjs --self-test",
+    "lint:classes": "node scripts/tw-unknown-classes.mjs src",
+    "lint:classes:self-test": "node scripts/tw-unknown-classes.mjs --self-test",
+    "verify:routes": "node scripts/verify-routes.mjs",
+    "shots": "node scripts/capture-shots.mjs",
+    "shots:diff": "node scripts/shot-diff.mjs",
+    "boxes": "node scripts/box-check.mjs",
+    "auth-flow": "node scripts/auth-flow.mjs"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "playwright": "1.61.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,5 @@
+src/components/collection/MyCards.tsx
+src/components/collection/CardDetail.tsx
+src/app/bo-suu-tap/cua-toi/**
+src/app/dev/collection-ports/**
+src/styles/areas/collection.css

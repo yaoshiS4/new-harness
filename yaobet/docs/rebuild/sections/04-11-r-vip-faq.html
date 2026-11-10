@@ -1,0 +1,271 @@
+<section>
+<h2 id="r-vip-faq">VipFaq</h2>
+<h4>1. Purpose</h4><p>Single-open accordion of 7 VIP questions.</p>
+<h4>2. Source</h4><p><code>src/components/vip/VipFaq.tsx</code>, <code>VipFaq.module.css</code>; items in <code>src/lib/vip/copy.ts</code>.</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">div.list
+  for item i:
+    div.item[.itemOpen]                 (::before 3px gold left bar)
+      button.question[.questionOpen] id="vip-faq-button-{i}" aria-expanded aria-controls="vip-faq-panel-{i}"
+        span  question
+        span.chevron[.chevronOpen] aria-hidden  "⌄"
+      div.answer[.answerOpen] id="vip-faq-panel-{i}" role=region aria-labelledby=button
+        div.answerInner  answer</code></pre>
+<h4>4. Props</h4><p>items: FaqItem[]; lang.</p>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.list</td><td>flex column; gap 12px; max-width 760px; margin 0 auto</td><td></td></tr>
+<tr><td>.item</td><td>relative; border 1px rgba(255,255,255,.07); radius 12px; background #17140d; overflow hidden</td><td></td></tr>
+<tr><td>.item::before</td><td>absolute inset 0 auto 0 0; width 3px; #e3c15a; opacity 0 (1 when open)</td><td></td></tr>
+<tr><td>.item:hover</td><td>border-color rgba(227,193,90,.24)</td><td></td></tr>
+<tr><td>.itemOpen</td><td>background rgba(227,193,90,.08); border-color rgba(227,193,90,.34)</td><td></td></tr>
+<tr><td>.question</td><td>width 100%; flex space-between centre; gap 12px; min-height 44px; padding 16px 24px; border 0; transparent; #e6ebf5; body font 16px 600; line-height 1.4; left</td><td>≤900: padding 12px 16px; 14px</td></tr>
+<tr><td>.question:hover</td><td>#f6e39a</td><td></td></tr>
+<tr><td>.questionOpen</td><td>#e3c15a (also on hover)</td><td></td></tr>
+<tr><td>.chevron</td><td>flex 0 0 auto; 26×26; radius 50%; border 1px rgba(227,193,90,.30); #e3c15a; 18px; line-height 1</td><td></td></tr>
+<tr><td>.chevronOpen</td><td>rotate(180deg); border rgba(227,193,90,.55); background rgba(227,193,90,.08)</td><td></td></tr>
+<tr><td>.answer</td><td>max-height 0; overflow hidden; #c9c3b4</td><td></td></tr>
+<tr><td>.answerOpen</td><td>max-height 520px</td><td></td></tr>
+<tr><td>.answerInner</td><td>padding 0 24px 24px; 14px; line-height 1.65; #c9c3b4</td><td>≤900: padding 0 16px 16px</td></tr>
+</tbody></table>
+<details><summary>Verbatim VipFaq.module.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Luxury VIP — VipFaq. Single-open accordion.
+ * Warm near-black rows on hairline borders; open row gets a faint gold film,
+ * a gold left accent bar, a gold question and a rotated chevron. Body reveals
+ * via a max-height transition.
+ * ==========================================================================*/
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.item {
+  position: relative;
+  border: 1px solid var(--vip-hairline);
+  border-radius: var(--vip-radius-control);
+  background: var(--vip-panel-bg);
+  overflow: hidden;
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+/* Gold left accent bar — off by default, fades in when the row opens. */
+.item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--vip-gold-mid);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.item:hover {
+  border-color: color-mix(in srgb, var(--vip-gold-mid) 24%, transparent);
+}
+
+.itemOpen {
+  background: var(--vip-gold-tint);
+  border-color: color-mix(in srgb, var(--vip-gold-mid) 34%, transparent);
+}
+
+.itemOpen::before {
+  opacity: 1;
+}
+
+.question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-4) var(--space-5);
+  border: 0;
+  background: transparent;
+  color: var(--vip-text-primary);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.question:hover {
+  color: var(--vip-gold-end);
+}
+
+/* BLUE MEANS FOCUS AND ONLY FOCUS */
+.question:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.questionOpen,
+.questionOpen:hover {
+  color: var(--vip-gold-mid);
+}
+
+.chevron {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--vip-gold-mid) 30%, transparent);
+  color: var(--vip-gold-mid);
+  font-size: var(--t-h3);
+  line-height: 1;
+  transition:
+    transform var(--dur-slow) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+/* icon affordance = scale(1.10). The accordion TRIGGER is a full-bleed row, so
+ * scaling it 1.05 would clip against .item{overflow:hidden}; the chevron
+ * carries the hover instead. */
+.question:hover .chevron {
+  transform: scale(1.1);
+}
+
+.question:hover .chevronOpen {
+  transform: rotate(180deg) scale(1.1);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  border-color: color-mix(in srgb, var(--vip-gold-mid) 55%, transparent);
+  background: var(--vip-gold-tint);
+}
+
+.answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--dur-slow) var(--ease-standard);
+  color: var(--vip-text-secondary);
+}
+
+.answerOpen {
+  max-height: 520px;
+}
+
+.answerInner {
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: var(--t-sm);
+  line-height: 1.65;
+  color: var(--vip-text-secondary);
+}
+
+@media (max-width: 900px) {
+  .question {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--t-sm);
+  }
+
+  .answerInner {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .question:hover .chevron {
+    transform: none;
+  }
+  .question:hover .chevronOpen,
+  .chevronOpen {
+    transform: rotate(180deg);
+  }
+}</code></pre></details>
+<h4>6. States</h4><p>Closed default (openFaq = −1). Clicking an open row closes it; clicking another switches. Hover chevron scale(1.1) (open: rotate(180deg) scale(1.1)). Focus-visible: outline 2px #6ea8ff offset −2px.</p>
+<h4>7. Motion</h4><p>item background/border 200ms; ::before opacity 200ms; question colour 200ms; chevron transform 300ms + border/background 200ms; answer max-height 300ms (all ease-standard). Reduced motion: no hover scale; open chevron stays rotated.</p>
+<h4>8. Copy (VI / EN)</h4>
+<table><thead><tr><th>#</th><th>Question VI</th><th>Answer VI</th><th>EN question</th></tr></thead><tbody>
+<tr><td>1</td><td>Làm sao để thăng hạng VIP?</td><td>Cược hợp lệ tích lũy theo tuần sẽ nâng cấp độ và hạng của bạn. Khi đạt mức cược tuần yêu cầu của hạng kế tiếp, bạn được thăng hạng tự động.</td><td>How do I rank up in VIP?</td></tr>
+<tr><td>2</td><td>Điểm thưởng được tính như thế nào?</td><td>Điểm thưởng được cộng theo cược hợp lệ trên từng sản phẩm. Tỷ lệ quy đổi tăng dần theo cấp độ trong hạng của bạn.</td><td>How are reward points calculated?</td></tr>
+<tr><td>3</td><td>Khi nào tôi nhận được hoàn tiền tuần?</td><td>Hoàn tiền tuần được kết toán vào đầu mỗi tuần dựa trên cược tuần trước và tỷ lệ theo hạng/cấp độ của bạn.</td><td>When do I receive weekly cashback?</td></tr>
+<tr><td>4</td><td>Xuống hạng có mất đặc quyền không?</td><td>Nếu không duy trì mức cược tuần yêu cầu, bạn có thể xuống hạng và các đặc quyền tương ứng sẽ được điều chỉnh theo hạng mới.</td><td>Do I lose privileges if I drop a tier?</td></tr>
+<tr><td>5</td><td>Quản lý VIP riêng là gì?</td><td>Từ hạng Bạch Kim trở lên, bạn được phân bổ một quản lý VIP riêng hỗ trợ ưu tiên, ưu đãi cá nhân và xử lý yêu cầu nhanh.</td><td>What is a personal VIP host?</td></tr>
+<tr><td>6</td><td>Làm sao đổi điểm lấy ưu đãi?</td><td>Vào cửa hàng điểm để đổi điểm lấy voucher tiền hoặc quà. Tỷ lệ đổi ưu đãi hơn khi hạng của bạn cao hơn.</td><td>How do I redeem points for offers?</td></tr>
+<tr><td>7</td><td>Giới hạn rút tiền theo hạng ra sao?</td><td>Hạng càng cao thì hạn mức và tốc độ rút càng ưu tiên. Chi tiết hạn mức theo hạng được hiển thị khi bạn thực hiện lệnh rút.</td><td>How do withdrawal limits vary by tier?</td></tr>
+</tbody></table>
+<p>EN answers are in <code>src/lib/vip/copy.ts</code> lines 86–152 (verbatim below).</p>
+<details><summary>Verbatim FAQ_ITEMS</summary><pre><code class="lang-tsx">/** FAQ accordion (single-open). Answers are VIP-policy placeholder stubs. */
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    q: { vi: "Làm sao để thăng hạng VIP?", en: "How do I rank up in VIP?" },
+    a: {
+      vi: "Cược hợp lệ tích lũy theo tuần sẽ nâng cấp độ và hạng của bạn. Khi đạt mức cược tuần yêu cầu của hạng kế tiếp, bạn được thăng hạng tự động.",
+      en: "Valid weekly wagering raises your level and tier. When you reach the next tier's required weekly wager, you are promoted automatically.",
+    },
+  },
+  {
+    q: {
+      vi: "Điểm thưởng được tính như thế nào?",
+      en: "How are reward points calculated?",
+    },
+    a: {
+      vi: "Điểm thưởng được cộng theo cược hợp lệ trên từng sản phẩm. Tỷ lệ quy đổi tăng dần theo cấp độ trong hạng của bạn.",
+      en: "Points accrue from valid wagering on each product. The conversion rate scales up with your level within a tier.",
+    },
+  },
+  {
+    q: {
+      vi: "Khi nào tôi nhận được hoàn tiền tuần?",
+      en: "When do I receive weekly cashback?",
+    },
+    a: {
+      vi: "Hoàn tiền tuần được kết toán vào đầu mỗi tuần dựa trên cược tuần trước và tỷ lệ theo hạng/cấp độ của bạn.",
+      en: "Weekly cashback is settled at the start of each week based on the prior week's wagering and your tier/level rate.",
+    },
+  },
+  {
+    q: {
+      vi: "Xuống hạng có mất đặc quyền không?",
+      en: "Do I lose privileges if I drop a tier?",
+    },
+    a: {
+      vi: "Nếu không duy trì mức cược tuần yêu cầu, bạn có thể xuống hạng và các đặc quyền tương ứng sẽ được điều chỉnh theo hạng mới.",
+      en: "If you do not maintain the required weekly wager you may drop a tier, and the matching privileges adjust to your new tier.",
+    },
+  },
+  {
+    q: { vi: "Quản lý VIP riêng là gì?", en: "What is a personal VIP host?" },
+    a: {
+      vi: "Từ hạng Bạch Kim trở lên, bạn được phân bổ một quản lý VIP riêng hỗ trợ ưu tiên, ưu đãi cá nhân và xử lý yêu cầu nhanh.",
+      en: "From Platinum upward you are assigned a personal VIP host for priority support, tailored offers and faster request handling.",
+    },
+  },
+  {
+    q: {
+      vi: "Làm sao đổi điểm lấy ưu đãi?",
+      en: "How do I redeem points for offers?",
+    },
+    a: {
+      vi: "Vào cửa hàng điểm để đổi điểm lấy voucher tiền hoặc quà. Tỷ lệ đổi ưu đãi hơn khi hạng của bạn cao hơn.",
+      en: "Visit the points store to redeem points for cash vouchers or gifts. Redemption rates improve at higher tiers.",
+    },
+  },
+  {
+    q: {
+      vi: "Giới hạn rút tiền theo hạng ra sao?",
+      en: "How do withdrawal limits vary by tier?",
+    },
+    a: {
+      vi: "Hạng càng cao thì hạn mức và tốc độ rút càng ưu tiên. Chi tiết hạn mức theo hạng được hiển thị khi bạn thực hiện lệnh rút.",
+      en: "Higher tiers receive higher limits and prioritized withdrawal speed. Exact per-tier limits are shown when you request a withdrawal.",
+    },
+  },
+];</code></pre></details>
+<div class="callout warn">FAQ #5 says a personal VIP host starts "from Bạch Kim", but the privilege data unlocks bnHost only at Kim Cương (perks 4). FAQ #1 says ranking up is automatic on weekly wager while the matrix lock tooltip reads "Cược tuần …" — consistent; but /tier rules say rank is by total turnover ("tổng vòng cược"), a different rule.</div>
+<h4>9–10. Data / a11y</h4><p>FAQ_ITEMS; key = VI question. aria-expanded/controls, region labelled by button. Closed panels stay in the DOM (max-height 0) and remain in the accessibility tree (inference).</p>
+</section>
+

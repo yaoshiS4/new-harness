@@ -1,0 +1,407 @@
+<section>
+<h2 id="f-tokens">Token contract — src/styles/tokens.css</h2>
+<p>The file holds one <code>:root</code> block with <strong>163 custom properties</strong>, grouped below in file order with exact values. This is the only file in the app that may hold design literals. Every other stylesheet reads <code>var(--…)</code>. The "resolved literal" column follows <code>var()</code> chains under the default brand (<code>[data-brand="yaobet"]</code> repeats the same aliases). <code>var(--font-be-vietnam)</code> and <code>var(--font-montserrat)</code> stay unresolved because <code>next/font</code> injects them on <code>&lt;html&gt;</code> at runtime (see <a href="#f-typography">f-typography</a>).</p>
+<ul>
+<li><strong>GROUP A (locked base)</strong> is authored on <code>:root</code> only and is forbidden inside any <code>[data-brand]</code> block (lint A1).</li>
+<li><strong>GROUP B (i) raw ramp</strong> (<code>--gold-*</code>, <code>--text-on-gold</code>, <code>--cta*</code>, <code>--font-body/-num</code>) holds source literals that components must never <code>var()</code>-read (lint A2).</li>
+<li><strong>GROUP B (ii) <code>--brand-*</code></strong> is the indirection layer that components read and brands re-point.</li>
+<li><strong>PINNED</strong>: <code>--focus-ring</code>, <code>--win</code>, <code>--loss</code>, <code>--error</code> must be standalone literals (lint A3).</li>
+<li>There are <strong>no breakpoint tokens</strong>. CSS custom properties cannot be used in media queries, so every component hard-codes its media-query widths. The values seen in <code>src/ui</code> are <code>max-width: 639px</code> (Modal) plus <code>hover/pointer</code> feature queries.</li>
+<li>There is <strong>no light theme</strong> and no <code>prefers-color-scheme</code> handling. <code>globals.css</code> sets <code>color-scheme: dark</code> on <code>html</code>.</li>
+</ul>
+<div class="callout warn">Token hygiene findings:
+<ul>
+<li>17 tokens are defined but never <code>var()</code>-read anywhere in <code>src</code>: <code>--banner-mb --blue-soft --brand-logo --dur-header --field-rhythm --frame-min --glow-gold --halo --lift --progress-dot-glow --progress-tag-bg --progress-tag-border --shadow-2 --status-locked-bg --status-locked-text --vip-gold-grad --vip-negative</code>.</li>
+<li>The <code>--shadow-2</code> comment says QuickActionRail reads <code>var(--shadow-2, &lt;fallback&gt;)</code>. No such read exists any more, so the token is an orphan.</li>
+<li><code>--brand-logo</code> points to <code>/assets/brand/logo.svg</code>, but no CSS reads it. The Header and AuthModal hard-code <code>&lt;img src="/assets/logo.svg"&gt;</code> (a different file). So the emerald brand's logo override has no effect.</li>
+<li><code>--progress-track</code>'s comment mentions "our OLED #1f222e", but the canvas is now <code>#0a0a0a</code>. That is a stale comment.</li>
+<li>The <code>--gold-grad</code> and <code>--cta-grad</code> names say "grad", but both are solid colours (<code>#d4af37</code>, <code>#1e3d59</code>).</li>
+<li>Under the emerald brand, <code>--brand-accent-grad</code> and <code>--brand-cta-grad</code> become real <code>linear-gradient()</code>s. Button reads <code>--brand-cta-grad</code> for <code>.primary</code>, so a primary button would carry a gradient under that brand. That breaks the "no button gradient" invariant (default brand unaffected).</li>
+<li><code>--vip-text-*</code> uses cool blue-greys (<code>#e6ebf5</code>, <code>#8b96ad</code>), while the app text ladder is warm champagne. The source comment says this seam is intentional.</li>
+<li>The <code>--brand-font-display</code> comment still describes the removed Cinzel face. <code>typography.css</code> (line 39) still says "the Cinzel luxury layer is untouched" even though Cinzel is no longer loaded.</li>
+</ul></div>
+<h3 id="f-tokens-surfaces">Colour — canvas &amp; surfaces (GROUP A, locked)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--canvas</span></td><td><code>#0a0a0a</code></td><td>—</td><td><span class="sw" style="background:#0a0a0a"></span></td><td>page background (the .app-main analog) — the ONE root bg</td></tr><tr><td><span class="tok">--shell</span></td><td><code>#050505</code></td><td>—</td><td><span class="sw" style="background:#050505"></span></td><td>deeper shell behind the canvas (J9 --deep)</td></tr><tr><td><span class="tok">--surface</span></td><td><code>#141414</code></td><td>—</td><td><span class="sw" style="background:#141414"></span></td><td>dominant surface: card/panel/button-default base</td></tr><tr><td><span class="tok">--surface-2</span></td><td><code>#1a1a1a</code></td><td>—</td><td><span class="sw" style="background:#1a1a1a"></span></td><td>module card bg (J9 .list/.rule-wrap)</td></tr><tr><td><span class="tok">--surface-3</span></td><td><code>#212121</code></td><td>—</td><td><span class="sw" style="background:#212121"></span></td><td>raised panel / table head</td></tr><tr><td><span class="tok">--tile</span></td><td><code>#171717</code></td><td>—</td><td><span class="sw" style="background:#171717"></span></td><td>game-tile bg (.game-item/.game_bg) — fixed-tile surface</td></tr><tr><td><span class="tok">--surface-hover</span></td><td><code>#262626</code></td><td>—</td><td><span class="sw" style="background:#262626"></span></td><td>hover / active menu item — 1.22:1 over --surface (perceptible)</td></tr><tr><td><span class="tok">--surface-disabled</span></td><td><code>#303030</code></td><td>—</td><td><span class="sw" style="background:#303030"></span></td><td></td></tr><tr><td><span class="tok">--scrim</span></td><td><code>rgba(0, 0, 0, 0.7)</code></td><td>—</td><td><span class="sw" style="background:rgba(0, 0, 0, 0.7)"></span></td><td>modal scrim — SOLID, never backdrop-filter:blur</td></tr></tbody></table>
+<h3 id="f-tokens-semantic">Colour — semantic (GROUP A; --win/--loss/--error/--focus-ring PINNED)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--win</span></td><td><code>#45c9a5</code></td><td>—</td><td><span class="sw" style="background:#45c9a5"></span></td><td>J9 win/positive amount (×161) — luminance ~matched to --loss. PINNED</td></tr><tr><td><span class="tok">--loss</span></td><td><code>#f53f55</code></td><td>—</td><td><span class="sw" style="background:#f53f55"></span></td><td>J9 --Minor-Color-Red — equal-salience loss. PINNED</td></tr><tr><td><span class="tok">--error</span></td><td><code>#e42946</code></td><td>—</td><td><span class="sw" style="background:#e42946"></span></td><td>J9 red CTA/danger (validation, not outcomes). PINNED</td></tr><tr><td><span class="tok">--green</span></td><td><code>#31bc69</code></td><td>—</td><td><span class="sw" style="background:#31bc69"></span></td><td>J9 --Minor-Color-Green — flat positive accent. PINNED</td></tr><tr><td><span class="tok">--info</span></td><td><code>#018fff</code></td><td>—</td><td><span class="sw" style="background:#018fff"></span></td><td>J9 blue solid</td></tr><tr><td><span class="tok">--caution</span></td><td><code>#f5a623</code></td><td>—</td><td><span class="sw" style="background:#f5a623"></span></td><td>amber "allowed-but-costs-more" — NOT a reward (gold) nor a block (red/error). LOCKED neutral. PINNED; ≥4.5:1 vs canvas (9.77:1)</td></tr><tr><td><span class="tok">--on-caution</span></td><td><code>#2a1a00</code></td><td>—</td><td><span class="sw" style="background:#2a1a00"></span></td><td>dark text on a solid --caution fill (≥4.5:1 → 8.31:1)</td></tr><tr><td><span class="tok">--focus-ring</span></td><td><code>#6ea8ff</code></td><td>—</td><td><span class="sw" style="background:#6ea8ff"></span></td><td>AA focus indicator — LOCKED neutral blue. PINNED; ≥3:1 vs canvas (8.21:1)</td></tr></tbody></table>
+<h3 id="f-tokens-text">Colour — text ladder (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--text-hi</span></td><td><code>#f2f0e4</code></td><td>—</td><td><span class="sw" style="background:#f2f0e4"></span></td><td>primary text — 17.31:1 on --canvas</td></tr><tr><td><span class="tok">--text</span></td><td><code>#d6d3c7</code></td><td>—</td><td><span class="sw" style="background:#d6d3c7"></span></td><td>strong secondary — 13.20:1 on --canvas</td></tr><tr><td><span class="tok">--text-mid</span></td><td><code>#888888</code></td><td>—</td><td><span class="sw" style="background:#888888"></span></td><td>muted — the system's #888888; AA floor on --canvas (5.59:1)</td></tr><tr><td><span class="tok">--text-dim</span></td><td><code>#6f6f6f</code></td><td>—</td><td><span class="sw" style="background:#6f6f6f"></span></td><td>DECORATIVE-ONLY hint text (3.94:1) — never functional copy</td></tr></tbody></table>
+<h3 id="f-tokens-border">Colour — border &amp; tint (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--border</span></td><td><code>rgba(212, 175, 55, 0.55)</code></td><td>—</td><td><span class="sw" style="background:rgba(212, 175, 55, 0.55)"></span></td><td>load-bearing gold hairline</td></tr><tr><td><span class="tok">--tint</span></td><td><code>rgba(242, 240, 228, 0.05)</code></td><td>—</td><td><span class="sw" style="background:rgba(242, 240, 228, 0.05)"></span></td><td>subtle warm surface tint</td></tr></tbody></table>
+<h3 id="f-tokens-type">Typography scale, line-height, weight (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--t-micro</span></td><td><code>12px</code></td><td>—</td><td></td><td>dense caption</td></tr><tr><td><span class="tok">--t-sm</span></td><td><code>14px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--t-body</span></td><td><code>16px</code></td><td>—</td><td></td><td>body base</td></tr><tr><td><span class="tok">--t-h3</span></td><td><code>18px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--t-h2</span></td><td><code>20px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--t-h1</span></td><td><code>24px</code></td><td>—</td><td></td><td>section heading</td></tr><tr><td><span class="tok">--t-display</span></td><td><code>32px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--t-hero</span></td><td><code>40px</code></td><td>—</td><td></td><td>hero counters</td></tr><tr><td><span class="tok">--t-num</span></td><td><code>16px</code></td><td>—</td><td></td><td>inline tabular money</td></tr><tr><td><span class="tok">--t-num-lg</span></td><td><code>32px</code></td><td>—</td><td></td><td>hero tabular money</td></tr><tr><td><span class="tok">--lh-body</span></td><td><code>1.5</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--lh-tight</span></td><td><code>1.3</code></td><td>—</td><td></td><td>MIN line-height for VN text ≤14px (diacritics need headroom)</td></tr><tr><td><span class="tok">--weight-reg</span></td><td><code>400</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--weight-semi</span></td><td><code>600</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--weight-bold</span></td><td><code>700</code></td><td>—</td><td></td><td></td></tr></tbody></table>
+<h3 id="f-tokens-space">Spacing (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--space-1</span></td><td><code>4px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-2</span></td><td><code>8px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-3</span></td><td><code>12px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-4</span></td><td><code>16px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-5</span></td><td><code>24px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-6</span></td><td><code>32px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-7</span></td><td><code>40px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--space-8</span></td><td><code>48px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--gutter</span></td><td><code>16px</code></td><td>—</td><td></td><td>the single horizontal gutter — replaces J9's 15/16 split</td></tr><tr><td><span class="tok">--field-rhythm</span> <em>(never read)</em></td><td><code>24px</code></td><td>—</td><td></td><td>.input-item margin-bottom analog</td></tr></tbody></table>
+<h3 id="f-tokens-radius">Radius (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--radius-sm</span></td><td><code>4px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--radius-md</span></td><td><code>8px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--radius-lg</span></td><td><code>12px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--radius-card</span></td><td><code>16px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--radius-pill</span></td><td><code>9999px</code></td><td>—</td><td></td><td></td></tr></tbody></table>
+<h3 id="f-tokens-shadow">Elevation / shadow — all neutralised to none</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--glow-gold</span> <em>(never read)</em></td><td><code>none</code></td><td>—</td><td></td><td>was: inset gold edge — lit/active state is a border-color change</td></tr><tr><td><span class="tok">--halo</span> <em>(never read)</em></td><td><code>none</code></td><td>—</td><td></td><td>was: soft ambient for modals/hero</td></tr><tr><td><span class="tok">--lift</span> <em>(never read)</em></td><td><code>none</code></td><td>—</td><td></td><td>was: sparse card lift</td></tr><tr><td><span class="tok">--shadow-2</span> <em>(never read)</em></td><td><code>none</code></td><td>—</td><td></td><td></td></tr></tbody></table>
+<h3 id="f-tokens-z">Z-index ladder (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--z-content</span></td><td><code>1</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--z-sticky</span></td><td><code>100</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--z-dropdown</span></td><td><code>1000</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--z-modal</span></td><td><code>2000</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--z-toast</span></td><td><code>3000</code></td><td>—</td><td></td><td></td></tr></tbody></table>
+<h3 id="f-tokens-chrome">Layout / chrome sizes</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--header-h</span></td><td><code>72px</code></td><td>—</td><td></td><td>tier-1 logo/identity (J9 120px = 72 + 48 nav)</td></tr><tr><td><span class="tok">--nav-h</span></td><td><code>48px</code></td><td>—</td><td></td><td>tier-2 category row (J9 .routers-list 48px)</td></tr><tr><td><span class="tok">--logo-h</span></td><td><code>44px</code></td><td>—</td><td></td><td>J9 main logo height inside a 170×60 lockup box</td></tr><tr><td><span class="tok">--header-bg</span></td><td><code>#0a0a0a</code></td><td>—</td><td><span class="sw" style="background:#0a0a0a"></span></td><td>sticky header — OPAQUE canvas (per RULES §; NOT the .8 blur)</td></tr><tr><td><span class="tok">--rail-w</span></td><td><code>304px</code></td><td>—</td><td></td><td>member left rail</td></tr><tr><td><span class="tok">--frame-w</span></td><td><code>1424px</code></td><td>—</td><td></td><td>J9 fixed content frame (.home_wrapper 1424px)</td></tr><tr><td><span class="tok">--frame-min</span> <em>(never read)</em></td><td><code>1150px</code></td><td>—</td><td></td><td>J9 min-width clamp (.routers-list min-width)</td></tr><tr><td><span class="tok">--bottombar-h</span></td><td><code>56px</code></td><td>—</td><td></td><td>+ safe-area-inset-bottom</td></tr></tbody></table>
+<h3 id="f-tokens-grid">Grid / tile / band spacing system</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--band-gap</span></td><td><code>16px</code></td><td>—</td><td></td><td>between every band; module top-margin (J9's 16, ×187)</td></tr><tr><td><span class="tok">--gap</span></td><td><code>16px</code></td><td>—</td><td></td><td>THE grid/rail gap (alias of --gutter; J9 cheat-sheet name)</td></tr><tr><td><span class="tok">--gap-sm</span></td><td><code>8px</code></td><td>—</td><td></td><td>dense tile clusters, chip rows (J9 ×35)</td></tr><tr><td><span class="tok">--gap-xs</span></td><td><code>4px</code></td><td>—</td><td></td><td>label/icon pairs (J9 ×10)</td></tr><tr><td><span class="tok">--feature-w</span></td><td><code>418px</code></td><td>—</td><td></td><td>home feature-rail fixed column (J9 .img-list 418px auto)</td></tr><tr><td><span class="tok">--tile-h</span></td><td><code>205px</code></td><td>—</td><td></td><td>canonical game-tile height (J9 .game-list li 205px)</td></tr><tr><td><span class="tok">--provider-w</span></td><td><code>128px</code></td><td>—</td><td></td><td>provider chip fixed cell (J9 repeat(auto-fill,128px))</td></tr><tr><td><span class="tok">--provider-h</span></td><td><code>48px</code></td><td>—</td><td></td><td>provider chip height (J9 .provider-btn 48px)</td></tr><tr><td><span class="tok">--card-pad</span></td><td><code>24px</code></td><td>—</td><td></td><td>spacious module card padding (J9 ×37)</td></tr><tr><td><span class="tok">--card-pad-sm</span></td><td><code>16px</code></td><td>—</td><td></td><td>standard card padding (J9 ×16)</td></tr><tr><td><span class="tok">--banner-mb</span> <em>(never read)</em></td><td><code>22px</code></td><td>—</td><td></td><td>hero/banner block bottom margin (J9 .banner_content)</td></tr></tbody></table>
+<h3 id="f-tokens-motion">Motion — durations &amp; easings (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--dur-fast</span></td><td><code>200ms</code></td><td>—</td><td></td><td>micro-interactions — hover, focus, colour shift</td></tr><tr><td><span class="tok">--dur-base</span></td><td><code>200ms</code></td><td>—</td><td></td><td>THE default</td></tr><tr><td><span class="tok">--dur-slow</span></td><td><code>300ms</code></td><td>—</td><td></td><td>larger transforms — translate/scale/height</td></tr><tr><td><span class="tok">--dur-header</span> <em>(never read)</em></td><td><code>300ms</code></td><td>—</td><td></td><td>header height collapse/expand</td></tr><tr><td><span class="tok">--ease-standard</span></td><td><code>cubic-bezier(0.645, 0.045, 0.355, 1)</code></td><td>—</td><td></td><td>J9 ease-in-out-quad</td></tr><tr><td><span class="tok">--ease-entrance</span></td><td><code>cubic-bezier(0.23, 1, 0.32, 1)</code></td><td>—</td><td></td><td>J9 ease-out-quint</td></tr></tbody></table>
+<h3 id="f-tokens-tap">Tap targets (GROUP A)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--tap-min</span></td><td><code>44px</code></td><td>—</td><td></td><td>every interactive primitive</td></tr><tr><td><span class="tok">--tap-bar</span></td><td><code>48px</code></td><td>—</td><td></td><td>bottom bar</td></tr></tbody></table>
+<h3 id="f-tokens-member">Member-hub premium layer (surfaces, gradients, progress)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--page-bloom</span></td><td><code>radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--brand-accent) 6%, transparent) 0%, rgba(10, 10, 10, 0) 46%), radial-gradient(140% 120% at 50% 120%, rgba(30, 61, 89, 0.25) 0%, rgba(10, 10, 10, 0) 55%), var(--canvas)</code></td><td><code>radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, #d4af37 6%, transparent) 0%, rgba(10, 10, 10, 0) 46%), radial-gradient(140% 120% at 50% 120%, rgba(30, 61, 89, 0.25) 0%, rgba(10, 10, 10, 0) 55%), #0a0a0a</code></td><td><span class="sw" style="background:radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, #d4af37 6%, transparent) 0%, rgba(10, 10, 10, 0) 46%), radial-gradient(140% 120% at 50% 120%, rgba(30, 61, 89, 0.25) 0%, rgba(10, 10, 10, 0) 55%), #0a0a0a"></span></td><td></td></tr><tr><td><span class="tok">--member-canvas</span></td><td><code>var(--canvas)</code></td><td><code>#0a0a0a</code></td><td><span class="sw" style="background:#0a0a0a"></span></td><td></td></tr><tr><td><span class="tok">--header-card-grad</span></td><td><code>radial-gradient(120% 140% at 14% 30%, color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%, rgba(20, 20, 20, 0) 52%), var(--surface)</code></td><td><code>radial-gradient(120% 140% at 14% 30%, color-mix(in srgb, #d4af37 14%, transparent) 0%, rgba(20, 20, 20, 0) 52%), #141414</code></td><td><span class="sw" style="background:radial-gradient(120% 140% at 14% 30%, color-mix(in srgb, #d4af37 14%, transparent) 0%, rgba(20, 20, 20, 0) 52%), #141414"></span></td><td></td></tr><tr><td><span class="tok">--wallet-sheen-grad</span></td><td><code>linear-gradient(118deg, rgba(242, 240, 228, 0.05) -10%, rgba(242, 240, 228, 0.012) 60%, transparent 100%)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(118deg, rgba(242, 240, 228, 0.05) -10%, rgba(242, 240, 228, 0.012) 60%, transparent 100%)"></span></td><td></td></tr><tr><td><span class="tok">--card-sheen-grad</span></td><td><code>radial-gradient(circle at 78% 26%, rgba(242, 240, 228, 0.04) 0%, rgba(242, 240, 228, 0.01) 57%, transparent 72%)</code></td><td>—</td><td><span class="sw" style="background:radial-gradient(circle at 78% 26%, rgba(242, 240, 228, 0.04) 0%, rgba(242, 240, 228, 0.01) 57%, transparent 72%)"></span></td><td></td></tr><tr><td><span class="tok">--qr-surface</span></td><td><code>#ffffff</code></td><td>—</td><td><span class="sw" style="background:#ffffff"></span></td><td></td></tr><tr><td><span class="tok">--balance-text</span></td><td><code>var(--text-hi)</code></td><td><code>#f2f0e4</code></td><td><span class="sw" style="background:#f2f0e4"></span></td><td></td></tr><tr><td><span class="tok">--t-balance</span></td><td><code>28px</code></td><td>—</td><td></td><td>hero balance size — between --t-h1 24 and --t-display 32</td></tr><tr><td><span class="tok">--progress-track</span></td><td><code>hsla(0, 0%, 100%, 0.12)</code></td><td>—</td><td><span class="sw" style="background:hsla(0, 0%, 100%, 0.12)"></span></td><td></td></tr><tr><td><span class="tok">--progress-fill</span></td><td><code>var(--brand-accent)</code></td><td><code>#d4af37</code></td><td><span class="sw" style="background:#d4af37"></span></td><td>filled portion keyed to the brand</td></tr><tr><td><span class="tok">--progress-fill-grad</span></td><td><code>linear-gradient(90deg, var(--brand-accent), var(--brand-accent))</code></td><td><code>linear-gradient(90deg, #d4af37, #d4af37)</code></td><td><span class="sw" style="background:linear-gradient(90deg, #d4af37, #d4af37)"></span></td><td></td></tr><tr><td><span class="tok">--progress-dot</span></td><td><code>#ffffff</code></td><td>—</td><td><span class="sw" style="background:#ffffff"></span></td><td>locked neutral white comet head</td></tr><tr><td><span class="tok">--progress-dot-glow</span> <em>(never read)</em></td><td><code>none</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--progress-tag-bg</span> <em>(never read)</em></td><td><code>var(--surface-3)</code></td><td><code>#212121</code></td><td><span class="sw" style="background:#212121"></span></td><td>right-pinned next-tier pill bg</td></tr><tr><td><span class="tok">--progress-tag-text</span></td><td><code>var(--brand-accent)</code></td><td><code>#d4af37</code></td><td><span class="sw" style="background:#d4af37"></span></td><td>next-tier pill label + chevron</td></tr><tr><td><span class="tok">--progress-tag-border</span> <em>(never read)</em></td><td><code>color-mix(in srgb, var(--brand-accent) 32%, transparent)</code></td><td><code>color-mix(in srgb, #d4af37 32%, transparent)</code></td><td><span class="sw" style="background:color-mix(in srgb, #d4af37 32%, transparent)"></span></td><td></td></tr><tr><td><span class="tok">--status-locked-bg</span> <em>(never read)</em></td><td><code>color-mix(in srgb, var(--green) 12%, transparent)</code></td><td><code>color-mix(in srgb, #31bc69 12%, transparent)</code></td><td><span class="sw" style="background:color-mix(in srgb, #31bc69 12%, transparent)"></span></td><td></td></tr><tr><td><span class="tok">--status-locked-text</span> <em>(never read)</em></td><td><code>var(--green)</code></td><td><code>#31bc69</code></td><td><span class="sw" style="background:#31bc69"></span></td><td></td></tr></tbody></table>
+<h3 id="f-tokens-ramp">GROUP B — raw ramp (default-brand source literals; components must NOT read)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--gold-500</span></td><td><code>#d4af37</code></td><td>—</td><td><span class="sw" style="background:#d4af37"></span></td><td>primary accent (VIP, prices, active tabs) — 9.42:1 on --canvas</td></tr><tr><td><span class="tok">--gold-600</span></td><td><code>#b4952f</code></td><td>—</td><td><span class="sw" style="background:#b4952f"></span></td><td>pressed/darker step (−15% L)</td></tr><tr><td><span class="tok">--gold-grad</span></td><td><code>#d4af37</code></td><td>—</td><td><span class="sw" style="background:#d4af37"></span></td><td></td></tr><tr><td><span class="tok">--gold-hairline</span></td><td><code>rgba(212, 175, 55, 0.55)</code></td><td>—</td><td><span class="sw" style="background:rgba(212, 175, 55, 0.55)"></span></td><td>card hairline — matches --border (3.46:1 vs --surface)</td></tr><tr><td><span class="tok">--text-on-gold</span></td><td><code>#0a0a0a</code></td><td>—</td><td><span class="sw" style="background:#0a0a0a"></span></td><td>DARK ink on gold (ruling A3): 9.42:1. White would be 2.11:1 — AA fail</td></tr><tr><td><span class="tok">--cta</span></td><td><code>#5e97c9</code></td><td>—</td><td><span class="sw" style="background:#5e97c9"></span></td><td>link / focus border — 6.36:1 on --canvas, 5.92:1 on --surface</td></tr><tr><td><span class="tok">--cta-grad</span></td><td><code>#1e3d59</code></td><td>—</td><td><span class="sw" style="background:#1e3d59"></span></td><td>flat secondary FILL (--text-hi on it = 9.83:1) — solid, not a gradient</td></tr><tr><td><span class="tok">--cta-accent</span></td><td><code>#f53f55</code></td><td>—</td><td><span class="sw" style="background:#f53f55"></span></td><td>register/scarce accent — matches the pinned --loss hue</td></tr><tr><td><span class="tok">--blue-soft</span> <em>(never read)</em></td><td><code>#8fb4d6</code></td><td>—</td><td><span class="sw" style="background:#8fb4d6"></span></td><td>soft nav text / links — 9.11:1 on --canvas</td></tr></tbody></table>
+<h3 id="f-tokens-fonts">GROUP B — font stacks (raw ramp)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--font-body</span></td><td><code>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--font-num</span></td><td><code>var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--font-head</span></td><td><code>var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code></td><td>—</td><td></td><td></td></tr></tbody></table>
+<h3 id="f-tokens-brand">GROUP B — --brand-* indirection (the only vars a [data-brand] re-points)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--brand-accent</span></td><td><code>var(--gold-500)</code></td><td><code>#d4af37</code></td><td><span class="sw" style="background:#d4af37"></span></td><td>→ --gold-500    flat accent — VIP, prices, active tabs</td></tr><tr><td><span class="tok">--brand-accent-2</span></td><td><code>var(--gold-600)</code></td><td><code>#b4952f</code></td><td><span class="sw" style="background:#b4952f"></span></td><td>→ --gold-600    pressed/darker accent step</td></tr><tr><td><span class="tok">--brand-accent-grad</span></td><td><code>var(--gold-grad)</code></td><td><code>#d4af37</code></td><td><span class="sw" style="background:#d4af37"></span></td><td>→ --gold-grad   the brand fill gradient</td></tr><tr><td><span class="tok">--brand-accent-hairline</span></td><td><code>var(--gold-hairline)</code></td><td><code>rgba(212, 175, 55, 0.55)</code></td><td><span class="sw" style="background:rgba(212, 175, 55, 0.55)"></span></td><td>→ --gold-hairline  card hairline in brand accent</td></tr><tr><td><span class="tok">--brand-on-accent</span></td><td><code>var(--text-on-gold)</code></td><td><code>#0a0a0a</code></td><td><span class="sw" style="background:#0a0a0a"></span></td><td>→ --text-on-gold   on-accent text (≥4.5:1 on --brand-accent)</td></tr><tr><td><span class="tok">--brand-cta</span></td><td><code>var(--cta)</code></td><td><code>#5e97c9</code></td><td><span class="sw" style="background:#5e97c9"></span></td><td>→ --cta         primary CTA</td></tr><tr><td><span class="tok">--brand-cta-grad</span></td><td><code>var(--cta-grad)</code></td><td><code>#1e3d59</code></td><td><span class="sw" style="background:#1e3d59"></span></td><td>→ --cta-grad    primary CTA fill</td></tr><tr><td><span class="tok">--brand-cta-accent</span></td><td><code>var(--cta-accent)</code></td><td><code>#f53f55</code></td><td><span class="sw" style="background:#f53f55"></span></td><td>→ --cta-accent  scarce/register accent</td></tr><tr><td><span class="tok">--brand-font-body</span></td><td><code>var(--font-body)</code></td><td><code>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code></td><td></td><td>→ --font-body   brand body face (VN-diacritic complete)</td></tr><tr><td><span class="tok">--brand-font-num</span></td><td><code>var(--font-num)</code></td><td><code>var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif</code></td><td></td><td>→ --font-num    brand tabular-numeral face</td></tr><tr><td><span class="tok">--brand-font-head</span></td><td><code>var(--font-head)</code></td><td><code>var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code></td><td></td><td>→ --font-head   brand display/heading face (VN-complete)</td></tr><tr><td><span class="tok">--brand-logo</span> <em>(never read)</em></td><td><code>url("/assets/brand/logo.svg")</code></td><td>—</td><td></td><td>logo lockup slot (literal URL, no raw-ramp source)</td></tr></tbody></table>
+<h3 id="f-tokens-vip">Luxury VIP layer (/vip page-scoped palette, --vip-*)</h3><table><thead><tr><th>token</th><th>authored value</th><th>resolved literal</th><th>swatch</th><th>source comment (verbatim)</th></tr></thead><tbody><tr><td><span class="tok">--vip-page-bg</span></td><td><code>#0b0a07</code></td><td>—</td><td><span class="sw" style="background:#0b0a07"></span></td><td>warm near-black page</td></tr><tr><td><span class="tok">--vip-panel-bg</span></td><td><code>#17140d</code></td><td>—</td><td><span class="sw" style="background:#17140d"></span></td><td>warm panel</td></tr><tr><td><span class="tok">--vip-panel-alt</span></td><td><code>#141019</code></td><td>—</td><td><span class="sw" style="background:#141019"></span></td><td>alt panel (cool-violet cast)</td></tr><tr><td><span class="tok">--vip-inner-bg</span></td><td><code>#0f0c07</code></td><td>—</td><td><span class="sw" style="background:#0f0c07"></span></td><td>inner well</td></tr><tr><td><span class="tok">--vip-text-primary</span></td><td><code>#e6ebf5</code></td><td>—</td><td><span class="sw" style="background:#e6ebf5"></span></td><td></td></tr><tr><td><span class="tok">--vip-text-secondary</span></td><td><code>#c9c3b4</code></td><td>—</td><td><span class="sw" style="background:#c9c3b4"></span></td><td></td></tr><tr><td><span class="tok">--vip-text-muted</span></td><td><code>#8b96ad</code></td><td>—</td><td><span class="sw" style="background:#8b96ad"></span></td><td></td></tr><tr><td><span class="tok">--vip-text-faint</span></td><td><code>#6b7690</code></td><td>—</td><td><span class="sw" style="background:#6b7690"></span></td><td></td></tr><tr><td><span class="tok">--vip-text-disabled</span></td><td><code>#565f70</code></td><td>—</td><td><span class="sw" style="background:#565f70"></span></td><td>dimmed locked-ahead values</td></tr><tr><td><span class="tok">--vip-gold-start</span></td><td><code>#9a7b1e</code></td><td>—</td><td><span class="sw" style="background:#9a7b1e"></span></td><td></td></tr><tr><td><span class="tok">--vip-gold-mid</span></td><td><code>#e3c15a</code></td><td>—</td><td><span class="sw" style="background:#e3c15a"></span></td><td></td></tr><tr><td><span class="tok">--vip-gold-end</span></td><td><code>#f6e39a</code></td><td>—</td><td><span class="sw" style="background:#f6e39a"></span></td><td></td></tr><tr><td><span class="tok">--vip-gold-ink</span></td><td><code>#2e2404</code></td><td>—</td><td><span class="sw" style="background:#2e2404"></span></td><td>ink ON a gold fill</td></tr><tr><td><span class="tok">--vip-gold-grad</span> <em>(never read)</em></td><td><code>linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a)"></span></td><td></td></tr><tr><td><span class="tok">--vip-gold-tint</span></td><td><code>rgba(227, 193, 90, 0.08)</code></td><td>—</td><td><span class="sw" style="background:rgba(227, 193, 90, 0.08)"></span></td><td>faint gold film (open FAQ / selected col)</td></tr><tr><td><span class="tok">--vip-positive</span></td><td><code>#34d399</code></td><td>—</td><td><span class="sw" style="background:#34d399"></span></td><td>unlocked ✓</td></tr><tr><td><span class="tok">--vip-negative</span> <em>(never read)</em></td><td><code>#fb7185</code></td><td>—</td><td><span class="sw" style="background:#fb7185"></span></td><td></td></tr><tr><td><span class="tok">--vip-hairline</span></td><td><code>rgba(255, 255, 255, 0.07)</code></td><td>—</td><td><span class="sw" style="background:rgba(255, 255, 255, 0.07)"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-bronze-grad</span></td><td><code>linear-gradient(135deg, #8c5a2b, #c88f5a, #e0a56b)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(135deg, #8c5a2b, #c88f5a, #e0a56b)"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-bronze-acc</span></td><td><code>#e0a56b</code></td><td>—</td><td><span class="sw" style="background:#e0a56b"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-silver-grad</span></td><td><code>linear-gradient(135deg, #8a94a6, #cbd3df, #eef2f7)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(135deg, #8a94a6, #cbd3df, #eef2f7)"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-silver-acc</span></td><td><code>#cbd3df</code></td><td>—</td><td><span class="sw" style="background:#cbd3df"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-gold-grad</span></td><td><code>linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a)"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-gold-acc</span></td><td><code>#e3c15a</code></td><td>—</td><td><span class="sw" style="background:#e3c15a"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-platinum-grad</span></td><td><code>linear-gradient(135deg, #6b7280, #cfd6e0, #e8edf3)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(135deg, #6b7280, #cfd6e0, #e8edf3)"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-platinum-acc</span></td><td><code>#cfd6e0</code></td><td>—</td><td><span class="sw" style="background:#cfd6e0"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-diamond-grad</span></td><td><code>linear-gradient(135deg, #3f7fb5, #9fd7ee, #e6f7ff)</code></td><td>—</td><td><span class="sw" style="background:linear-gradient(135deg, #3f7fb5, #9fd7ee, #e6f7ff)"></span></td><td></td></tr><tr><td><span class="tok">--vip-tier-diamond-acc</span></td><td><code>#9fd7ee</code></td><td>—</td><td><span class="sw" style="background:#9fd7ee"></span></td><td></td></tr><tr><td><span class="tok">--vip-radius-table</span></td><td><code>14px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--vip-radius-control</span></td><td><code>12px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--vip-radius-gem</span></td><td><code>8px</code></td><td>—</td><td></td><td></td></tr><tr><td><span class="tok">--brand-font-display</span></td><td><code>var(--font-head)</code></td><td>Montserrat stack (same as <span class="tok">--font-head</span>)</td><td></td><td>display face for VIP headings; distinct role from heading so a future brand may differ (read by <code>VipHeroMember.module.css:45</code> and others)</td></tr></tbody></table>
+<h3 id="f-tokens-verbatim">tokens.css verbatim</h3>
+<details><summary>Verbatim src/styles/tokens.css (363 lines)</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — :root TOKEN CONTRACT (SPEC-02-DESIGN-SYSTEM.md, authored verbatim)
+ * ----------------------------------------------------------------------------
+ * Two named token groups, one base :root layer.
+ *
+ *   GROUP A  — LOCKED base. Never per-brand overridable. Authored on :root only;
+ *              FORBIDDEN inside any [data-brand] block (lint A1).
+ *   GROUP B  — Brand-overridable indirection. Splits into:
+ *                (i)  RAW RAMP source literals (--gold-*, --cta*, --font-body/-num,
+ *                     --text-on-gold) — default-brand source values; components must
+ *                     NOT read these directly (lint A2).
+ *                (ii) --brand-* INDIRECTION vars — the ONLY tokens a [data-brand]
+ *                     block re-points and the ONLY brand-tinted vars components read.
+ *
+ * PINNED-to-neutral (§0.2): --focus-ring, --win, --loss, --error are standalone
+ * LOCKED constants. They MUST NOT reference any --brand-* or RAW-RAMP token (lint A3).
+ *
+ * Components read brand/semantic/locked vars — NEVER raw ramp literals.
+ * No component hardcodes a hex / px / duration; everything is var(--…).
+ * ==========================================================================*/
+
+:root {
+  /* ======================================================================
+   * GROUP A — LOCKED BASE  (forbidden inside [data-brand])
+   * ==================================================================== */
+
+  /* §1 — Color: canvas &amp; surfaces — FLAT / DARK-LUXURY (PM ruling A1 "dark")
+   * ---------------------------------------------------------------------
+   * Obsidian ground #0a0a0a, card #141414. Ruling A2 measured that pair at
+   * 1.05:1 — surfaces CANNOT carry separation in this palette. The ladder
+   * below is therefore intentionally tight (each step ~1.06–1.22:1) and the
+   * gold hairline (--border / --gold-hairline) is the load-bearing edge.
+   * Ladder is monotone-ascending: canvas &lt; tile &lt; surface &lt; 2 &lt; 3 &lt; hover
+   * &lt; disabled, so "more elevated" is always "lighter" — no inversions. */
+  --canvas:           #0a0a0a; /* page background (the .app-main analog) — the ONE root bg */
+  --shell:            #050505; /* deeper shell behind the canvas (J9 --deep) */
+  --surface:          #141414; /* dominant surface: card/panel/button-default base */
+  --surface-2:        #1a1a1a; /* module card bg (J9 .list/.rule-wrap) */
+  --surface-3:        #212121; /* raised panel / table head */
+  --tile:             #171717; /* game-tile bg (.game-item/.game_bg) — fixed-tile surface */
+  --surface-hover:    #262626; /* hover / active menu item — 1.22:1 over --surface (perceptible) */
+  --surface-disabled: #303030;
+  --scrim:            rgba(0, 0, 0, 0.7); /* modal scrim — SOLID, never backdrop-filter:blur */
+
+  /* §3 — Semantic: J9-EXACT win/loss + focus (PINNED neutral) ---------- */
+  --win:        #45c9a5; /* J9 win/positive amount (×161) — luminance ~matched to --loss. PINNED */
+  --loss:       #f53f55; /* J9 --Minor-Color-Red — equal-salience loss. PINNED */
+  --error:      #e42946; /* J9 red CTA/danger (validation, not outcomes). PINNED */
+  --green:      #31bc69; /* J9 --Minor-Color-Green — flat positive accent. PINNED */
+  --info:       #018fff; /* J9 blue solid */
+  --caution:    #f5a623; /* amber "allowed-but-costs-more" — NOT a reward (gold) nor a block (red/error). LOCKED neutral. PINNED; ≥4.5:1 vs canvas (9.77:1) */
+  --on-caution: #2a1a00; /* dark text on a solid --caution fill (≥4.5:1 → 8.31:1) */
+  --focus-ring: #6ea8ff; /* AA focus indicator — LOCKED neutral blue. PINNED; ≥3:1 vs canvas (8.21:1) */
+
+  /* §3 — Text ladder on dark — champagne, not white (Flat / Dark-Luxury)
+   * ---------------------------------------------------------------------
+   * #f2f0e4 champagne replaces the white-alpha ladder: on #0a0a0a it measures
+   * 17.3:1. The muted step is the design system's #888888 (5.59:1 — clears AA
+   * for body copy). --text-dim stays BELOW it, decorative-only, at 3.94:1. */
+  --text-hi:  #f2f0e4; /* primary text — 17.31:1 on --canvas */
+  --text:     #d6d3c7; /* strong secondary — 13.20:1 on --canvas */
+  --text-mid: #888888; /* muted — the system's #888888; AA floor on --canvas (5.59:1) */
+  --text-dim: #6f6f6f; /* DECORATIVE-ONLY hint text (3.94:1) — never functional copy */
+
+  /* Ruling A2: shadows AND card gradients are banned, so on a 1.05:1
+   * surface/canvas pair the BORDER is the only thing that draws a card. This
+   * is a gold-tinted hairline at 3.46:1 vs --surface / 3.71:1 vs --canvas —
+   * i.e. it clears the WCAG 1.4.11 non-text 3:1 floor on its own. A literal
+   * (not var(--brand-accent)) so --border stays a locked constant and the
+   * emerald regression brand keeps a byte-identical edge contrast. */
+  --border:   rgba(212, 175, 55, 0.55); /* load-bearing gold hairline */
+  --tint:     rgba(242, 240, 228, 0.05); /* subtle warm surface tint */
+
+  /* §4 — Typography: scale (px — J9's 12-dense rhythm) ----------------- */
+  --t-micro:   12px; /* dense caption */
+  --t-sm:      14px;
+  --t-body:    16px; /* body base */
+  --t-h3:      18px;
+  --t-h2:      20px;
+  --t-h1:      24px; /* section heading */
+  --t-display: 32px;
+  --t-hero:    40px; /* hero counters */
+  --t-num:     16px; /* inline tabular money */
+  --t-num-lg:  32px; /* hero tabular money */
+  --lh-body:   1.5;
+  --lh-tight:  1.3; /* MIN line-height for VN text ≤14px (diacritics need headroom) */
+  --weight-reg:  400;
+  --weight-semi: 600;
+  --weight-bold: 700;
+
+  /* §5 — Spacing (clean 8px base) -------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 48px;
+  --gutter:  16px; /* the single horizontal gutter — replaces J9's 15/16 split */
+  --field-rhythm: 24px; /* .input-item margin-bottom analog */
+
+  /* §6 — Radii (no 4.8px artifact) ------------------------------------- */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-card: 16px;
+  --radius-pill: 9999px;
+
+  /* §6 — Elevation: NONE. "ABSOLUTELY NO BOX SHADOWS." ------------------
+   * Flat Design bans shadows outright. These three are GROUP-A and legal to
+   * redefine at :root (lint A1 only forbids them INSIDE [data-brand]), so the
+   * ban is enforced HERE, once — not policed across twelve component files.
+   * Every `box-shadow: var(--lift|--halo|--glow-gold)` in the app resolves to
+   * `none` from this line. Separation is now the --border hairline (A2). */
+  --glow-gold: none; /* was: inset gold edge — lit/active state is a border-color change */
+  --halo:      none; /* was: soft ambient for modals/hero */
+  --lift:      none; /* was: sparse card lift */
+  /* Orphan reference: QuickActionRail reads var(--shadow-2, &lt;hardcoded fallback&gt;)
+   * for a token that was never defined, so the fallback painted a shadow on
+   * every route. Defining it here neutralises it without a component edit. */
+  --shadow-2:  none;
+
+  /* §6 — Z-index: named ladder ----------------------------------------- */
+  --z-content:  1;
+  --z-sticky:   100;
+  --z-dropdown: 1000;
+  --z-modal:    2000;
+  --z-toast:    3000;
+
+  /* §6 — Layout / chrome (J9 FIXED-TILE system — 02-J9-MEASUREMENTS §9) ----- */
+  --header-h:    72px;   /* tier-1 logo/identity (J9 120px = 72 + 48 nav) */
+  --nav-h:       48px;   /* tier-2 category row (J9 .routers-list 48px) */
+  --logo-h:      44px;   /* J9 main logo height inside a 170×60 lockup box */
+  --header-bg:   #0a0a0a;/* sticky header — OPAQUE canvas (per RULES §; NOT the .8 blur) */
+  --rail-w:      304px;  /* member left rail */
+  --frame-w:     1424px; /* J9 fixed content frame (.home_wrapper 1424px) */
+  --frame-min:   1150px; /* J9 min-width clamp (.routers-list min-width) */
+  --bottombar-h: 56px;   /* + safe-area-inset-bottom */
+
+  /* §6b — J9 grid / tile / spacing system (the dead-space fix) --------- */
+  --band-gap:    16px;   /* between every band; module top-margin (J9's 16, ×187) */
+  --gap:         16px;   /* THE grid/rail gap (alias of --gutter; J9 cheat-sheet name) */
+  --gap-sm:      8px;    /* dense tile clusters, chip rows (J9 ×35) */
+  --gap-xs:      4px;    /* label/icon pairs (J9 ×10) */
+  --feature-w:   418px;  /* home feature-rail fixed column (J9 .img-list 418px auto) */
+  --tile-h:      205px;  /* canonical game-tile height (J9 .game-list li 205px) */
+  --provider-w:  128px;  /* provider chip fixed cell (J9 repeat(auto-fill,128px)) */
+  --provider-h:  48px;   /* provider chip height (J9 .provider-btn 48px) */
+  --card-pad:    24px;   /* spacious module card padding (J9 ×37) */
+  --card-pad-sm: 16px;   /* standard card padding (J9 ×16) */
+  --banner-mb:   22px;   /* hero/banner block bottom margin (J9 .banner_content) */
+
+  /* §7 — Motion: snappy &amp; direct (Flat Design) --------------------------
+   * 200ms is the default for every colour/opacity/border micro-interaction;
+   * 300ms is reserved for the larger transforms (height collapse, sheets,
+   * route-level reveals). Nothing is slower than 300ms. */
+  --dur-fast:   200ms; /* micro-interactions — hover, focus, colour shift */
+  --dur-base:   200ms; /* THE default */
+  --dur-slow:   300ms; /* larger transforms — translate/scale/height */
+  --dur-header: 300ms; /* header height collapse/expand */
+  --ease-standard: cubic-bezier(0.645, 0.045, 0.355, 1); /* J9 ease-in-out-quad */
+  --ease-entrance: cubic-bezier(0.23, 1, 0.32, 1);       /* J9 ease-out-quint */
+
+  /* §8 — Compliance tap targets ---------------------------------------- */
+  --tap-min: 44px; /* every interactive primitive */
+  --tap-bar: 48px; /* bottom bar */
+
+  /* §9 — MEMBER-HUB PREMIUM LAYER (additive GROUP-A base; brand-following) ----
+   * Surface/effect/progress/typography tokens for the member-hub rebuild.
+   * Re-expresses J9's per-tier raster art (bgN.png / bg_wallet.png) as pure-CSS
+   * blooms over the LOCKED --canvas / --surface. Every accent-tinted stop runs
+   * through color-mix(… var(--brand-accent) …) so the emerald brand re-skins
+   * them from a single :root definition — they intentionally do NOT appear in
+   * any [data-brand] block (A1/A3 invariant preserved). --progress-dot stays a
+   * locked neutral white (the dot is brand-agnostic, like a comet head). */
+
+  /* Ambient page backdrop — faint gold bloom (top) + cool blue lift (bottom)
+   * over the locked canvas. Layered OVER var(--canvas) so a browser without
+   * color-mix degrades to the flat canvas, never to transparent/black. */
+  --page-bloom:
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--brand-accent) 6%, transparent) 0%, rgba(10, 10, 10, 0) 46%),
+    radial-gradient(140% 120% at 50% 120%, rgba(30, 61, 89, 0.25) 0%, rgba(10, 10, 10, 0) 55%),
+    var(--canvas);
+  /* Member content column stays flat matte so lifted cards read as raised. */
+  --member-canvas: var(--canvas);
+
+  /* Fused hero card — warm brand-accent halo behind the avatar into --surface. */
+  --header-card-grad:
+    radial-gradient(120% 140% at 14% 30%, color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%, rgba(20, 20, 20, 0) 52%),
+    var(--surface);
+  /* Faint diagonal sheen on the wallet block — re-tinted champagne (was a cool
+   * ice-white that reads blue-grey against the warm Flat palette). */
+  --wallet-sheen-grad:
+    linear-gradient(118deg, rgba(242, 240, 228, 0.05) -10%, rgba(242, 240, 228, 0.012) 60%, transparent 100%);
+  /* The signature corner glow — soft champagne bleed from the upper-right. */
+  --card-sheen-grad:
+    radial-gradient(circle at 78% 26%, rgba(242, 240, 228, 0.04) 0%, rgba(242, 240, 228, 0.01) 57%, transparent 72%);
+
+  /* QR/scan tile — a genuine pure-white surface (a QR must be on white to be
+   * scannable). The ONE intentional white block on a member surface; locked
+   * neutral, brand-agnostic (like --progress-dot). Components read this token,
+   * never a raw #fff (lint A2). */
+  --qr-surface: #ffffff;
+
+  /* Balance renders near-WHITE (not gold — gold is chrome/CTA only). */
+  --balance-text: var(--text-hi);
+  --t-balance: 28px; /* hero balance size — between --t-h1 24 and --t-display 32 */
+
+  /* Membership progress track. The empty groove is a 12% white hairline (J9's
+   * dark rgba(0,0,0,.1) vanishes on our OLED #1f222e — re-expressed lighter). */
+  --progress-track: hsla(0, 0%, 100%, 0.12);
+  --progress-fill: var(--brand-accent); /* filled portion keyed to the brand */
+  /* The app's ONLY `background-image:` call-site, so this one MUST stay in
+   * &lt;image&gt; syntax — a bare &lt;color&gt; would make the declaration invalid and the
+   * progress bar would lose its fill entirely. Degenerate on purpose: two
+   * identical stops render dead flat, so the flat ban holds visually while the
+   * property stays valid. Do NOT collapse this to var(--brand-accent-grad). */
+  --progress-fill-grad: linear-gradient(90deg, var(--brand-accent), var(--brand-accent));
+  --progress-dot: #ffffff; /* locked neutral white comet head */
+  /* Also a box-shadow → also `none` under the flat ban. The comet head now
+   * reads by its own white fill against the track, not by a glow. */
+  --progress-dot-glow: none;
+  --progress-tag-bg: var(--surface-3); /* right-pinned next-tier pill bg */
+  --progress-tag-text: var(--brand-accent); /* next-tier pill label + chevron */
+  --progress-tag-border: color-mix(in srgb, var(--brand-accent) 32%, transparent);
+
+  /* Activation status chip (the not-activated shield pill on the hero). --green
+   * is already PINNED neutral; the verified state prefers Badge tone="info". */
+  --status-locked-bg: color-mix(in srgb, var(--green) 12%, transparent);
+  --status-locked-text: var(--green);
+
+  /* ======================================================================
+   * GROUP B — RAW RAMP (default-brand source literals)
+   * Components must NOT read these directly — only the --brand-* aliases below.
+   * An alternate [data-brand] block bypasses these entirely by re-pointing
+   * the --brand-* aliases to its own hex.
+   * ==================================================================== */
+
+  /* §2 — Gold accent — Flat / Dark-Luxury #d4af37 ---------------------- */
+  --gold-500:      #d4af37; /* primary accent (VIP, prices, active tabs) — 9.42:1 on --canvas */
+  --gold-600:      #b4952f; /* pressed/darker step (−15% L) */
+  /* Flat Design bans gradients on buttons and cards, and this token IS the
+   * button/pill fill (20 call-sites, incl. Header .goPay and QuickActionRail
+   * .jackpotCta). Re-pointed to a SOLID COLOUR, not a degenerate two-stop
+   * gradient: a same-colour gradient still *computes* as a gradient on a
+   * button, which is the thing the system bans and the thing any future
+   * automated check trips on. A &lt;color&gt; is legal in every `background:`
+   * shorthand call-site (audited: all 20, incl. Odometer's
+   * background-clip:text). The ONE `background-image:` slot in the app reads
+   * --progress-fill-grad, which keeps gradient syntax below. */
+  --gold-grad:     #d4af37;
+  --gold-hairline: rgba(212, 175, 55, 0.55); /* card hairline — matches --border (3.46:1 vs --surface) */
+  --text-on-gold:  #0a0a0a; /* DARK ink on gold (ruling A3): 9.42:1. White would be 2.11:1 — AA fail */
+
+  /* §3 — Secondary / deep navy #1e3d59 (the system's "Secondary") ------
+   * Split by ROLE, because #1e3d59 is a FILL colour: as text on --canvas it
+   * measures 1.76:1 and --cta is read as link/border colour in the auth flow.
+   *   --cta      → a same-hue (208°) lightened step that clears AA as text.
+   *   --cta-grad → the literal #1e3d59, flat, as the secondary button fill
+   *                (--text-hi on it = 9.83:1). */
+  --cta:        #5e97c9; /* link / focus border — 6.36:1 on --canvas, 5.92:1 on --surface */
+  --cta-grad:   #1e3d59; /* flat secondary FILL (--text-hi on it = 9.83:1) — solid, not a gradient */
+  --cta-accent: #f53f55; /* register/scarce accent — matches the pinned --loss hue */
+  --blue-soft:  #8fb4d6; /* soft nav text / links — 9.11:1 on --canvas */
+
+  /* §4 — Font stack (Vietnamese-first) ---------------------------------
+   * Both faces are loaded by next/font/google in app/layout.tsx and injected
+   * as --font-be-vietnam / --font-montserrat. Both serve the Google
+   * `vietnamese` subset (U+1EA0–1EF9), so the toned vowels in `BỘ SƯU TẬP`
+   * and `Đổi thưởng` resolve INSIDE the face — no mid-word fallback.
+   * Outfit is REJECTED (ruling A4): latin/latin-ext only, skips U+1EA0–1EF1. */
+  --font-body: var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-num:  var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif;
+  /* Display / headings / uppercase labels — Montserrat (ruling A4). */
+  --font-head: var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* ======================================================================
+   * GROUP B — BRAND INDIRECTION  (the ONLY vars a [data-brand] re-points;
+   * the ONLY brand-tinted vars components consume). ALIAS MAP → RAW RAMP.
+   * ==================================================================== */
+  --brand-accent:          var(--gold-500);      /* → --gold-500    flat accent — VIP, prices, active tabs */
+  --brand-accent-2:        var(--gold-600);      /* → --gold-600    pressed/darker accent step */
+  --brand-accent-grad:     var(--gold-grad);     /* → --gold-grad   the brand fill gradient */
+  --brand-accent-hairline: var(--gold-hairline); /* → --gold-hairline  card hairline in brand accent */
+  --brand-on-accent:       var(--text-on-gold);  /* → --text-on-gold   on-accent text (≥4.5:1 on --brand-accent) */
+  --brand-cta:             var(--cta);           /* → --cta         primary CTA */
+  --brand-cta-grad:        var(--cta-grad);      /* → --cta-grad    primary CTA fill */
+  --brand-cta-accent:      var(--cta-accent);    /* → --cta-accent  scarce/register accent */
+  --brand-font-body:       var(--font-body);     /* → --font-body   brand body face (VN-diacritic complete) */
+  --brand-font-num:        var(--font-num);      /* → --font-num    brand tabular-numeral face */
+  --brand-font-head:       var(--font-head);     /* → --font-head   brand display/heading face (VN-complete) */
+  --brand-logo:            url("/assets/brand/logo.svg"); /* logo lockup slot (literal URL, no raw-ramp source) */
+
+  /* ======================================================================
+   * LUXURY VIP PROGRAM LAYER (/vip rebuild) — page-scoped palette.
+   * ----------------------------------------------------------------------
+   * A SELF-CONTAINED warm-near-black + luxury-gold palette for the /vip page
+   * only, applied via a .vipPalette page-root wrapper. Intentionally distinct
+   * from the app --canvas/--brand-accent chrome (a visible seam vs the shell
+   * is accepted &amp; flagged). tokens.css is the ONLY file permitted literals;
+   * components read these via var() and tint via color-mix(). Names use the
+   * --vip-* prefix (NEVER --gold-*, which is RAW-RAMP-reserved). --font-cinzel
+   * is provided at runtime by next/font/google on &lt;html&gt; (layout.tsx). */
+
+  /* surfaces / text */
+  --vip-page-bg:        #0b0a07; /* warm near-black page */
+  --vip-panel-bg:       #17140d; /* warm panel */
+  --vip-panel-alt:      #141019; /* alt panel (cool-violet cast) */
+  --vip-inner-bg:       #0f0c07; /* inner well */
+  --vip-text-primary:   #e6ebf5;
+  --vip-text-secondary: #c9c3b4;
+  --vip-text-muted:     #8b96ad;
+  --vip-text-faint:     #6b7690;
+  --vip-text-disabled:  #565f70; /* dimmed locked-ahead values */
+
+  /* luxury gold ramp + ink */
+  --vip-gold-start: #9a7b1e;
+  --vip-gold-mid:   #e3c15a;
+  --vip-gold-end:   #f6e39a;
+  --vip-gold-ink:   #2e2404; /* ink ON a gold fill */
+  --vip-gold-grad:  linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a);
+  --vip-gold-tint:  rgba(227, 193, 90, 0.08); /* faint gold film (open FAQ / selected col) */
+
+  /* semantic (distinct from app --win/--loss) */
+  --vip-positive: #34d399; /* unlocked ✓ */
+  --vip-negative: #fb7185;
+  --vip-hairline: rgba(255, 255, 255, 0.07);
+
+  /* per-tier gradients + accents (bronze → diamond) */
+  --vip-tier-bronze-grad:   linear-gradient(135deg, #8c5a2b, #c88f5a, #e0a56b);
+  --vip-tier-bronze-acc:    #e0a56b;
+  --vip-tier-silver-grad:   linear-gradient(135deg, #8a94a6, #cbd3df, #eef2f7);
+  --vip-tier-silver-acc:    #cbd3df;
+  --vip-tier-gold-grad:     linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a);
+  --vip-tier-gold-acc:      #e3c15a;
+  --vip-tier-platinum-grad: linear-gradient(135deg, #6b7280, #cfd6e0, #e8edf3);
+  --vip-tier-platinum-acc:  #cfd6e0;
+  --vip-tier-diamond-grad:  linear-gradient(135deg, #3f7fb5, #9fd7ee, #e6f7ff);
+  --vip-tier-diamond-acc:   #9fd7ee;
+
+  /* VIP-local radii (panels reuse --radius-card 16 / pills --radius-pill) */
+  --vip-radius-table:   14px;
+  --vip-radius-control: 12px;
+  --vip-radius-gem:     8px;
+
+  /* display face — Montserrat, the same geometric sans as --brand-font-head.
+   *
+   * WAS Cinzel, and Cinzel had to go for two independent reasons:
+   *   1. CORRECTNESS. Cinzel serves `latin` + `latin-ext` only — no `vietnamese`
+   *      subset — so U+1EA0–1EF1 falls out of the face. Measured on the running
+   *      app: `Đồng` lost `ồ`, `Bạc` and `Bạch Kim` lost `ạ`, mid-word, on /vip.
+   *      This is the identical defect that got Outfit rejected in ruling A4;
+   *      rejecting one and shipping the other would have been incoherent.
+   *   2. SYSTEM. Flat Design specifies a GEOMETRIC SANS for display. Cinzel is
+   *      an inscriptional serif — it was the previous luxury direction's voice
+   *      and is off-system regardless of the language failure.
+   *
+   * Kept as its own token rather than collapsed into --brand-font-head: display
+   * and heading are distinct roles and a future brand may want them to differ.
+   * The serif fallbacks are gone with the serif. */
+  --brand-font-display: var(--font-head);
+}
+</code></pre></details>
+</section>
+

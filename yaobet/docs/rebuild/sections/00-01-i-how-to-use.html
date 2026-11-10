@@ -1,0 +1,15 @@
+<section>
+<h2 id="i-how-to-use">How to use this guide</h2>
+<p>This is an as-built specification of the Yaobet web app in <code>apps/web</code>. It is written for an agent that has no access to the repository and must rebuild the current UI so that it looks and behaves the same. It describes what exists today, including defects; it is not a redesign brief. Where the source has a bug or a token-contract break, the guide reproduces the behaviour and flags it in an amber callout so you can decide separately whether to fix it.</p>
+<div class="callout note"><p><strong>Rule of precedence.</strong> When two parts of this guide disagree, trust them in this order: (1) verbatim CSS and code blocks, (2) style and copy tables, (3) prose, (4) reference screenshots. Screenshots are taken at device pixel ratio 1 with reduced motion and cannot show hover, focus, motion or alternate states.</p></div>
+<h3 id="i-conventions">Conventions</h3>
+<dl>
+<dt><span class="tok">--token</span></dt><dd>A CSS custom property from the token contract (<a href="#f-tokens">Tokens</a>). Wherever a style uses one, both the token and its resolved value are given.</dd>
+<dt>Amber callout</dt><dd>A discrepancy: a literal value that breaks the token contract, a comment that disagrees with the code, a bug, or dead code.</dd>
+<dt>Green callout</dt><dd>A rebuild tip or an ordering dependency.</dd>
+<dt>(inference)</dt><dd>A statement deduced from the code rather than read directly. Everything else is fact.</dd>
+<dt>(not found in source)</dt><dd>Something the template asks for that the app does not define. Do not invent it.</dd>
+<dt>Copy tables</dt><dd>Vietnamese strings are verbatim, including diacritics and punctuation. The English column is a gloss for you, never shown in the UI.</dd>
+</dl>
+</section>
+

@@ -1,0 +1,217 @@
+<section>
+<h2 id="r-vip-current-tier-card">CurrentTierCard (/tier)</h2>
+<h4>1. Purpose</h4><p>On /tier: a guest join prompt, or the member's current tier with a turnover progress bar to the next tier.</p>
+<h4>2. Source</h4><p><code>src/components/vip/CurrentTierCard.tsx</code>, <code>CurrentTierCard.module.css</code>; copy <code>src/components/vip/copy.ts</code>.</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">guest:
+Card(variant="vip").guestCard
+  span.badge aria-hidden  Icon vip 32
+  div.guestBody
+    h2.guestTitle  "Tham gia hạng VIP Yaobet"
+    p.guestCopy    "Đăng ký để bắt đầu tích lũy vòng cược và nhận hoàn trả theo hạng."
+  Button(variant=gold size=lg fullWidth) "Đăng ký ngay"  → openAuthModal({mode:"register", resumeIntent:{action:"none"}})
+member:
+Card(variant="vip" active).memberCard
+  div.identity
+    span.badge aria-hidden  Icon vip 36
+    div.identityText
+      span.tierEyebrow  "Hạng hiện tại"
+      span.tierName     tier.name
+      Badge(tone=gold variant=subtle)  "Hoàn trả {rate}%"
+  ProgressBar(progress)
+    absent  → nothing
+    loading → div.progressZone aria-busy: Skeleton 40%×0.9em, Skeleton 100%×10px.skelBar, Skeleton 60%×0.9em
+    error   → div.progressZone: ErrorState title "Không tải được tiến độ lên hạng"
+    live, no nextTierName → p.maxedCopy: Icon trophy 18 + "Bạn đang ở hạng cao nhất — cảm ơn bạn."
+    live → div.progressZone
+             div.progressHead: span.progressLabel "Vòng cược lên hạng kế tiếp" · span.progressPct "{round(pct)}%"
+             div.track role=progressbar aria-valuemin=0 aria-valuemax=target aria-valuenow=current: span.fill width pct%
+             p.remain "Còn " MoneyValue(remaining VND, kind=balance) " vòng cược để lên " strong nextTierName</code></pre>
+<h4>4. Props</h4><p>tiers: VipTier[]; progress: Envelope&lt;VipProgress&gt;. Card/Button/Badge/Skeleton/ErrorState/MoneyValue: see track F.</p>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.guestCard/.memberCard</td><td>flex column; gap 24px; padding 24px</td><td></td></tr>
+<tr><td>.badge</td><td>64×64; radius pill; grid centred; colour #d4af37; background #212121; border 1px rgba(212,175,55,.55)</td><td></td></tr>
+<tr><td>.guestCard</td><td>align centre; text centre</td><td>≥768: flex-direction row; text left; button width auto, flex 0 0 auto</td></tr>
+<tr><td>.guestBody</td><td>flex column; gap 8px; align centre</td><td>≥768: align flex-start; flex 1</td></tr>
+<tr><td>.guestTitle</td><td>20px 700 #f2f0e4</td><td></td></tr>
+<tr><td>.guestCopy</td><td>16px; lh 1.5; #888888; max-width 38ch</td><td></td></tr>
+<tr><td>.identity</td><td>flex; centre; gap 16px</td><td></td></tr>
+<tr><td>.identityText</td><td>flex column; gap 8px; align flex-start</td><td></td></tr>
+<tr><td>.tierEyebrow</td><td>12px; letter-spacing .04em; uppercase; #888888</td><td></td></tr>
+<tr><td>.tierName</td><td>24px 700 #d4af37; lh 1.3</td><td></td></tr>
+<tr><td>.progressZone</td><td>flex column; gap 8px</td><td></td></tr>
+<tr><td>.progressHead</td><td>flex baseline space-between gap 12px</td><td></td></tr>
+<tr><td>.progressLabel</td><td>14px #888888</td><td></td></tr>
+<tr><td>.progressPct</td><td>14px 700 #d4af37; num font; tabular</td><td></td></tr>
+<tr><td>.track</td><td>height 10px; radius pill; background #303030; overflow hidden</td><td></td></tr>
+<tr><td>.fill</td><td>block; height 100%; radius pill; background #d4af37</td><td></td></tr>
+<tr><td>.remain</td><td>14px; lh 1.5; #d6d3c7; strong #f2f0e4 600</td><td></td></tr>
+<tr><td>.maxedCopy</td><td>inline-flex; gap 8px; 16px; #d6d3c7; icon #d4af37</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim CurrentTierCard.module.css</summary><pre><code class="lang-css">/* CurrentTierCard — current-tier identity + §F-gated progress. Tokens only. */
+
+.guestCard,
+.memberCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+/* ---- shared badge SLOT (awaits licensed tier art) -------------------------
+ * FLAT: a solid raised surface drawn by the gold hairline. The old fill was a
+ * radial gradient on a 64px disc — that is not "large background decoration",
+ * and it carried a raw rgba() literal outside the token layer. */
+.badge {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  color: var(--brand-accent);
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+}
+
+/* ---- guest ---- */
+.guestCard {
+  align-items: center;
+  text-align: center;
+}
+.guestBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+}
+.guestTitle {
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+.guestCopy {
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+  max-width: 38ch;
+}
+
+/* ---- member identity ---- */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.identityText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.tierEyebrow {
+  font-size: var(--t-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.tierName {
+  font-size: var(--t-h1);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  line-height: var(--lh-tight);
+}
+
+/* ---- progress zone (reserved footprint so loading→live = no shift) ---- */
+.progressZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.skelBar {
+  display: block;
+  border-radius: var(--radius-pill);
+}
+.progressHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.progressLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+.progressPct {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-disabled);
+  overflow: hidden;
+}
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  /* truthful static width; decorative-only transition zeroed under reduced-motion */
+  transition: width var(--dur-base) var(--ease-standard);
+}
+
+.remain {
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+.remain strong {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.maxedCopy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-body);
+  color: var(--text);
+}
+.maxedIcon {
+  color: var(--brand-accent);
+}
+
+@media (min-width: 768px) {
+  .guestCard {
+    flex-direction: row;
+    text-align: left;
+    align-items: center;
+  }
+  .guestBody {
+    align-items: flex-start;
+    flex: 1;
+  }
+  .guestCard :global(button) {
+    width: auto;
+    flex: 0 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
+  }
+}</code></pre></details>
+<h4>6. States</h4><p>Guest vs member as above. Member tier = <code>tiers.find(t =&gt; t.level === user.vipLevel) ?? tiers[0]</code>. Fixture live progress: current 18,600,000, target 30,000,000 → pct 62% (rounded), remaining 11,400,000 VND (MoneyValue balance kind → "11.400.000 ₫", formatting per F), next "Kim Cương".</p>
+<h4>7. Motion</h4><p>.fill width 200ms ease-standard; reduced motion → none.</p>
+<h4>8. Copy</h4><p>"Hạng hiện tại", "Vòng cược lên hạng kế tiếp", "Còn", "vòng cược để lên", "Bạn đang ở hạng cao nhất — cảm ơn bạn.", "Không tải được tiến độ lên hạng", "Tham gia hạng VIP Yaobet", "Đăng ký để bắt đầu tích lũy vòng cược và nhận hoàn trả theo hạng.", "Đăng ký ngay", "Hoàn trả {pct}%" where pct uses a VN comma (1.2 → "1,2"; 1.0 → "1").</p>
+<h4>9–10. Data / a11y</h4><p><code>getVipProgress()</code> envelope; the progressbar uses raw VND for aria-valuenow/max.</p>
+<div class="callout warn">The progress envelope is not user-aware: a level-0 member (Tân thủ) still sees "Còn 11.400.000 ₫ vòng cược để lên Kim Cương" (fixture says current tier Bạch Kim).</div>
+</section>
+

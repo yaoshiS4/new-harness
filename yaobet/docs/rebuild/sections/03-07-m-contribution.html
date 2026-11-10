@@ -1,0 +1,1460 @@
+<section>
+<h2 id="m-contribution">m-contribution — /cuoc-hop-le (game-contribution / valid-bet rate table)</h2>
+
+<h3 id="m-route-cuoc-hop-le">Route /cuoc-hop-le</h3>
+<dl>
+<dt>URL</dt><dd><code>/cuoc-hop-le</code> (tab "Tỷ lệ tính cược", default) and <code>/cuoc-hop-le?tab=han-che</code> (tab "Game hạn chế", see <a href="#m-restricted">#m-restricted</a>). Any other <code>tab</code> value = rate tab.</dd>
+<dt>Page file</dt><dd><code>src/app/cuoc-hop-le/page.tsx</code> (async Server Component, NOT in the (member) group → no MemberSidebar), <code>cuoc-hop-le.module.css</code>, <code>loading.tsx</code></dd>
+<dt>Metadata</dt><dd><code>title: "Tỷ lệ tính cược theo trò chơi — Yaobet"</code> (same for both tabs)</dd>
+<dt>Auth</dt><dd>None. Guest and member get identical HTML. No useAuth anywhere in the feature.</dd>
+<dt>Data</dt><dd>Always fetches BOTH <code>getContributionRates()</code>, <code>getContributionCatalogue()</code>, <code>getRestrictedGames()</code>; formats stamps with <code>formatStamp(iso)</code> = UTC <code>DD/MM/YYYY HH:mm</code>.</dd>
+<dt>Shell</dt><dd>Footer links "Tỷ lệ tính cược theo trò chơi" → <code>/cuoc-hop-le</code> and "Game hạn chế khuyến mãi" → <code>/cuoc-hop-le?tab=han-che</code>. The QuickActionRail is suppressed on <code>/cuoc-hop-le</code> and <code>/game-han-che</code> (<code>RAIL_SUPPRESSED_PATHS</code> in <code>QuickActionRail.tsx</code>, track S).</dd>
+</dl>
+<pre><code class="lang-txt">div.page
+└─ ContributionTabs initialTab
+   ├─ Tabs (ui) "Tỷ lệ tính cược" | "Game hạn chế"
+   └─ div.panel role=tabpanel  (only the active one)
+      rate tab:       PageIntro → ContributionRoot rates catalogue stampDate="09/08/2026 09:30" version="26.8"
+      restricted tab: RestrictedIntro → RestrictedRoot list stampDate="08/08/2026 10:00" version="26.8"
+
+ContributionRoot (rate tab) top→bottom:
+  RateFilters (search, category dropdown, provider dropdown, rate-bucket pills)
+  ResultStatus ("240 trò chơi")
+  [index error] FilterNotice error
+  [not found]   NotFoundResolver
+  [empty filter] FilterNotice empty
+  RateTable (frame: Scroller&lt;table&gt; → Pager → TableFoot) + legend</code></pre>
+<table>
+<thead><tr><th>Selector</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.page</td><td>bg #0a0a0a; flex column; gap 24px; min-width 0; padding-bottom <code>calc(var(--bottombar-h) + env(safe-area-inset-bottom) + var(--space-5))</code> = calc(56px + safe-area + 24px)</td><td>base</td></tr>
+<tr><td>.page</td><td>padding-bottom 32px</td><td>min-width: 768px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/app/cuoc-hop-le/cuoc-hop-le.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * /cuoc-hop-le — page shell only (gutter, rhythm, bottom inset). The shared
+ * content frame (ShellChrome) already supplies the horizontal --gutter, so this
+ * module deliberately does NOT re-add it (that would double the mobile gutter);
+ * it owns the --canvas bg, the --space-5 section rhythm, and the BottomTabBar
+ * inset so TableFoot + the last row clear the fixed bar. The BottomTabBar hides
+ * at ≥768px (BottomTabBar.module.css), so the inset drops there.
+ * ==========================================================================*/
+
+.page {
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  /* reserve for the fixed BottomTabBar (56px + safe area) so nothing overlaps */
+  padding-bottom: calc(
+    var(--bottombar-h) + env(safe-area-inset-bottom) + var(--space-5)
+  );
+}
+
+/* tab bar hidden ≥768 → drop the reserve to a plain bottom rhythm */
+@media (min-width: 768px) {
+  .page {
+    padding-bottom: var(--space-6);
+  }
+}
+</code></pre>
+</details>
+<table>
+<thead><tr><th>Width</th><th>Composition</th></tr></thead>
+<tbody>
+<tr><td>375</td><td>Tab strip (horizontally scrollable ui/Tabs) → h1/lead/how-to-read/caveats → full-width search → category dropdown → provider dropdown → 4 bucket pills (wrap) → count line → table frame (min-width 480px, scrolls sideways inside Scroller with frozen name column; cell padding 8px 12px) → pager → foot (notes then stamp, stacked) → legend. Tier groups in the Nổ hũ rate cell stack one per line, middot hidden.</td></tr>
+<tr><td>768</td><td>Filter bar becomes a wrapping row: the two dropdowns share line 1 (flex 1 1 auto), pills take line 2 (flex 1 1 100%). Rate cell groups inline with " · ". TableFoot = notes left, stamp right (nowrap). Bottom padding drops to 32px.</td></tr>
+<tr><td>1024</td><td>Table fits without horizontal scroll (inference: 4 columns at ≥480px). Row hover lifts all cells to #262626. Padding returns to 12px 16px above 900px.</td></tr>
+<tr><td>1440</td><td>Same; frame up to 1424px (QuickActionRail suppressed here so no right-rail reservation — inference from the suppression set; see #s-shell).</td></tr>
+</tbody>
+</table>
+<p><strong>Loading</strong> (<code>loading.tsx</code>): <code>div.page</code> → <code>PageIntro</code> (real copy) → <code>RateTableSkeleton</code>. Note it omits the tab strip.</p>
+<div class="callout warn"><code>cuoc-hop-le.module.css</code> says the ShellChrome supplies only the horizontal gutter, but ShellChrome's <code>.frame</code> ALSO reserves <code>calc(56px + safe-area + 16px)</code> bottom padding (&lt;768) / 32px (≥768); this page adds its own reserve on top, doubling the bottom gap (inference: ≈ 152px below 768px, 64px above). Both tab panels are server-rendered into the RSC payload on every request.</div>
+
+<h3 id="m-contribution-tabs">ContributionTabs</h3>
+<p><strong>Purpose</strong> — two-tab switch between the rate table and the restricted list, with the URL <code>?tab=</code> as source of truth. <strong>Source</strong> — <code>src/components/contribution/ContributionTabs.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">div.tabs
+├─ Tabs items=[{id:"ty-le",label:"Tỷ lệ tính cược"},{id:"han-che",label:"Game hạn chế"}] active label="Chọn bảng để xem"
+└─ active==="han-che" ? div#panel-han-che.panel role=tabpanel aria-labelledby="tab-han-che" → restrictedPanel
+                      : div#panel-ty-le.panel  role=tabpanel aria-labelledby="tab-ty-le"  → ratePanel</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>initialTab</td><td><code>"ty-le" | "han-che"</code></td><td>used when the URL has no <code>tab</code> key</td></tr>
+<tr><td>ratePanel / restrictedPanel</td><td>ReactNode</td><td>server-built panels</td></tr>
+</tbody>
+</table>
+<p>Behaviour: <code>active = toTab(searchParams.get("tab") ?? initialTab)</code>; click → if different, <code>router.replace(`${pathname}?tab=${next}`, { scroll: false })</code> (always writes explicit <code>?tab=ty-le</code> when returning to the rate tab). Inactive panel is unmounted, so the island state (search, filters, page) of the hidden tab resets on every switch. Keyboard: ui/Tabs arrows/Home/End move focus AND activate. Tab ids <code>tab-ty-le</code>/<code>tab-han-che</code> come from ui/Tabs (<code>id={`tab-${id}`}</code>).</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody><tr><td>.tabs / .panel</td><td>flex column; gap 24px; min-width 0</td></tr></tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/ContributionTabs.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * ContributionTabs — the two-tab shell on /cuoc-hop-le (rate table + restricted
+ * list). The ui/Tabs primitive owns the strip; this module owns only the column
+ * rhythm between the strip and the active panel, and the panel's own inner
+ * rhythm (intro → island), matching the old two-child page gap. Tokens only.
+ * ==========================================================================*/
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+</code></pre>
+</details>
+
+<h3 id="m-page-intro">PageIntro</h3>
+<p><strong>Purpose</strong> — page h1, lead explanation, how-to-read line and a caveats paragraph with one inline link to the restricted tab. <strong>Source</strong> — <code>src/components/contribution/PageIntro.tsx</code> (Server Component), <code>.module.css</code>.</p>
+<pre><code class="lang-txt">header.intro
+├─ h1.title     "Tỷ lệ tính cược theo trò chơi"
+├─ p.lead       {contribution.lead}
+├─ p.howToRead  {contribution.howToRead}
+└─ p.caveats    {before} Link.caveatLink href="/cuoc-hop-le?tab=han-che" "danh sách game hạn chế trong khuyến mãi" {after}</code></pre>
+<table>
+<thead><tr><th>Vietnamese (verbatim)</th><th>English gloss</th><th>Element</th></tr></thead>
+<tbody>
+<tr><td>Tỷ lệ tính cược theo trò chơi</td><td>Bet-counting rate by game</td><td>h1</td></tr>
+<tr><td>Với những người chơi đang tham gia khuyến mãi hoàn trả hằng ngày: số tiền hoàn trả của bạn dựa trên phần cược được tính từ các game bạn chơi — mà mỗi game tính khác nhau. Ví dụ: game 100% tính toàn bộ tiền cược, game 20% chỉ tính 1/5, game 0% thì không tính. Xem bảng để biết game bạn chơi tính bao nhiêu.</td><td>For players in the daily cashback promotion: your cashback is based on the counted part of your bets, and each game counts differently. E.g. a 100% game counts the whole stake, 20% counts 1/5, 0% counts nothing. See the table.</td><td>p.lead</td></tr>
+<tr><td>0% nghĩa là không cộng cược, nhưng bạn vẫn chơi bình thường. Phần cược được tính còn dùng cho quyền lợi VIP và thưởng tuần/tháng. Dùng ô tìm kiếm hoặc bộ lọc để tra từng game.</td><td>0% means the bet is not added, but you still play normally. The counted part is also used for VIP benefits and weekly/monthly bonuses. Use search or filters to look up each game.</td><td>p.howToRead</td></tr>
+<tr><td>Cấp VIP được xét theo cách riêng, không dựa trên tỷ lệ ở trang này. Khi tỷ lệ thay đổi, mức mới chỉ áp dụng cho cược đặt từ ngày hiệu lực. Mỗi khuyến mãi cũng có thể có điều kiện cược riêng — xem <em>danh sách game hạn chế trong khuyến mãi</em>.</td><td>VIP level is assessed separately, not on these rates. New rates apply only to bets from the effective date. Each promo may have its own wagering conditions — see the restricted games list.</td><td>p.caveats (emphasised part = the underlined link)</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.intro</td><td>flex column; gap 8px; min-width 0</td></tr>
+<tr><td>.title</td><td>#f2f0e4; <span class="tok">--brand-font-body</span>; 24px; 600; lh 1.3</td></tr>
+<tr><td>.lead</td><td>#d6d3c7; 16px; lh 1.5</td></tr>
+<tr><td>.howToRead</td><td>#888888; 14px; lh 1.5</td></tr>
+<tr><td>.caveats</td><td>margin-top 8px; #888888; 14px; lh 1.5; min-width 0</td></tr>
+<tr><td>.caveatLink</td><td>#f2f0e4; 600; underline; text-underline-offset 0.2em; radius 4px; hover: no underline; focus: outline 2px #6ea8ff offset 2px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/PageIntro.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * PageIntro — sentence-case h1 on the BODY face (never the Cinzel display
+ * face); a lifted lead (--text / --t-body), a muted "how to read" line
+ * (--text-mid / --t-sm) and a single plain muted caveats paragraph (no box, no
+ * heading — owner override 2026-08-11). Trust-surface type floor: never below
+ * --text-mid, never --text-dim. Tokens only — no raw hex / px / ms.
+ * ==========================================================================*/
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-h1);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+}
+
+/* the lifted lead — the one line that says what the number IS */
+.lead {
+  color: var(--text);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+}
+
+/* the read-the-table line — secondary guidance, muted but above the AA floor */
+.howToRead {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+/* ---- the caveats paragraph ------------------------------------------------- *
+ * A single muted paragraph of plain sentences — no box, no border, no heading,
+ * no grid (owner override 2026-08-11). Muted but above the AA floor (--text-mid).
+ */
+.caveats {
+  margin-top: var(--space-2);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  min-width: 0;
+}
+
+/* the ONE inline link — points at the Game-hạn-chế tab (/cuoc-hop-le?tab=han-che) */
+.caveatLink {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  border-radius: var(--radius-sm);
+}
+
+.caveatLink:hover {
+  color: var(--text-hi);
+  text-decoration: none;
+}
+
+.caveatLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+</code></pre>
+</details>
+<div class="callout warn">Comments reference "Cinzel" as the /vip display face; tokens.css says Cinzel was replaced by Montserrat. The caveats link points to the same page with <code>?tab=han-che</code>; clicking it soft-navigates and ContributionTabs re-derives the tab.</div>
+
+<h3 id="m-contribution-root">ContributionRoot — the rate-table island</h3>
+<p><strong>Purpose</strong> — owns search/filter/page state and derives the visible page of rows. <strong>Source</strong> — <code>src/components/contribution/ContributionRoot.tsx</code>, <code>ContributionRoot.module.css</code> (<code>.root</code>: flex column; gap 16px; min-width 0).</p>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>rates</td><td><code>ContributionRates { version; effectiveAt; categories[] }</code></td><td>8 categories (rate lives on category)</td></tr>
+<tr><td>catalogue</td><td><code>ContributionTitle[]</code></td><td>240 titles; each resolves its rate via categoryId</td></tr>
+<tr><td>stampDate</td><td>string</td><td>"09/08/2026 09:30"</td></tr>
+<tr><td>version</td><td>string</td><td>"26.8"</td></tr>
+</tbody>
+</table>
+<p><strong>State</strong>: <code>rawQuery</code> "", <code>query</code> "" (folded, debounced), <code>categoryId</code> "all", <code>provider</code> "all", <code>bucket</code> "all", <code>page</code> 1, <code>online</code> true (tracks <code>navigator.onLine</code> + online/offline events), <code>errorNonce</code> 0.</p>
+<ol>
+<li><strong>Base rows</strong>: each catalogue title → <code>{ key, name, rate: category.rate, categoryId, categoryName, provider, bucket: rateBucket(rate), sortKey: searchKey }</code>. Sort: category order (as authored in <code>CATEGORIES</code>), then provider by codepoint (<code>a &lt; b</code>), then folded title, then id.</li>
+<li><strong>Search index</strong> (try/catch; failure → error notice, table still works): per row tokens of name, previous names, folded provider, and the category's searchKey + all aliases.</li>
+<li><strong>Filter</strong> (AND): category, provider, bucket, and if query: every query token must be a prefix of some token in name OR any prevName OR provider OR category pool.</li>
+<li><strong>Paginate</strong>: PAGE_SIZE 25; <code>pageCount = max(1, ceil(total/25))</code>; page clamped.</li>
+<li><code>notFound = total===0 &amp;&amp; query!==""</code>; <code>emptyFilter = total===0 &amp;&amp; query===""</code>.</li>
+<li>Every filter change and every committed query resets page to 1. Picking a chip in NotFoundResolver clears query + bucket + provider and sets that category.</li>
+</ol>
+<p><strong>Data — the 8 categories</strong> (render order = this order):</p>
+<table>
+<thead><tr><th>#</th><th>id</th><th>name</th><th>rate</th><th>bucket</th><th>titles</th><th>searchKey / aliases</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>casino</td><td>Casino / Bàn chơi</td><td>flat 0 → "0%"</td><td>none</td><td>40</td><td>casino ban choi / casino, casino truc tuyen, live casino, bau cua, xoc dia, tai xiu, baccarat, … (more aliases in source)</td></tr>
+<tr><td>2</td><td>slots</td><td>Nổ hũ</td><td>perTier bronze 15, gold 20 → "15% (Hạng 1–2) · 20% (Hạng 3–5)"</td><td>partial</td><td>48</td><td>no hu / no hu, nohu, slot, slots, hu, jackpot</td></tr>
+<tr><td>3</td><td>sports</td><td>Thể thao</td><td>flat 100 → "100%"</td><td>full</td><td>28</td><td>the thao / the thao, bong da, bd, keo, xien, ca cuoc bong da</td></tr>
+<tr><td>4</td><td>fishing</td><td>Bắn cá</td><td>flat 0</td><td>none</td><td>26</td><td>ban ca / ban ca, ca</td></tr>
+<tr><td>5</td><td>card</td><td>Game bài đối kháng</td><td>flat 0</td><td>none</td><td>30</td><td>game bai doi khang / game bai, tien len, tlmn, sam loc, phom, ta la, mau binh</td></tr>
+<tr><td>6</td><td>lottery</td><td>Xổ số</td><td>flat 0</td><td>none</td><td>22</td><td>xo so / xo so, lo de, de, so de, xs</td></tr>
+<tr><td>7</td><td>cockfight</td><td>Đá gà</td><td>flat 0</td><td>none</td><td>16</td><td>da ga / da ga, ga choi, dag</td></tr>
+<tr><td>8</td><td>arcade</td><td>Game nhanh</td><td>flat 0</td><td>none</td><td>30</td><td>game nhanh / game nhanh, mini game, crash, tai xiu nhanh</td></tr>
+</tbody>
+</table>
+<p>Total 240 titles → default view "240 trò chơi", 10 pages. Catalogue = 21 curated titles (13 slots s-01…s-13, 8 sports t-01…t-08) + a deterministic generator per category: name = <code>prefixes[i % P] + " " + suffixes[floor(i / P) % S]</code>, provider = <code>providers[i % N]</code>, id <code>{stem}-g{i}</code>. Edge titles: duplicate name "Nổ Hũ Thần Tài" (JILI and PG Soft), renamed "Vua Săn Hũ" (prevNames "no hu vang"), no-diacritic "Golden Fortune", long "Nổ Hũ Đại Gia Phát Tài Vô Cực Thịnh Vượng" (Pragmatic Play).</p>
+<p><strong>Provider dropdown options</strong> (derived, <code>localeCompare(…, "vi")</code>, computed by running the source): Tất cả nhà cung cấp, BTi, CQ9, Dream Gaming, Evolution, GW, JDB, JILI, K-Sports, KingMaker, PG Soft, Pragmatic Play, SA Gaming, SABA, Spribe, SV388, TC Gaming, V8 Poker, WM Casino, WS168.</p>
+<details><summary>Default page 1 rows (25, all "Casino / Bàn chơi", rate "0%"), computed from the source sort</summary>
+<table>
+<thead><tr><th>#</th><th>Tên trò chơi</th><th>Nhà cung cấp</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Blackjack Kim Cương</td><td>Dream Gaming</td></tr>
+<tr><td>2</td><td>Blackjack Thượng Hạng</td><td>Dream Gaming</td></tr>
+<tr><td>3</td><td>Rồng Hổ Đại Gia</td><td>Dream Gaming</td></tr>
+<tr><td>4</td><td>Rồng Hổ Hoàng Gia</td><td>Dream Gaming</td></tr>
+<tr><td>5</td><td>Sicbo Đại Gia</td><td>Dream Gaming</td></tr>
+<tr><td>6</td><td>Sicbo Hoàng Gia</td><td>Dream Gaming</td></tr>
+<tr><td>7</td><td>Tài Xỉu Kim Cương</td><td>Dream Gaming</td></tr>
+<tr><td>8</td><td>Tài Xỉu Thượng Hạng</td><td>Dream Gaming</td></tr>
+<tr><td>9</td><td>Xì Dách Đại Gia</td><td>Dream Gaming</td></tr>
+<tr><td>10</td><td>Xì Dách Hoàng Gia</td><td>Dream Gaming</td></tr>
+<tr><td>11</td><td>Baccarat Kim Cương</td><td>Evolution</td></tr>
+<tr><td>12</td><td>Baccarat Thượng Hạng</td><td>Evolution</td></tr>
+<tr><td>13</td><td>Bầu Cua Đại Gia</td><td>Evolution</td></tr>
+<tr><td>14</td><td>Bầu Cua Hoàng Gia</td><td>Evolution</td></tr>
+<tr><td>15</td><td>Poker Bàn Kim Cương</td><td>Evolution</td></tr>
+<tr><td>16</td><td>Poker Bàn Thượng Hạng</td><td>Evolution</td></tr>
+<tr><td>17</td><td>Roulette Kim Cương</td><td>Evolution</td></tr>
+<tr><td>18</td><td>Roulette Thượng Hạng</td><td>Evolution</td></tr>
+<tr><td>19</td><td>Xóc Đĩa Đại Gia</td><td>Evolution</td></tr>
+<tr><td>20</td><td>Xóc Đĩa Hoàng Gia</td><td>Evolution</td></tr>
+<tr><td>21</td><td>Baccarat Đại Gia</td><td>SA Gaming</td></tr>
+<tr><td>22</td><td>Baccarat Hoàng Gia</td><td>SA Gaming</td></tr>
+<tr><td>23</td><td>Bầu Cua Kim Cương</td><td>SA Gaming</td></tr>
+<tr><td>24</td><td>Bầu Cua Thượng Hạng</td><td>SA Gaming</td></tr>
+<tr><td>25</td><td>Poker Bàn Đại Gia</td><td>SA Gaming</td></tr>
+</tbody>
+</table>
+</details>
+<div class="callout warn">The default table opens on 25 rows of 0% casino games; the only non-zero categories (Nổ hũ, Thể thao) start on page 2+. The i18n catalog lists categories in a different order (Thể thao first) and calls this "lobby order". The provider list is sorted with ICU <code>localeCompare("vi")</code> although the island comment insists on locale-free codepoint ordering for hydration safety. <code>ResultStatus</code> always receives a number (never null), so "240 trò chơi" shows on the default view, contradicting its comment "nothing announces on the default view".</div>
+
+<h3 id="m-rate-filters">RateFilters (+ SelectFilter)</h3>
+<p><strong>Purpose</strong> — full-width search on top; below, a category dropdown, a provider dropdown and four rate-bucket pills. <strong>Source</strong> — <code>src/components/contribution/RateFilters.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">div.filters
+├─ div.searchWrap → SearchField value=rawQuery onChange onCommit offline
+└─ div.filterBar
+   ├─ SelectFilter small="Loại trò chơi" panelLabel="Lọc theo loại trò chơi" options=[Tất cả, 8 categories]
+   ├─ SelectFilter small="Nhà cung cấp"  panelLabel="Nhà cung cấp"           options=[Tất cả nhà cung cấp, providers…]
+   └─ div.bucketWrap role=group aria-label="Lọc theo tỷ lệ được tính"
+      └─ Pill active={bucket===value} ×4 : "Tất cả" (all) · "100%" (full) · "Một phần" (partial) · "Không tính" (none)
+
+SelectFilter:
+div.selectWrap
+└─ Dropdown open onOpenChange label={panelLabel} placement="bottom-start"
+   trigger: button.trigger → span.triggerLabel {small} + span.triggerValue {current label} + Icon chevronDown .chevron
+   panel:   ul.menu → li → button.option[.optionOn] role=menuitemradio aria-checked → span {label} + [selected] Icon check
+            onClick → onPick(value) + close</code></pre>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.filters</td><td>flex column; gap 12px; min-width 0</td><td>base</td></tr>
+<tr><td>.searchWrap</td><td>width 100%; min-width 0</td><td>base</td></tr>
+<tr><td>.filterBar</td><td>flex column; gap 12px</td><td>base</td></tr>
+<tr><td>.filterBar</td><td>row; wrap; align center; gap 12px 16px</td><td>min-width: 768px</td></tr>
+<tr><td>.selectWrap</td><td>min-width 0 (≥768 flex 1 1 auto)</td><td>base / 768</td></tr>
+<tr><td>.bucketWrap</td><td>flex; wrap; gap 8px (≥768 flex 1 1 100%)</td><td>base / 768</td></tr>
+<tr><td>.trigger</td><td>flex; center; gap 8px; width 100%; min-height 44px; padding 0 12px; bg <span class="tok">--surface</span> #141414; border 1px solid rgba(212,175,55,0.55); radius 8px; #f2f0e4; body font; 14px; pointer; transition background-color/border-color 200ms</td><td>base</td></tr>
+<tr><td>.trigger:hover</td><td>bg #262626; border rgba(212,175,55,0.55) (no scale)</td><td>base</td></tr>
+<tr><td>.triggerLabel</td><td>#888888; flex 0 0 auto</td><td>base</td></tr>
+<tr><td>.triggerValue</td><td>flex 1 1 auto; min-width 0; left; ellipsis nowrap; 600</td><td>base</td></tr>
+<tr><td>.chevron</td><td>flex 0 0 auto; #888888; font-size 16px (Icon is 1em)</td><td>base</td></tr>
+<tr><td>.menu</td><td>flex column; gap 4px; no list styling</td><td>base</td></tr>
+<tr><td>.option</td><td>flex; center; space-between; gap 12px; width 100%; min-height 44px; padding 0 12px; transparent; border 0; radius 4px; #d6d3c7; body font; 14px; left; pointer; hover bg #262626 color #f2f0e4; focus outline 2px #6ea8ff offset 2px</td><td>base</td></tr>
+<tr><td>.optionOn</td><td>#f2f0e4; 600</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/RateFilters.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RateFilters — the conventional-table header IA (owner override,
+ * decisions/2026-08-10). A full-width PRIMARY search on top; a SECONDARY filter
+ * bar below with three filters (category dropdown · provider dropdown · rate-%
+ * pill group) that stack &lt;768 and wrap to a row ≥768. Tokens only — no --loss /
+ * --error / --win / --text-dim / --brand-accent / --vip-* / --brand-font-display;
+ * no raw hex / px / ms (the media-query breakpoints are the sanctioned literals).
+ * ==========================================================================*/
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ---- PRIMARY: full-width search ------------------------------------------- */
+.searchWrap {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---- SECONDARY: the three-filter bar -------------------------------------- */
+.filterBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.selectWrap {
+  min-width: 0;
+}
+
+.bucketWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .filterBar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+  }
+  /* the two dropdowns share the first line; the pill group wraps to its own */
+  .selectWrap {
+    flex: 1 1 auto;
+  }
+  .bucketWrap {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---- dropdown trigger (category + provider) -------------------------------- */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+/* Colour shift only — NO hover scale. A dropdown trigger anchors a popover to
+ * its own box; scaling it on hover moves the anchor out from under the pointer
+ * mid-open. Same documented exception the collection feature applies to its
+ * &lt;select&gt;. Every trigger on this surface behaves identically. */
+.trigger:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent-hairline);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.triggerLabel {
+  color: var(--text-mid);
+  flex: 0 0 auto;
+}
+
+.triggerValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-semi);
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: var(--text-mid);
+  font-size: var(--t-body);
+}
+
+/* ---- dropdown menu (inside ui/Dropdown's panel) --------------------------- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--surface-hover);
+  color: var(--text-hi);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.optionOn {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger {
+    transition: none;
+  }
+}
+</code></pre>
+</details>
+<p>Bucket filter semantics (<code>rateBucket</code>): perTier → partial; flat 100 → full; flat 0 → none; other flat → partial. So "100%" shows Thể thao (28), "Một phần" shows Nổ hũ (48), "Không tính" shows the six 0% categories (164).</p>
+<div class="callout warn">FACT (<code>ui/Pill/Pill.tsx</code>): every Pill renders <code>aria-pressed={active}</code>, so the bucket pills expose toggle state correctly — but the NotFoundResolver category chips and the deposit preset chips (plain actions) also announce as unpressed toggle buttons. The "100%" bucket label is authored copy containing a literal % (allowed by the i18n comment).</div>
+
+<h3 id="m-search-field">SearchField (+ foldQuery)</h3>
+<p><strong>Purpose</strong> — the feature's one text input: diacritic-insensitive, debounced, IME-safe search with a clear button and a hint. <strong>Source</strong> — <code>src/components/contribution/SearchField.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">div.field
+├─ label.srOnly for="contribution-search" "Tìm tên trò chơi"
+├─ div.control
+│  ├─ span.lead aria-hidden → Icon search (1em)
+│  ├─ input#contribution-search.input type=text inputMode=search autoComplete=off placeholder="Tìm tên trò chơi…" disabled={offline}
+│  └─ [value &amp;&amp; !offline] button.clear type=button aria-label="Xóa nội dung tìm kiếm" → Icon close
+├─ p.hintLive    {offline ? "Tìm trò chơi cần có mạng." : "Gõ không dấu cũng được (vd: no hu)"}
+├─ p.hintOffline "Tìm trò chơi cần có mạng."     (display:none; revealed only by noscript CSS)
+└─ noscript → style ".{input}{opacity:.5;pointer-events:none;}.{hintLive}{display:none;}.{hintOffline}{display:block;}"</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>value</td><td>string</td><td>required</td><td>controlled raw text</td></tr>
+<tr><td>onChange</td><td>(raw) =&gt; void</td><td>required</td><td>immediate raw update</td></tr>
+<tr><td>onCommit</td><td>(folded) =&gt; void</td><td>required</td><td>debounced folded query ("" if &lt; 2 chars)</td></tr>
+<tr><td>offline</td><td>boolean</td><td>false</td><td>disables input, hides clear, swaps hint</td></tr>
+</tbody>
+</table>
+<p><strong>Folding</strong> (<code>foldQuery</code>, verbatim order): lowercase → replace <code>đ</code> with <code>d</code> → <code>normalize("NFD")</code> → strip U+0300–U+036F → replace <code>[^a-z0-9\s]</code> with space → collapse whitespace → trim. E.g. "Đá gà" → "da ga", "Nổ Hũ" → "no hu".</p>
+<p><strong>Timing</strong>: DEBOUNCE_MS 250, MIN_CHARS 2. Each change restarts a 250ms timer unless an IME composition is active; <code>compositionstart</code> cancels the timer; <code>compositionend</code> starts it. Clear: cancels timer, <code>onChange("")</code>, <code>onCommit("")</code>.</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.field</td><td>flex column; gap 8px; min-width 0; width 100%</td></tr>
+<tr><td>.control</td><td>relative; flex; center; height <span class="tok">--tap-bar</span> 48px; padding 1px; bg #212121; border 1px solid rgba(212,175,55,0.55); radius 8px; transition border-color 200ms</td></tr>
+<tr><td>.control:focus-within</td><td>border-width 2px; border-color #6ea8ff; padding 0 (no reflow)</td></tr>
+<tr><td>.lead</td><td>inline-flex center; padding-inline 12px; #888888; 16px; flex 0 0 auto</td></tr>
+<tr><td>.input</td><td>flex 1 1 auto; min-width 0; height 100%; padding-inline 0 12px; border 0; transparent; #f2f0e4; body font; 16px; lh 1.5; placeholder #888888 opacity 1; disabled cursor not-allowed</td></tr>
+<tr><td>.clear</td><td>flex 0 0 auto; inline-flex center; 44×44px; margin-inline-end 4px; transparent; border 0; radius 8px; #888888; pointer; transition color/transform 200ms; hover #f2f0e4 scale(1.05)</td></tr>
+<tr><td>.hintLive, .hintOffline</td><td>#888888; 14px; lh 1.3; .hintOffline display none</td></tr>
+<tr><td>.srOnly</td><td>standard visually-hidden (1px, clip rect(0,0,0,0), etc.)</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/SearchField.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * SearchField — hand-rolled input (prototype §2.2). 48px (--tap-bar) tall,
+ * 16px (--t-body) text so iOS never zooms on focus; leading search glyph; a
+ * 44×44 clear ✕ padded off the field edge. Tokens only — no --loss / --error /
+ * --win / --text-dim / --vip-* / --brand-font-display; no raw hex / px / ms.
+ *
+ * FLAT input contract (30-PM-DESIGN-SYSTEM, as CORRECTED 2026-08-17):
+ *   resting = filled --surface-3 PLUS a 1px --border hairline;
+ *   focus   = 2px SOLID accent border, never a glow ring.
+ *
+ * The original rule said "resting = no border". Reversed by the PM: --surface-3
+ * against this page ground is ~1.1:1, so a border-less field has no boundary at
+ * all and fails WCAG 1.4.11's 3:1 floor for UI component edges. The flat system
+ * removes shadow, gradient and border simultaneously; in a dark palette nothing
+ * survives that, so the hairline is load-bearing for fields as it is for cards.
+ * DO NOT remove the resting border again.
+ *
+ * The accent focus edge overrides the feature's earlier "no --brand-accent" rule
+ * for the FOCUS edge ONLY: that rule exists because gold is reward chrome and a
+ * contribution rate must not read as a prize — a transient keyboard state
+ * carries no such reading, and the app must not run two focus languages. Every
+ * RESTING/value colour on this surface stays neutral; the resting hairline is
+ * --border, the LOCKED constant, not a brand accent.
+ * ==========================================================================*/
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  width: 100%;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--tap-bar);
+  /* 1px pad compensates the 1px resting border: content box is identical at rest
+   * (1 border + 1 pad) and at focus (2 border + 0 pad) — no reflow. */
+  padding: 1px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+
+.control:focus-within {
+  border-width: 2px;
+  /* FOCUS IS BLUE, EVERYWHERE — PM ruling, reconciling a split between two
+     sweep areas (one used --brand-accent here, one used --focus-ring).
+     Focus is ONE affordance and gets ONE colour: a user learns "blue = where I
+     am" once, or not at all. Two reinforcing reasons for blue over gold:
+       · --focus-ring is the PINNED, AA-guaranteed indicator (8.21:1 vs canvas),
+         locked identical across brands. Gold is not.
+       · On this product gold is REWARD chrome. Focus is not a reward, and the
+         trust surfaces (contribution/restricted) already forbid brand accent
+         for exactly that reason.
+     The design system's "border-2 solid Primary" was written for a light
+     palette where Primary WAS the focus blue and the two coincided. In dark
+     gold they diverge, and the accessibility token wins. */
+  border-color: var(--focus-ring);
+  padding: 0;
+}
+
+.lead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--space-3);
+  color: var(--text-mid);
+  font-size: var(--t-body);
+  flex: 0 0 auto;
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding-inline: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body); /* 16px — below it iOS zooms on focus */
+  line-height: var(--lh-body);
+}
+
+.input::placeholder {
+  color: var(--text-mid);
+  opacity: 1;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+/* clear ✕ — 44×44 tap target, padded off the field edge */
+.clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin-inline-end: var(--space-1);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+/* uniform hover — button 1.05, never scaled by prominence */
+.clear:hover {
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+
+.hintLive,
+.hintOffline {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-tight);
+}
+
+/* the static offline hint is revealed only by the JS-off &lt;noscript&gt; style */
+.hintOffline {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control,
+  .clear {
+    transition: none;
+  }
+  /* absent, not instant */
+  .clear:hover {
+    transform: none;
+  }
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</code></pre>
+</details>
+<div class="callout warn">The input has no visible focus outline of its own; focus is shown by the 2px blue border on <code>.control:focus-within</code>. The hard-coded input id <code>contribution-search</code> is shared by the restricted tab's SearchField (only one tab is mounted at a time, so no duplicate in practice).</div>
+
+<h3 id="m-result-status">ResultStatus</h3>
+<p><code>src/components/contribution/ResultStatus.tsx</code>. <code>p.status aria-live="polite"</code> containing: notFound → <code>span.srOnly</code> "Chúng tôi chưa khớp được tên bạn gõ. Trò chơi nào cũng thuộc một loại, và loại nào cũng có tỷ lệ riêng. Chọn loại của bạn:"; else if count != null → <code>span</code> "{n} trò chơi" ({n} games); else empty. Styles: #888888; 14px; lh 1.3; min-height 14px.</p>
+<details><summary>Verbatim CSS — <code>src/components/contribution/ResultStatus.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * ResultStatus — one muted line at the --text-mid AA floor / --t-sm. No colour
+ * carries meaning here; no --text-dim, no --t-micro. No percentage ever appears
+ * in this line (the rate lives only in the table's rate column).
+ * ==========================================================================*/
+
+.status {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-tight);
+  min-height: var(--t-sm); /* reserve the line so a count landing shifts nothing */
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</code></pre>
+</details>
+
+<h3 id="m-not-found-resolver">NotFoundResolver</h3>
+<p><strong>Purpose</strong> — when a search matches nothing: a calm box with all 8 category chips, a tip and a help link. <strong>Source</strong> — <code>src/components/contribution/NotFoundResolver.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">section.resolver aria-label="Chúng tôi chưa khớp được tên bạn gõ."
+├─ p.title   "Chúng tôi chưa khớp được tên bạn gõ."                       (We couldn't match what you typed.)
+├─ p.resolve "Trò chơi nào cũng thuộc một loại, và loại nào cũng có tỷ lệ riêng. Chọn loại của bạn:"
+├─ div.chips → Pill ×8 {category name} onClick=onPick(id)
+├─ p.tip     "Mẹo: gõ ngắn hơn, không dấu — ví dụ "no hu"."               (Tip: type shorter, without accents — e.g. "no hu".)
+└─ Link.help href="/tro-giup" → span "Vẫn chưa rõ? Xem Trợ giúp" + Icon chevronRight   (Still unclear? See Help)</code></pre>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.resolver</td><td>flex column; gap 12px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; padding 16px</td></tr>
+<tr><td>.title</td><td>#f2f0e4; body font; 20px; 600; lh 1.3</td></tr>
+<tr><td>.resolve</td><td>#d6d3c7; 16px; lh 1.5</td></tr>
+<tr><td>.chips</td><td>flex; wrap; gap 8px</td></tr>
+<tr><td>.tip</td><td>#888888; 14px; lh 1.5</td></tr>
+<tr><td>.help</td><td>inline-flex; center; gap 4px; align-self flex-start; min-height 44px; #888888; 14px; no underline; hover #f2f0e4; focus outline 2px #6ea8ff offset 2px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/NotFoundResolver.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * NotFoundResolver — a calm block above the table (prototype §2.2/§4.6). Chips
+ * WRAP (a completeness list is never a scroller). Title --text-hi/--t-h2; body
+ * --text/--t-body; tip + help --text-mid/--t-sm. Help link is a 44px target with
+ * ≥8px gaps between chips. No raw hex / px / ms; no percentage; no --text-dim.
+ * ==========================================================================*/
+
+.resolver {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.title {
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+}
+
+.resolve {
+  color: var(--text);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+}
+
+/* the eight category chips — wrapped, never a scroller; ≥8px gaps */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tip {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+.help {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  text-decoration: none;
+}
+
+.help:hover {
+  color: var(--text-hi);
+}
+
+.help:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+</code></pre>
+</details>
+<p>Note: the help link goes to the <code>/tro-giup</code> stub ("Trung tâm trợ giúp sẽ sớm ra mắt.").</p>
+
+<h3 id="m-filter-notice">FilterNotice</h3>
+<p><strong>Purpose</strong> — inline strip for "filters match nothing" (variant empty) or "search index failed" (variant error), with an optional ghost button. <strong>Source</strong> — <code>src/components/contribution/FilterNotice.tsx</code>, <code>.module.css</code>. Reused by the restricted tab.</p>
+<pre><code class="lang-txt">div.notice[.error]
+├─ span.icon aria-hidden → Icon {error ? "warning" : "info"}
+└─ div.body → p.message {message} + [action] div.action → Button ghost sm {action.label} onClick</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>variant</td><td><code>"empty" | "error"</code></td><td>error → amber icon + warning glyph</td></tr>
+<tr><td>message</td><td>string</td><td>body text</td></tr>
+<tr><td>action</td><td><code>{ label; onClick }</code> (optional)</td><td>ghost sm button</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.notice</td><td>flex; align flex-start; gap 12px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; padding 12px 16px</td></tr>
+<tr><td>.icon</td><td>flex 0 0 auto; inline-flex; #888888; 16px; lh 1; margin-top 4px</td></tr>
+<tr><td>.error .icon</td><td>color <span class="tok">--caution</span> #f5a623</td></tr>
+<tr><td>.body / .message / .action</td><td>flex column gap 8px min-width 0 / #d6d3c7 14px lh 1.5 / flex</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/FilterNotice.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * FilterNotice — a neutral inline strip (prototype §2.2). --surface-2 panel on a
+ * --border hairline; body copy at the --text-mid floor. Icon is --text-mid for
+ * the informational variants and --caution for the error variant — NEVER --loss,
+ * NEVER --error, never red (a 0% category is not a loss and an index failure is
+ * not a validation error). No raw hex / px / ms; no percentage anywhere.
+ * ==========================================================================*/
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--text-mid);
+  font-size: var(--t-body);
+  line-height: 1;
+  margin-top: var(--space-1);
+}
+
+/* error variant — amber "attention", not a loss / not red */
+.error .icon {
+  color: var(--caution);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.message {
+  color: var(--text);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+.action {
+  display: flex;
+}
+</code></pre>
+</details>
+<p>Rate-tab uses: empty → "Không có trò chơi nào khớp với bộ lọc đang chọn." + "Xóa bộ lọc" (resets category/provider/bucket, not the query); error → "Không tải được danh sách trò chơi. Tỷ lệ theo loại vẫn xem được trong bảng bên dưới." + "Thử lại" (re-runs index build).</p>
+
+<h3 id="m-rate-table">RateTable</h3>
+<p><strong>Purpose</strong> — bordered frame with a horizontally scrollable 4-column table (frozen game-name column), the pager, the foot notes/stamp, and a legend line under the frame. <strong>Source</strong> — <code>src/components/contribution/RateTable.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">div.frame
+├─ Scroller freezeFirstColumn snap={false} peek={false} label="Bảng tỷ lệ được tính — vuốt ngang để xem thêm cột"
+│  └─ table.table
+│     ├─ caption.srOnly "Tỷ lệ cược được tính theo loại trò chơi và theo trò chơi. Cập nhật {date}, phiên bản {version}."
+│     ├─ thead → tr.headRow
+│     │   ├─ th.th.corner scope=col "Tên trò chơi"
+│     │   ├─ th.th scope=col "Tỷ lệ được tính"
+│     │   ├─ th.th scope=col "Loại trò chơi"
+│     │   └─ th.th scope=col "Nhà cung cấp"
+│     └─ tbody → tr ×rows
+│         ├─ th.rowHead scope=row → span.rowName {name}
+│         ├─ td.td data-numeric → RateCell rate
+│         ├─ td.td.meta {category}
+│         └─ td.td.meta {provider}
+├─ Pager page pageCount onPage
+└─ TableFoot stampDate version
+div.legend → p.legendLine "0% — vẫn chơi bình thường, chỉ là cược không cộng vào cược hợp lệ."</code></pre>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.frame</td><td>border 1px solid rgba(212,175,55,0.55); radius 16px; bg #0a0a0a; overflow hidden</td><td>base</td></tr>
+<tr><td>.table</td><td>border-collapse separate; border-spacing 0; width 100%; min-width 480px; num font; tabular-nums</td><td>base</td></tr>
+<tr><td>.th, .td</td><td>padding 12px 16px; border-bottom 1px solid rgba(212,175,55,0.55); nowrap; bg #0a0a0a; 14px; #d6d3c7; left; vertical-align top</td><td>base</td></tr>
+<tr><td>last row .td / .rowHead</td><td>border-bottom none</td><td>base</td></tr>
+<tr><td>.rowHead</td><td>sticky; left 0; z-index 1; display flex column; align flex-start; gap 4px; padding 12px 16px; bg #1a1a1a; border-right + border-bottom 1px solid rgba(212,175,55,0.55); #f2f0e4; body font; 600; 14px; white-space normal; overflow-wrap anywhere</td><td>base</td></tr>
+<tr><td>.headRow .th</td><td>bg #212121; #888888; 600</td><td>base</td></tr>
+<tr><td>.corner</td><td>sticky; left 0; z-index calc(100 + 1) = 101; bg #212121</td><td>base</td></tr>
+<tr><td>.meta</td><td>#888888</td><td>base</td></tr>
+<tr><td>tbody tr:hover .td / .rowHead</td><td>bg #262626</td><td>min-width: 1024px</td></tr>
+<tr><td>.th, .td, .rowHead</td><td>padding 8px 12px</td><td>max-width: 900px</td></tr>
+<tr><td>.legend</td><td>flex column; gap 4px; margin-top 12px; #888888; 14px; lh 1.5</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/RateTable.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RateTable — frame + a11y table + frozen first column (prototype §2.2/§5).
+ * min-width:480px is the entire mechanism that forces the horizontal scroll;
+ * the page body never scrolls (globals.css pins overflow-x:hidden) — the table
+ * scrolls inside its own Scroller. No --lift / --halo / --glow-gold / gradient;
+ * no --loss / --error / --win / --text-dim / --brand-accent / --vip-*; no raw
+ * hex / px / ms (the media-query breakpoints are the sanctioned literals).
+ * ==========================================================================*/
+
+.frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.table {
+  border-collapse: separate; /* REQUIRED — sticky cells break under `collapse` */
+  border-spacing: 0;
+  width: 100%;
+  min-width: 480px; /* forces the horizontal scroll inside the Scroller */
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.th,
+.td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--canvas); /* opaque — required for the sticky column */
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: left;
+  vertical-align: top;
+}
+
+tbody tr:last-child .td,
+tbody tr:last-child .rowHead {
+  border-bottom: none;
+}
+
+/* THIS is what actually freezes the column (not Scroller.freeze). Every cell
+ * is opaque so the pinned column occludes the scrolling body. */
+.rowHead {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-content);
+  /* flex column keeps the (possibly wrapping) name hugging the left */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2); /* a different surface from canvas + head */
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-semi);
+  font-size: var(--t-sm);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal; /* the ONE cell licensed to wrap (large-font @360) */
+  overflow-wrap: anywhere;
+}
+
+/* the game name — the wrapping text line in the frozen column */
+.rowName {
+  overflow-wrap: anywhere;
+}
+
+.headRow .th {
+  background: var(--surface-3); /* licensed as "raised panel / table head" */
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+
+.corner {
+  position: sticky;
+  left: 0;
+  z-index: calc(var(--z-sticky) + 1);
+  background: var(--surface-3);
+}
+
+/* the descriptive (Loại / Nhà cung cấp) cells read muted */
+.meta {
+  color: var(--text-mid);
+}
+
+/* ≥1024 pointer reading aid (not a state) — the whole row lifts on hover */
+@media (min-width: 1024px) {
+  tbody tr:hover .td {
+    background: var(--surface-hover);
+  }
+  tbody tr:hover .rowHead {
+    background: var(--surface-hover);
+  }
+}
+
+/* denser padding on narrow / mid widths */
+@media (max-width: 900px) {
+  .th,
+  .td,
+  .rowHead {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+/* ---- legend — two lines under the table, at the --text-mid AA floor -------- */
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+.legendLine {
+  color: var(--text-mid);
+}
+</code></pre>
+</details>
+<div class="callout warn"><code>.rowHead</code> is a <code>&lt;th&gt;</code> set to <code>display: flex</code>, which takes it out of table-cell layout in some engines (inference: row heights may not match neighbours when names wrap). <code>.legend</code> header says "two lines" — only one line renders. Comment says no sticky thead; correct.</div>
+
+<h3 id="m-rate-cell">RateCell</h3>
+<p><strong>Purpose</strong> — renders a category rate. Flat → a bare "N%". Per-tier → coalesced groups "15% (Hạng 1–2) · 20% (Hạng 3–5)" with only the "(Hạng …)" words in amber. <strong>Source</strong> — <code>src/components/contribution/RateCell.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">flat:    span.value {formatPercent(p)}                 e.g. "100%", "0%"
+perTier: span.groups
+         ├─ (per group i) [i&gt;0] span.sep aria-hidden " · "
+         │                span.group → span.value "{p}%" + " " + span.groupLabel "(Hạng a–b)" | "(Hạng n)"
+         └─ span.srOnly "15 phần trăm từ hạng 1 đến hạng 2; 20 phần trăm từ hạng 3 đến hạng 5"</code></pre>
+<p>Resolution: <code>resolveTierRates</code> fills the 5 tiers (bronze, silver, gold, platinum, diamond) carrying the last authored leg upward (and the lowest leg downward); <code>coalesceAdjacentEqual</code> merges equal neighbours into ordinal ranges. Range label uses an en dash "–".</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.value / .groups</td><td>color #f2f0e4</td><td>base</td></tr>
+<tr><td>.group</td><td>display block (one per line)</td><td>base</td></tr>
+<tr><td>.groupLabel</td><td>color <span class="tok">--caution</span> #f5a623</td><td>base</td></tr>
+<tr><td>.sep</td><td>display none</td><td>base</td></tr>
+<tr><td>.group / .sep</td><td>display inline</td><td>min-width: 768px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/RateCell.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RateCell — a zero is a value, never a state (prototype §3.1). Every numeral
+ * renders in --text-hi at IDENTICAL colour/size/weight for 0% / 15% / 20% /
+ * 100%. The ONLY coloured element is --caution on the ordinal-group WORDS
+ * (which survive greyscale). No --loss / --error / --win / --text-dim /
+ * --brand-accent / --vip-* / --brand-font-display; no raw hex / px / ms.
+ * ==========================================================================*/
+
+/* single value — plain numeral, no container of any kind (also the 0% cell) */
+.value {
+  color: var(--text-hi);
+}
+
+/* per-tier cell — one &lt;td&gt; at every width */
+.groups {
+  color: var(--text-hi);
+}
+
+/* each ordinal group; stacks as its own line &lt;768 */
+.group {
+  display: block;
+}
+
+/* the tier condition — the one coloured element, on WORDS, never the numeral */
+.groupLabel {
+  color: var(--caution);
+}
+
+/* the middot — hidden while the groups stack &lt;768 */
+.sep {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .group {
+    display: inline;
+  }
+  .sep {
+    display: inline;
+  }
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</code></pre>
+</details>
+
+<h3 id="m-pager">Pager</h3>
+<p><strong>Purpose</strong> — numbered page control: ‹ 1 … n−1 n n+1 … last ›. <strong>Source</strong> — <code>src/components/contribution/Pager.tsx</code>, <code>.module.css</code>. Renders nothing when <code>pageCount ≤ 1</code>.</p>
+<pre><code class="lang-txt">nav.pager aria-label="Phân trang danh sách trò chơi"
+├─ button.step aria-label="Trang trước" disabled={page≤1} → Icon chevronLeft
+├─ ol.pages → li per token: number → button.page[.pageOn] aria-label="Trang {n}" aria-current="page"(active) {n}
+│                           "ellipsis" → li.gap aria-hidden "…"
+└─ button.step aria-label="Trang sau" disabled={page≥pageCount} → Icon chevronRight</code></pre>
+<p><code>pageTokens(page, count)</code>: keep {1, count, page−1, page, page+1} within range, sorted; insert "ellipsis" wherever the gap &gt; 1. Rate tab page 1 of 10 → "1 2 … 10"; page 5 → "1 … 4 5 6 … 10".</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.pager</td><td>flex; center; justify center; wrap; gap 8px; border-top 1px solid rgba(212,175,55,0.55); padding 12px; min-width 0</td></tr>
+<tr><td>.step</td><td>inline-flex center; 44×44px; flex 0 0 auto; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; #f2f0e4; pointer; transition background-color/transform 200ms</td></tr>
+<tr><td>.step:hover:not(:disabled)</td><td>bg #262626; scale(1.05)</td></tr>
+<tr><td>.step:disabled</td><td>bg <span class="tok">--surface-disabled</span> #303030; #888888; cursor not-allowed</td></tr>
+<tr><td>.pages</td><td>flex; center; wrap; justify center; gap 4px; no list styling</td></tr>
+<tr><td>.page</td><td>inline-flex center; min-width 44px; height 44px; padding 0 8px; transparent; border 1px solid transparent; radius 8px; #888888; num font; tabular-nums; 14px; 600; pointer; transition background-color/transform 200ms; hover bg #262626 #f2f0e4 scale(1.05)</td></tr>
+<tr><td>.pageOn</td><td>bg #212121; border-color rgba(212,175,55,0.55); #f2f0e4</td></tr>
+<tr><td>.gap</td><td>inline-flex center; min-width 16px; height 44px; #888888; 14px</td></tr>
+<tr><td>focus-visible (.step, .page)</td><td>outline 2px solid #6ea8ff; offset 2px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/Pager.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * Pager — the numbered pager, rendered INSIDE the table frame but OUTSIDE the
+ * Scroller (it never scrolls sideways); a top hairline separates it from the
+ * last row. Neutral chrome only — the active page reads as a raised --surface-3
+ * chip (NOT gold: gold is reserved, and no rate value lives here anyway). Tokens
+ * only — no --loss / --error / --win / --text-dim / --brand-accent / --vip-* /
+ * --brand-font-display; no raw hex / px / ms.
+ * ==========================================================================*/
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-top: 1px solid var(--border);
+  padding: var(--space-3);
+  min-width: 0;
+}
+
+/* Prev / Next — a 44×44 square step */
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex: 0 0 auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-hi);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+/* uniform hover: EVERY button in this pager scales 1.05 — the active page is
+ * not scaled differently from an inactive one (30-PM-DESIGN-SYSTEM §B1). */
+.step:hover:not(:disabled) {
+  background: var(--surface-hover);
+  transform: scale(1.05);
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.step:disabled {
+  background: var(--surface-disabled);
+  color: var(--text-mid);
+  cursor: not-allowed;
+}
+
+/* the numbered page list */
+.pages {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-mid);
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+.page:hover {
+  background: var(--surface-hover);
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+
+.page:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* the active page — a raised, bordered chip; never gold */
+.pageOn {
+  background: var(--surface-3);
+  border-color: var(--border);
+  color: var(--text-hi);
+}
+
+/* the ellipsis — inert, muted */
+.gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-4);
+  height: var(--tap-min);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .page {
+    transition: none;
+  }
+  /* absent, not instant */
+  .step:hover:not(:disabled),
+  .page:hover {
+    transform: none;
+  }
+}
+</code></pre>
+</details>
+<div class="callout warn">Changing page does not scroll the table back into view; with 25 rows the pager sits at the bottom and the new page renders above it (inference: user stays scrolled at the pager). Pages are not deep-linkable (state only).</div>
+
+<h3 id="m-table-foot">TableFoot</h3>
+<p><code>src/components/contribution/TableFoot.tsx</code> — inside the frame, under the pager.</p>
+<pre><code class="lang-txt">div.foot
+├─ div.notes
+│  ├─ p.line "Ở mọi trò chơi trong bảng (kể cả mức 0%), tiền thắng và tiền thua vẫn được thanh toán bình thường."
+│  ├─ p.line "Một số cược không được tính dù trò chơi có tỷ lệ — ví dụ kèo thể thao dưới 1.50, cược bị huỷ hoặc rút sớm."
+│  └─ p.line "Tỷ lệ có thể thay đổi, chúng tôi báo trước 30 ngày."
+└─ p.stamp data-numeric "Cập nhật 09/08/2026 09:30 · Phiên bản 26.8"</code></pre>
+<p>Glosses: winnings and losses settle normally in every game incl. 0% · some bets don't count even where the game has a rate (e.g. sports odds under 1.50, cancelled or cashed-out bets) · rates may change, 30 days' notice · "Updated … · Version …".</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.foot</td><td>border-top 1px solid rgba(212,175,55,0.55); bg #1a1a1a; padding 12px 16px; #888888; 14px; lh 1.5; flex column; gap 12px</td><td>base</td></tr>
+<tr><td>.notes</td><td>flex column; gap 4px; min-width 0</td><td>base</td></tr>
+<tr><td>.line / .stamp</td><td>#888888</td><td>base</td></tr>
+<tr><td>.foot</td><td>row; space-between; align flex-start; gap 24px; .stamp nowrap right-aligned</td><td>min-width: 768px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/TableFoot.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * TableFoot — inside the table frame border (--surface-2, top hairline). All
+ * copy at the --text-mid AA floor / --t-sm. Stacks &lt;768; notes-left + stamp-
+ * right ≥768. The stamp carries data-numeric (tabular numerals).
+ * ==========================================================================*/
+
+.foot {
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.line {
+  color: var(--text-mid);
+}
+
+.stamp {
+  color: var(--text-mid);
+}
+
+@media (min-width: 768px) {
+  .foot {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-5);
+  }
+  .stamp {
+    white-space: nowrap;
+    text-align: right;
+  }
+}
+</code></pre>
+</details>
+<div class="callout warn">The sport caveat uses "huỷ" while elsewhere the app writes "Hủy".</div>
+
+<h3 id="m-rate-table-skeleton">RateTableSkeleton</h3>
+<p><code>src/components/contribution/RateTableSkeleton.tsx</code> (prop <code>rows = 8</code>). Used only by <code>app/cuoc-hop-le/loading.tsx</code>.</p>
+<pre><code class="lang-txt">div.wrap role=status aria-busy=true
+├─ span.srOnly "Đang tải bảng tỷ lệ"
+├─ div.filters aria-hidden → Skeleton block height=var(--tap-bar) width 100%
+│                            + div.rail → Skeleton pill height=var(--tap-min) width 72 / 88 / 64 / 120 / 80
+└─ div.frame aria-hidden
+   ├─ div.row.head → span.cellName (Skeleton 60%) + span.cellRate (Skeleton 50%)
+   └─ div.row ×8   → span.cellName (Skeleton width `${55 + ((i*7) % 35)}%`) + span.cellRate (Skeleton 40%)</code></pre>
+<p>Name widths for i = 0…7: 55%, 62%, 69%, 76%, 83%, 55%, 62%, 69%.</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.wrap / .filters</td><td>flex column gap 16px / flex column gap 12px</td><td>base</td></tr>
+<tr><td>.rail</td><td>flex; gap 8px; overflow hidden</td><td>base</td></tr>
+<tr><td>.frame</td><td>border 1px solid rgba(212,175,55,0.55); radius 16px; bg #0a0a0a; overflow hidden</td><td>base</td></tr>
+<tr><td>.row</td><td>flex; gap 16px; center; padding 12px 16px; border-bottom hairline (last none); 14px</td><td>base</td></tr>
+<tr><td>.head</td><td>bg #212121</td><td>base</td></tr>
+<tr><td>.cellName / .cellRate</td><td>flex 1 1 60% / flex 1 1 40%; min-width 0</td><td>base</td></tr>
+<tr><td>.row</td><td>padding 8px 12px</td><td>max-width: 900px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/contribution/RateTableSkeleton.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RateTableSkeleton — mirrors the real table's frame + row metrics (prototype
+ * §4.7) so the real data swaps in with no layout shift. Padding, hairlines and
+ * radii use the SAME tokens as RateTable, so heights match at every width.
+ * Tokens only — no raw hex / px / ms.
+ * ==========================================================================*/
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rail {
+  display: flex;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--t-sm);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.head {
+  background: var(--surface-3);
+}
+
+.cellName {
+  flex: 1 1 60%;
+  min-width: 0;
+}
+
+.cellRate {
+  flex: 1 1 40%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .row {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</code></pre>
+</details>
+<div class="callout warn">Skeleton shows a 2-cell row while the real table has 4 columns, 5 filter pills while the real UI has 2 dropdowns + 4 pills, and no tab strip — so the "no layout shift" claim does not hold.</div>
+</section>
+

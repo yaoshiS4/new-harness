@@ -1,0 +1,200 @@
+<section>
+<h2 id="r-vip-privilege-comparison">PrivilegeComparison (member)</h2>
+<h4>1. Purpose</h4><p>Two benefit cards — your current tier and a target tier — listing the four privileges with ✓/🔒 and a gold "MỚI" tag on newly gained ones.</p>
+<h4>2. Source</h4><p><code>src/components/vip/PrivilegeComparison.tsx</code>, <code>PrivilegeComparison.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">div.wrap
+  article.card
+    header.head
+      span.gem  style.background = left.acc   aria-hidden
+      h3.cardTitle style.color = left.acc     left tier name
+    ul.rows  (renderRows(left))
+  div.arrow aria-hidden  "→"
+  article.card.cardTarget
+    header.head  gem + h3 (right tier)
+    ul.rows  (renderRows(right, comparedTo=left))
+    targetAboveCurrent &amp;&amp; footer.footer
+      span.lock aria-hidden "🔒"
+      "{needWager} {right.unlock}"
+renderRows: for PRIVILEGES idx:
+  li.row[.rowLocked if !unlocked][.rowNew if isNew]
+    span.marker.(check|lock) aria-hidden  "✓" | "🔒"
+    span.rowLabel   privilege label
+    isNew &amp;&amp; span.newTag  "MỚI"
+  unlocked = idx &lt; tier.perks; isNew = comparedTo &amp;&amp; idx &gt;= comparedTo.perks &amp;&amp; unlocked</code></pre>
+<h4>4. Props</h4><p>tiers, selected, currentTierIndex (2), currentLevel (7, ignored — <code>void currentLevel</code>), lang.</p>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.wrap</td><td>flex; align stretch; gap 16px; wrap</td><td></td></tr>
+<tr><td>.card</td><td>flex 1 1 260px; flex column; padding 16px; radius 16px; background #17140d; border 1px solid rgba(255,255,255,.07)</td><td></td></tr>
+<tr><td>.cardTarget</td><td>border-color rgba(227,193,90,.45)</td><td></td></tr>
+<tr><td>.head</td><td>flex; centre; gap 8px; margin-bottom 12px; padding-bottom 12px; border-bottom 1px solid rgba(255,255,255,.07)</td><td></td></tr>
+<tr><td>.gem</td><td>20×20px; flex none; radius 8px; border 1px solid rgba(11,10,7,.40); rotate(45deg); background inline acc</td><td></td></tr>
+<tr><td>.cardTitle</td><td>Montserrat 18px 700; letter-spacing .03em; uppercase; colour inline acc</td><td></td></tr>
+<tr><td>.rows</td><td>no list style; flex column; gap 4px</td><td></td></tr>
+<tr><td>.row</td><td>flex; centre; gap 8px; padding 8px 0; #c9c3b4; 14px</td><td></td></tr>
+<tr><td>.rowLocked</td><td>colour #8b96ad</td><td></td></tr>
+<tr><td>.rowNew</td><td>colour #e3c15a; 600</td><td></td></tr>
+<tr><td>.marker</td><td>inline-grid centred; 20×20px; radius pill; 12px</td><td></td></tr>
+<tr><td>.check</td><td>colour #34d399; background rgba(52,211,153,.16)</td><td></td></tr>
+<tr><td>.lock</td><td>colour #8b96ad</td><td></td></tr>
+<tr><td>.newTag</td><td>margin-left auto; padding 2px 8px; radius pill; background #e3c15a; colour #2e2404; 12px 700; letter-spacing .06em</td><td></td></tr>
+<tr><td>.arrow</td><td>align-self center; #e3c15a; 32px; line-height 1</td><td>≤900: rotate(90deg)</td></tr>
+<tr><td>.footer</td><td>flex; centre; gap 8px; margin-top 12px; padding-top 12px; border-top 1px solid rgba(255,255,255,.07); #8b96ad; 14px</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim PrivilegeComparison.module.css</summary><pre><code class="lang-css">/* Member privilege comparison — current tier → upgrade target. */
+.wrap {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* Both cards share ONE flex basis and ONE padding, so the upgrade target is
+ * never physically larger than the current tier (ruling B1) — it is marked by
+ * BORDER COLOUR and by its position on the right of the arrow, nothing else. */
+.card {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-pad-sm);
+  border-radius: var(--radius-card);
+  background: var(--vip-panel-bg);
+  border: 1px solid var(--vip-hairline);
+}
+
+/* the right-hand (upgrade) card: a gold hairline. No gradient (banned on
+ * cards), no 1px shadow ring (banned outright). */
+.cardTarget {
+  border-color: color-mix(in srgb, var(--vip-gold-mid) 45%, transparent);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--vip-hairline);
+}
+
+/* the gem's inner bevel was an inset shadow — it is a real 1px border now
+ * (box-sizing: border-box globally, so the 20px footprint is unchanged). */
+.gem {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--vip-radius-gem);
+  border: 1px solid color-mix(in srgb, var(--vip-page-bg) 40%, transparent);
+  transform: rotate(45deg);
+}
+
+.cardTitle {
+  font-family: var(--brand-font-display);
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--vip-text-secondary);
+  font-size: var(--t-sm);
+}
+
+.rowLabel {
+  min-width: 0;
+}
+
+.rowLocked {
+  color: var(--vip-text-muted);
+}
+
+.rowNew {
+  color: var(--vip-gold-mid);
+  font-weight: var(--weight-semi);
+}
+
+.marker {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  font-size: var(--t-micro);
+}
+
+.check {
+  color: var(--vip-positive);
+  background: color-mix(in srgb, var(--vip-positive) 16%, transparent);
+}
+
+.lock {
+  color: var(--vip-text-muted);
+}
+
+.newTag {
+  margin-left: auto;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--vip-gold-mid);
+  color: var(--vip-gold-ink);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+}
+
+.arrow {
+  align-self: center;
+  color: var(--vip-gold-mid);
+  font-size: var(--t-display);
+  line-height: 1;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--vip-hairline);
+  color: var(--vip-text-muted);
+  font-size: var(--t-sm);
+}
+
+@media (max-width: 900px) {
+  .arrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+}</code></pre></details>
+<h4>6. States (default selection, current = Vàng)</h4>
+<table><thead><tr><th>Selected</th><th>Right card</th><th>Right rows (bnPoints, bnShop, bnEvent, bnHost)</th><th>Footer</th></tr></thead><tbody>
+<tr><td>Đồng (0)</td><td>Đồng</td><td>✓ 🔒 🔒 🔒 (no MỚI)</td><td>none</td></tr>
+<tr><td>Bạc (1)</td><td>Bạc</td><td>✓ ✓ 🔒 🔒</td><td>none</td></tr>
+<tr><td>Vàng (2, default)</td><td>Bạch Kim (current + 1)</td><td>✓ ✓ ✓ MỚI on bnEvent, 🔒 bnHost</td><td>🔒 Cược tuần 1,000,000</td></tr>
+<tr><td>Bạch Kim (3)</td><td>Bạch Kim</td><td>✓ ✓ ✓(MỚI) 🔒</td><td>🔒 Cược tuần 1,000,000</td></tr>
+<tr><td>Kim Cương (4)</td><td>Kim Cương</td><td>✓ ✓ ✓(MỚI) ✓(MỚI)</td><td>🔒 Cược tuần 3,000,000</td></tr>
+</tbody></table>
+<p>Left card is always Vàng: ✓ Đổi điểm ưu đãi, ✓ Chọn quà cửa hàng, 🔒 Ưu tiên sự kiện, 🔒 Quản lý VIP riêng.</p>
+<div class="callout warn">Header comment claims "the right card is ALWAYS an upgrade on own tier"; selecting Đồng/Bạc shows a LOWER tier on the right (gold-bordered "target" card) next to the arrow.</div>
+<h4>7. Motion</h4><p>None.</p>
+<h4>8. Copy</h4><p>"✓", "🔒" (emoji), "→", "MỚI"/"NEW", privilege labels, "Cược tuần {unlock}".</p>
+<h4>9–10. Data / a11y</h4><p>TIERS + PRIVILEGES. Markers aria-hidden; locked state is conveyed to AT only by… nothing (inference: the row text is identical for locked/unlocked).</p>
+</section>
+

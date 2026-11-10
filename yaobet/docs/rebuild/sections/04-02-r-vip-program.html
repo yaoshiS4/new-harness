@@ -1,0 +1,128 @@
+<section>
+<h2 id="r-vip-program">VipProgram (+ language toggle)</h2>
+<h4>1. Purpose</h4><p>The /vip page root: a warm-black luxury panel with a VI/EN toggle that holds the hero, tier deck, privileges, level table and FAQ.</p>
+<h4>2. Source</h4><p><code>src/components/vip/VipProgram.tsx</code>, <code>VipProgram.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">div.vipPalette
+  div.inner
+    div.langToggle  role=group aria-label="Language"
+      button.langBtn[.langBtnActive]  "VI"   aria-pressed
+      button.langBtn[.langBtnActive]  "EN"   aria-pressed
+    allowed ? VipHeroMember(user=CURRENT_USER, tiers, lang) : VipHeroGuest(lang, onRegister, onLogin)
+    section.section
+      VipSectionHeading  copy.allTiers
+      TierDeck(tiers, selected=vipSel, onSelect, currentTierIndex = allowed ? 2 : null, lang)
+    allowed
+      ? section.section  VipSectionHeading copy.tierSectionTitle + PrivilegeComparison(selected=vipSel, currentTierIndex=2, currentLevel=7)
+      : section.section  VipSectionHeading copy.tierMatrixTitle  + PrivilegeMatrix(selected=vipSel)
+    section.section
+      VipSectionHeading copy.lvlSectionTitle
+      LevelTable(tier=TIERS[vipSel], selectedTierIndex=vipSel, currentTierIndex = allowed?2:null, currentLevel = allowed?7:null)
+      span[hidden aria-hidden] {vipLvl}        (dead state, see Unused)
+    section.section
+      VipSectionHeading copy.faqTitle
+      VipFaq(items=FAQ_ITEMS, lang)</code></pre>
+<h4>4. Props / variants</h4><p>No props. State: <code>vipSel</code> (default 2), <code>vipLvl</code> (default min(7+1,10) = 8), <code>lang</code> ("vi"). <code>onSelect(i)</code>: vipSel = i; vipLvl = (i === 2) ? 8 : 1.</p>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th></tr></thead><tbody>
+<tr><td>.vipPalette</td><td>background <span class="tok">--vip-page-bg</span> #0b0a07; color <span class="tok">--vip-text-primary</span> #e6ebf5; font-family <span class="tok">--brand-font-body</span>; min-height 100%; padding 24px 16px 48px (<span class="tok">--space-5</span> <span class="tok">--gutter</span> <span class="tok">--space-8</span>); flex column; gap 32px; overflow-x hidden</td></tr>
+<tr><td>.inner</td><td>width 100%; max-width <span class="tok">--frame-w</span> 1424px (≤900px: 100%); margin-inline auto; flex column; gap 32px</td></tr>
+<tr><td>.section</td><td>flex column; gap 16px</td></tr>
+<tr><td>.langToggle</td><td>align-self flex-end; inline-flex; gap 4px; border 1px solid <span class="tok">--vip-hairline</span> rgba(255,255,255,.07); radius pill; padding 4px</td></tr>
+<tr><td>.langBtn</td><td>min-height 44px; padding 0 12px; border 0; radius pill; background transparent; color <span class="tok">--vip-text-muted</span> #8b96ad; font inherit (16px body); cursor pointer</td></tr>
+<tr><td>.langBtnActive (and :hover)</td><td>background <span class="tok">--vip-gold-mid</span> #e3c15a; color <span class="tok">--vip-gold-ink</span> #2e2404; weight 600</td></tr>
+</tbody></table>
+<details><summary>Verbatim VipProgram.module.css</summary><pre><code class="lang-css">/* Luxury VIP program — page-root palette wrapper + section rhythm (stub).
+ * The .vipPalette wrapper scopes the warm-near-black + gold palette to /vip. */
+
+.vipPalette {
+  background: var(--vip-page-bg);
+  color: var(--vip-text-primary);
+  font-family: var(--brand-font-body);
+  min-height: 100%;
+  padding: var(--space-5) var(--gutter) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  overflow-x: hidden;
+}
+
+.inner {
+  width: 100%;
+  max-width: var(--frame-w);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* small deferrable EN/VI toggle */
+.langToggle {
+  align-self: flex-end;
+  display: inline-flex;
+  gap: var(--space-1);
+  border: 1px solid var(--vip-hairline);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1);
+}
+
+.langBtn {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--vip-text-muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.langBtn:hover {
+  transform: scale(1.05);
+  color: var(--vip-gold-end);
+}
+
+.langBtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* SELECTED, not focused — a solid brand fill. The 3-stop --vip-gold-grad is
+ * banned on a button, and --focus-ring blue would be banned here outright. */
+.langBtnActive,
+.langBtnActive:hover {
+  background: var(--vip-gold-mid);
+  color: var(--vip-gold-ink);
+  font-weight: var(--weight-semi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .langBtn,
+  .langBtn:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .inner {
+    max-width: 100%;
+  }
+}</code></pre></details>
+<h4>6. States</h4><p>langBtn hover: scale(1.05), colour #f6e39a. Focus-visible: outline 2px solid <span class="tok">--focus-ring</span> #6ea8ff, offset 2px. Active button keeps gold fill on hover (and also scales 1.05). Logged-out vs logged-in: see structure.</p>
+<h4>7. Motion</h4><p>langBtn: transform/background/color 200ms <span class="tok">--ease-standard</span>. Reduced motion: transform none.</p>
+<h4>8. Copy</h4><p>"VI", "EN" (uppercased lang codes); aria-label "Language" (English, not localised). Section headings: see copy bag.</p>
+<h4>9. Data</h4><p><code>TIERS</code>, <code>CURRENT_USER</code>, <code>CUR</code>, <code>CUR_LEVEL</code>, <code>FAQ_ITEMS</code>, <code>getVipCopy(lang)</code> from <code>@/lib/vip</code>.</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Lang toggle re-renders the whole subtree in the chosen language (FAQ, tier names, labels). Toggle state is not persisted (resets to VI on reload). Guest CTAs both call <code>promptAuth()</code> which opens the auth modal in <strong>login</strong> mode.</p>
+<div class="callout warn">"Đăng ký ngay" (register) opens the auth modal in login mode — <code>onRegister</code> and <code>onLogin</code> are the same call (<code>useRequireAuth().promptAuth()</code> → <code>openAuthModal({ mode: "login" })</code>).</div>
+</section>
+

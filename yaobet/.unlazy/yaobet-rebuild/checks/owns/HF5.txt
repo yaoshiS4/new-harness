@@ -1,0 +1,3 @@
+.unlazy/yaobet-rebuild/genplan.py
+.unlazy/yaobet-rebuild/checks/I1.sh
+.unlazy/yaobet-rebuild/checks/boxes.json

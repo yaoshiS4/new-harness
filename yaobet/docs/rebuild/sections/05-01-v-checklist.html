@@ -1,0 +1,114 @@
+<section>
+<h2 id="v-checklist">Acceptance checklist</h2>
+<p>A rebuild passes only when every item below holds. Run them in order; later checks assume earlier ones pass.</p>
+<h3 id="v-static">1. Static checks</h3>
+<ol>
+<li><code>npm run lint:tokens</code> exits 0, and <code>npm run lint:tokens:self-test</code> exits 0 (the self-test seeds violations and must detect them).</li>
+<li><code>npm run lint</code> and <code>npx tsc --noEmit</code> exit 0.</li>
+<li><code>npm run build</code> succeeds and lists every route in the <a href="#i-routes">route inventory</a>.</li>
+<li>No CSS module reads a raw ramp variable (<code>--gold-*</code>, <code>--cta*</code>, <code>--font-body</code>, <code>--font-num</code>, <code>--text-on-gold</code>); components read semantic tokens only. The lint enforces this as assertion A2.</li>
+<li>Every <code>[data-brand]</code> block declares only <code>--brand-*</code> variables (assertion A1), and <span class="tok">--focus-ring</span>, <span class="tok">--win</span>, <span class="tok">--loss</span>, <span class="tok">--error</span> are standalone constants (assertion A3).</li>
+</ol>
+<h3 id="v-routes">2. Routes</h3>
+<ol>
+<li>Each URL in the route inventory returns 200 in the dev server, signed out and signed in, except the four redirect routes below, which answer 307 from <code>redirect()</code>.</li>
+<li><code>/bao-mat</code> and <code>/lich-su</code> land on <code>/tai-khoan</code>; <code>/hoan-tra</code> lands on <code>/khuyen-mai</code>; <code>/game-han-che</code> lands on <code>/cuoc-hop-le?tab=han-che</code> with the restricted tab selected.</li>
+<li>All 9 verticals render under <code>/[vertical]</code>; any other segment renders the vertical not-found page.</li>
+<li><code>/khuyen-mai/pr1</code> to <code>pr8</code> render; an unknown id behaves as the promotion section specifies.</li>
+<li>Routes that have a <code>loading.tsx</code> show their skeleton while loading.</li>
+</ol>
+<h3 id="v-visual">3. Visual comparison</h3>
+<ol>
+<li>Capture each route at 375 × 812 and 1440 × 900, device pixel ratio 1, reduced motion, full page, in both <code>guest</code> and <code>tiered</code> states (recipe below).</li>
+<li>Compare against the <a href="#g-gallery">reference screenshots</a> with the same file name. Section order, column count, spacing rhythm, colour, type weight and wrapping must match. Small differences in mock-randomised values are acceptable only where the data section says the value is random or time-based.</li>
+<li>Check the intermediate widths 768 and 1024 against each route's composition notes, especially the breakpoints where the header, category rail, bottom tab bar and member sidebar change.</li>
+<li><code>/vip</code> uses the luxury palette, not the default obsidian surfaces.</li>
+</ol>
+<h3 id="v-copy">4. Copy</h3>
+<ol>
+<li>Every Vietnamese string in the copy tables appears verbatim, with diacritics, case and punctuation unchanged.</li>
+<li>No Vietnamese glyph falls back to a system font: fonts load with the <code>vietnamese</code> subset (check <code>ữ</code>, <code>ặ</code>, <code>ở</code> in headings and buttons).</li>
+<li>Money and numbers use the formatters from <a href="#f-lib">Lib and mock data</a>, never ad-hoc formatting.</li>
+</ol>
+<h3 id="v-states">5. States, motion and accessibility</h3>
+<ol>
+<li>For every component, exercise each state listed in its States row: hover, focus-visible, active, selected, disabled, loading, empty, error, signed out and signed in. The style deltas must match.</li>
+<li>Keyboard: every interactive element is reachable with Tab, shows the focus ring, and modals and sheets trap focus and close on Escape as their sections specify.</li>
+<li>Motion: durations and easing match the <a href="#f-motion">motion tokens</a>; with <code>prefers-reduced-motion: reduce</code> the reduced behaviour described for each animation applies.</li>
+<li>Mock auth: every fresh load starts in <code>tiered</code>, register in the auth modal leads to <code>level-0</code>, log in leads to <code>tiered</code>, a reload returns to <code>tiered</code>, and the <code>DEV</code> toggle is absent from a production build.</li>
+</ol>
+<h3 id="v-capture">Screenshot capture recipe</h3>
+<p>The reference set was produced with Playwright against <code>next dev -p 3107</code>. Each state is set through the home-page <code>DEV</code> toggle (cycled until its label reads <code>Hội viên</code> or <code>Khách</code>), then routes are visited client-side so the in-memory session survives; a final check confirms the state did not drift. Use the same script to capture your rebuild, then compare file by file.</p>
+<details><summary>Capture script (Node, ESM)</summary>
+<pre><code class="lang-tsx">import fs from 'fs';
+import { chromium } from 'playwright';
+
+const BASE = 'http://localhost:3107';
+const OUT = './shots';
+const ALL = ['/', '/casino', '/slots', '/sports', '/khuyen-mai', '/khuyen-mai/pr1',
+  '/tai-khoan', '/vi-tien', '/tin-nhan', '/gioi-thieu', '/dai-ly', '/bao-mat',
+  '/vip', '/tier', '/cau-lac-bo', '/cua-hang', '/ve-so', '/bo-suu-tap', '/bo-suu-tap/cua-toi',
+  '/cuoc-hop-le', '/game-han-che', '/hoan-tra', '/lich-su', '/ho-tro', '/tro-giup',
+  '/tai-app', '/phong-cach', '/dev/collection-ports'];
+const GUEST = ['/', '/khuyen-mai', '/tai-khoan', '/vi-tien', '/vip', '/cua-hang', '/ve-so', '/gioi-thieu'];
+const PLAN = [{ state: 'tiered', label: 'Hội viên', routes: ALL }, { state: 'guest', label: 'Khách', routes: GUEST }];
+const VIEWPORTS = [{ name: 'm375', width: 375, height: 812 }, { name: 'd1440', width: 1440, height: 900 }];
+const slug = (r) =&gt; (r === '/' ? 'home' : r.slice(1).replace(/\//g, '__'));
+const log = (...a) =&gt; console.log('[shots]', ...a);
+
+async function setState(p, label) {
+  await p.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 60000 });
+  await p.waitForTimeout(800);
+  await p.getByRole('button', { name: /chuyển trạng thái đăng nhập/ }).click();
+  const cycle = p.locator('button[class*="cycle"]').first();
+  const cur = cycle.locator('[class*="stateLabel"]');
+  for (let i = 0; i &lt; 4 &amp;&amp; (await cur.innerText()).trim() !== label; i++) { await cycle.click(); await p.waitForTimeout(250); }
+  const got = (await cur.innerText()).trim();
+  if (got !== label) throw new Error(`state ${got} != ${label}`);
+  await p.getByRole('group', { name: /Trạng thái đăng nhập/ }).getByRole('button', { name: 'Đóng' }).click();
+  await p.waitForTimeout(300);
+  return got;
+}
+
+async function checkState(p, label) {
+  await p.evaluate(() =&gt; window.next.router.push('/'));
+  await p.waitForURL((u) =&gt; u.pathname === '/', { timeout: 30000 });
+  await p.waitForTimeout(600);
+  await p.getByRole('button', { name: /chuyển trạng thái đăng nhập/ }).click();
+  const got = (await p.locator('[class*="stateLabel"]').first().innerText()).trim();
+  await p.getByRole('group', { name: /Trạng thái đăng nhập/ }).getByRole('button', { name: 'Đóng' }).click();
+  return got === label ? 'ok' : `DRIFT ${got}`;
+}
+
+const b = await chromium.launch();
+const manifest = [];
+try {
+  for (const vp of VIEWPORTS) {
+    for (const plan of PLAN) {
+      const ctx = await b.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+      const p = await ctx.newPage();
+      log(vp.name, 'state set:', await setState(p, plan.label));
+      for (const r of plan.routes) {
+        try {
+          await p.evaluate((route) =&gt; window.next.router.push(route), r);
+          await p.waitForURL((u) =&gt; u.pathname === r, { timeout: 20000 }).catch(() =&gt; {});
+          await p.waitForLoadState('networkidle', { timeout: 60000 });
+          await p.waitForTimeout(1800);
+          const file = `${vp.name}-${plan.state}-${slug(r)}.jpg`;
+          await p.screenshot({ path: `${OUT}/${file}`, fullPage: true, type: 'jpeg', quality: 72 });
+          manifest.push({ route: r, state: plan.state, viewport: vp.name, file, landed: new URL(p.url()).pathname + new URL(p.url()).search });
+          log('saved', file, '-&gt;', p.url());
+        } catch (e) { log('FAIL', vp.name, plan.state, r, e.message); }
+      }
+      log(vp.name, plan.state, 'final check:', await checkState(p, plan.label));
+      await ctx.close();
+    }
+  }
+} finally {
+  await b.close();
+  fs.writeFileSync(`${OUT}/manifest.json`, JSON.stringify(manifest, null, 2));
+  log('DONE', manifest.length);
+}</code></pre>
+</details>
+<div class="callout note"><p>The cycle button is located by a class name containing <code>cycle</code>. CSS Modules hash class names, so keep the module class named <code>cycle</code> in the dev toggle's stylesheet, or change the selector. Redirect routes are captured at their destination URL.</p></div>
+</section>

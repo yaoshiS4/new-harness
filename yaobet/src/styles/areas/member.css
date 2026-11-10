@@ -1,0 +1,41 @@
+/* ============================================================================
+ * Member area partial — the member-local keyframes. Plain rules only; the
+ * components layer comes from the import line in globals.css.
+ * ==========================================================================*/
+
+/* MemberSidebar progress: the "alive" pulse on the dot and the loading shimmer
+ * on the skeleton groove — declared under the same no-preference query as the
+ * original; the utilities that run them are motion-safe: only. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes pulseDot {
+    from {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.4;
+    }
+    to {
+      transform: translate(-50%, -50%) scale(1.1);
+      opacity: 1;
+    }
+  }
+  @keyframes progressShimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* MessageCenter unread card: the 3px left accent edge (the faint wash is a
+ * utility on the same element). */
+.member-message-center-item-unread::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent);
+}

@@ -1,0 +1,262 @@
+<section>
+<h2 id="r-vip-hero-member">VipHeroMember</h2>
+<h4>1. Purpose</h4><p>Logged-in /vip hero: level ring, member name, tier pill, points balance and a wager progress bar to the next tier.</p>
+<h4>2. Source</h4><p><code>src/components/vip/VipHeroMember.tsx</code>, <code>VipHeroMember.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">section.hero
+  div.top
+    div.identity
+      LevelRing(level=7, percent=72, levelWord=copy.levelWord)
+      div.who
+        h1.name                      "Jordan Rivera"
+        span.tierPill style.background = tier.acc (#e3c15a)
+          span.crown aria-hidden     "♛"
+          tierName                    (uppercased by CSS → "VÀNG")
+    div.points
+      div.pointsLabel               copy.statPoints  ("ĐIỂM" via uppercase)
+      div.pointsValue               "86,880"
+  nextTier &amp;&amp;
+  div.progressBlock
+    div.progressHead
+      span.progressLabel            copy.progressLabel
+      span.progressPct              "72%"
+    div.trackRow
+      div.track role=progressbar aria-valuenow=72 min=0 max=100 aria-label=progressLabel
+        div.fill  style.width = 72%
+        span.knob style.left  = 72%
+      span.nextChip style.borderColor = color-mix(in srgb, nextTier.acc 55%, transparent), color = nextTier.acc
+        nextName  ("BẠCH KIM")
+        span.chevron aria-hidden  "›"
+    div.caption                     "33,120 điểm để lên Bạch Kim"</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>user</td><td>CurrentUser</td><td>name, tier/level, points, pct, pointsToNextTier, nextTierIndex</td></tr>
+<tr><td>tiers</td><td>VipTierDef[]</td><td>accent lookup</td></tr>
+<tr><td>lang</td><td>Lang</td><td>copy</td></tr></tbody></table>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.hero</td><td>relative; overflow hidden; flex column; gap 24px; padding 24px; radius 16px; background <code>radial-gradient(120% 140% at 82% -20%, rgba(227,193,90,.16) 0%, transparent 55%), radial-gradient(90% 120% at 4% 0%, rgba(154,123,30,.14) 0%, transparent 48%), #17140d</code>; border 1px solid color-mix(in srgb, #e3c15a 22%, rgba(255,255,255,.07))</td><td></td></tr>
+<tr><td>.top</td><td>flex wrap; align center; gap 24px</td><td></td></tr>
+<tr><td>.identity</td><td>flex; align center; gap 16px</td><td></td></tr>
+<tr><td>.who</td><td>flex column; gap 8px</td><td></td></tr>
+<tr><td>.name</td><td>Montserrat 24px 700; colour #e6ebf5; line-height 1.1</td><td></td></tr>
+<tr><td>.tierPill</td><td>inline-flex; gap 4px; align-self flex-start; padding 4px 12px; radius pill; colour #2e2404; 700; 14px; letter-spacing 0.04em; uppercase; background inline tier.acc</td><td></td></tr>
+<tr><td>.crown</td><td>16px; line-height 1</td><td></td></tr>
+<tr><td>.points</td><td>margin-left auto; text-align right</td><td>≤900: margin-left 0; text-align left; width 100%</td></tr>
+<tr><td>.pointsLabel</td><td>#8b96ad; 14px; uppercase; letter-spacing 0.1em</td><td></td></tr>
+<tr><td>.pointsValue</td><td>Montserrat 40px (<span class="tok">--t-hero</span>) 700; line-height 1.1; #e3c15a</td><td></td></tr>
+<tr><td>.progressBlock</td><td>flex column; gap 12px</td><td></td></tr>
+<tr><td>.progressHead</td><td>flex; baseline; space-between; gap 12px</td><td></td></tr>
+<tr><td>.progressLabel</td><td>#c9c3b4; 14px</td><td></td></tr>
+<tr><td>.progressPct</td><td>Montserrat 700 20px #e3c15a</td><td></td></tr>
+<tr><td>.trackRow</td><td>flex; align center; gap 12px</td><td>≤900: flex-wrap wrap</td></tr>
+<tr><td>.track</td><td>relative; flex 1 1 auto; height 10px; radius pill; background color-mix(in srgb, #9a7b1e 12%, #0f0c07) = #20190a; border 1px solid rgba(255,255,255,.07)</td><td></td></tr>
+<tr><td>.fill</td><td>absolute; inset 0 auto 0 0; radius pill; background #e3c15a; width inline</td><td></td></tr>
+<tr><td>.knob</td><td>absolute; top 50%; 18×18px; radius pill; background #f6e39a; border 2px solid #2e2404; translate(-50%,-50%); left inline</td><td></td></tr>
+<tr><td>.nextChip</td><td>inline-flex; gap 4px; flex none; padding 4px 12px; radius pill; border 1px solid (inline: next accent @55%); background color-mix(in srgb, #141019 70%, transparent) = rgba(20,16,25,.70); 14px; 600; uppercase; letter-spacing 0.04em; nowrap; colour inline next accent</td><td>≤900: order −1; align-self flex-end</td></tr>
+<tr><td>.chevron</td><td>16px; line-height 1</td><td></td></tr>
+<tr><td>.caption</td><td>#8b96ad; 14px</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim VipHeroMember.module.css</summary><pre><code class="lang-css">/* Member VIP hero — gold-tinted panel with radial glow. */
+.hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--card-pad);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(
+      120% 140% at 82% -20%,
+      color-mix(in srgb, var(--vip-gold-mid) 16%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 120% at 4% 0%,
+      color-mix(in srgb, var(--vip-gold-start) 14%, transparent) 0%,
+      transparent 48%
+    ),
+    var(--vip-panel-bg);
+  border: 1px solid color-mix(in srgb, var(--vip-gold-mid) 22%, var(--vip-hairline));
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.name {
+  font-family: var(--brand-font-display);
+  font-size: var(--t-h1);
+  font-weight: var(--weight-bold);
+  color: var(--vip-text-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.tierPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--vip-gold-ink);
+  font-weight: var(--weight-bold);
+  font-size: var(--t-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.crown {
+  font-size: var(--t-body);
+  line-height: 1;
+}
+
+.points {
+  margin-left: auto;
+  text-align: right;
+}
+
+.pointsLabel {
+  color: var(--vip-text-muted);
+  font-size: var(--t-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* flat: a SOLID gold figure. The clipped 3-stop gradient fill was the last
+ * "metallic" flourish on this hero and reads as depth on a flat surface. */
+.pointsValue {
+  font-family: var(--brand-font-display);
+  font-size: var(--t-hero);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  color: var(--vip-gold-mid);
+}
+
+/* ---- progress row ---------------------------------------------------- */
+.progressBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.progressHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.progressLabel {
+  color: var(--vip-text-secondary);
+  font-size: var(--t-sm);
+}
+
+.progressPct {
+  font-family: var(--brand-font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--t-h2);
+  color: var(--vip-gold-mid);
+}
+
+.trackRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--vip-gold-start) 12%, var(--vip-inner-bg));
+  border: 1px solid var(--vip-hairline);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+  background: var(--vip-gold-mid);
+  transition: width var(--dur-slow) var(--ease-entrance);
+}
+
+/* the knob reads by its own solid fill + dark ring border; the 4px halo it
+ * used to carry was a shadow. */
+.knob {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--vip-gold-end);
+  border: 2px solid var(--vip-gold-ink);
+  transform: translate(-50%, -50%);
+  transition: left var(--dur-slow) var(--ease-entrance);
+}
+
+.nextChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--vip-hairline);
+  background: color-mix(in srgb, var(--vip-panel-alt) 70%, transparent);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.chevron {
+  font-size: var(--t-body);
+  line-height: 1;
+}
+
+.caption {
+  color: var(--vip-text-muted);
+  font-size: var(--t-sm);
+}
+
+@media (max-width: 900px) {
+  .points {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+  .trackRow {
+    flex-wrap: wrap;
+  }
+  .nextChip {
+    order: -1;
+    align-self: flex-end;
+  }
+}</code></pre></details>
+<h4>6. States</h4><p>Static. If <code>nextTier</code> is undefined (nextTierIndex out of range) the whole progress block is omitted. pct clamped 0–100.</p>
+<h4>7. Motion</h4><p>.fill width and .knob left transition 300ms <span class="tok">--ease-entrance</span> (only visible if values change; they never do — constants).</p>
+<h4>8. Copy</h4><p>"Điểm" (label, shown uppercase), "Tiến độ cược lên hạng sau", "{pct}%", next tier name, "›", "{n} điểm để lên {next}". Tier names via copy bag; "♛" crown glyph.</p>
+<h4>9. Data</h4><p>CURRENT_USER: points 86880 → "86,880"; pointsToNextTier 33120 → "33,120"; tier Gold acc #e3c15a; next Platinum acc #cfd6e0 (chip border rgba(207,214,224,.55)).</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Progressbar role with aria-valuenow 72; ring is role=img aria-label "CẤP 7".</p>
+<div class="callout warn">The member hero ignores the authenticated user: a logged-in "Nguyễn Văn An" (fixture tier Bạch Kim) sees "Jordan Rivera / VÀNG". Points use en-US grouping ("86,880").</div>
+</section>
+

@@ -1,0 +1,5 @@
+# path<TAB>label<TAB>exact hex.sh hit count (pattern matches, not lines)
+src/app/layout.tsx	themeColor	1
+src/components/lottery/_internal/coverArt.ts	format doc comment	2
+src/components/collection/CardArt.tsx	hsl illustration (D-DS13)	16
+src/components/collection/PackStage.tsx	hsl illustration (D-DS13)	10

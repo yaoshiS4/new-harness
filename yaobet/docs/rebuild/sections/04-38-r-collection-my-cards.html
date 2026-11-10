@@ -1,0 +1,393 @@
+<section>
+<h2 id="r-collection-my-cards">MyCards (inventory)</h2>
+<h4>1. Purpose</h4><p>"My cards": a flat grid of the cards you hold (optionally all cards, ghosted), with sorting, and a History tab.</p>
+<h4>2. Source</h4><p><code>src/components/collection/MyCards.tsx</code>, <code>my-cards.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">div.page
+  nav.back  Link.backLink "/bo-suu-tap"  "← Bộ sưu tập"
+  h1.title "Thẻ của tôi"
+  Tabs(items [the-cua-toi "Thẻ của tôi", lich-su "Lịch sử"], active from ?tab, scrollable=false, label "Thẻ của tôi và lịch sử").tabs
+  tab lich-su: div.panel role=tabpanel id=panel-lich-su aria-labelledby=tab-lich-su → CollectionHistory
+  else: div.panel role=tabpanel id=panel-the-cua-toi
+    loading: p.muted "Đang tải…"
+    error:   div.failure p.muted "Không tải được thẻ của bạn." · button.btn "Thử lại"
+    ready:
+      p.count "Bạn đang giữ " strong N " thẻ"
+      div.controls
+        div.segment role=group aria-label="Lọc thẻ"
+          button.seg[.segOn] aria-pressed "Đang giữ ({N})" · button.seg "Tất cả"
+        div.sort  label.sortLabel for=my-cards-sort "Sắp xếp" · select#my-cards-sort.select  Mới nhất | Số lượng | Tên
+      cards.length===0 ? EmptyHolding : ul.grid  CardTile × cards
+  selected &amp;&amp; CardDetail
+CardTile: li.tile  button.tileBtn aria-label=ownership sentence
+            span.tileArt aria-hidden  CardArt(ghost=!held) · (count≥2) span.qty "×N" · (sets&gt;1) span.multi "{n} bộ"
+EmptyHolding: div.empty  h2.emptyTitle "Chưa có thẻ nào" · p.emptyBody · Link.emptyBtn "/bo-suu-tap" "Về trang mở thẻ"</code></pre>
+<h4>4. Props</h4><p>ports. State: filter "holding"|"all" (default holding), sort "recent"|"count"|"name" (default recent), selectedId, nonce. Tab is derived from the URL; tab click → <code>router.replace("{path}?tab={id}", {scroll:false})</code>.</p>
+<h4>Ordering</h4><p>held cards sorted: name → <code>localeCompare(…, "vi")</code>; count → desc, then name; recent → firstAcquiredAt desc (ISO string compare), then name. "Tất cả" appends the not-held cards (name-sorted) after the held ones.</p>
+<h4>5. Styles (verbatim)</h4><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — THẺ CỦA TÔI · the inventory surface. Semantic tokens only.
+ * ==========================================================================*/
+
+.page {
+  padding: var(--space-3) var(--gutter) calc(var(--bottombar-h) + var(--space-6));
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--text);
+  min-width: 0;
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-mid);
+  font-size: var(--t-body);
+}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+
+.back {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding-right: var(--space-2);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: var(--text-hi);
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--t-h1);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+}
+
+.tabs {
+  margin-bottom: var(--space-3);
+}
+
+.panel {
+  min-width: 0;
+}
+
+/* ── the one number. No denominator, no percentage (BR-04). ─────────────── */
+
+.count {
+  margin: 0 0 var(--space-3);
+  font-size: var(--t-body);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+}
+
+.count strong {
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── controls: filter segment + sort ────────────────────────────────────── */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.segment {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.seg {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.seg:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  transform: scale(1.05);
+}
+
+/* SELECTED, not focused. This was `--focus-ring` — the LOCKED neutral blue —
+   which put the focus colour on a resting state and left a keyboard user
+   unable to tell which of the two segments they had actually arrived at. In a
+   system whose only remaining separator is the border, the selected border is
+   the brand accent and blue means focus and nothing else. */
+.segOn {
+  background: var(--tint);
+  color: var(--text-hi);
+  border-color: var(--brand-accent);
+}
+
+.sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sortLabel {
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.select {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* A native &lt;select&gt; opens a platform popup anchored to its box; scaling the box
+   on hover moves the anchor out from under the pointer mid-open. Colour only. */
+.select:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent);
+}
+
+/* ── the grid ───────────────────────────────────────────────────────────────
+   FLAT — never grouped by set. A card is multi-membership, so a set-grouped
+   grid renders one card several times, each carrying its own `×N` badge, and
+   the page reads as a multiple of what the player actually holds.
+
+   `auto-fill` + a 140px MINIMUM, not a fixed column count. The floor is the
+   requirement: the rails' 104px tile renders `CardArt`'s own 19px nameplate at
+   ≈6.6px, and this page exists partly to fix that. A hard `repeat(3, 1fr)` at
+   390px would put the tile back at ~119px and reintroduce the defect, so the
+   column count yields to the legibility floor. At 390px this lands 2 columns
+   (~173px, nameplate ≈11px); ≥900px is pinned to 6 so a wide page does not
+   over-fill. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.tile {
+  min-width: 0;
+}
+
+/* A tile is a CARD, so it takes the card's 1.02 and not the button's 1.05 — it
+   is a button only because a card you can open has to be one. Every tile in the
+   grid scales by the same amount; nothing here is sorted or sized by what it is
+   worth (there is no money on this page at all). */
+.tileBtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.tileBtn:hover { transform: scale(1.02); }
+
+.tileArt {
+  position: relative;
+  display: block;
+}
+
+/* QUANTITY — top-LEFT, always. `3 bộ` and `×3` sitting adjacent at 9px are
+   indistinguishable at arm's length and would be read as one number, so the
+   two badges never share a corner. Rendered only at count ≥ 2. */
+.qty {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+}
+
+/* SET MEMBERSHIP — top-right, matching the rails' own badge. */
+.multi {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+}
+
+/* ── empty + failure ────────────────────────────────────────────────────── */
+
+/* A card, so it takes the gold hairline and the card radius (ruling A2). */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--t-h3);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+
+.emptyBody {
+  margin: 0;
+  max-width: 40ch;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+.emptyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-min);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-accent-hairline);
+  background: var(--tint);
+  color: var(--text-hi);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.emptyBtn:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent);
+  transform: scale(1.05);
+}
+
+.failure {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.btn {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.btn:hover {
+  background: var(--surface-hover);
+  transform: scale(1.05);
+}
+
+/* ── focus ──────────────────────────────────────────────────────────────── */
+
+.tileBtn:focus-visible,
+.seg:focus-visible,
+.select:focus-visible,
+.btn:focus-visible,
+.emptyBtn:focus-visible,
+.backLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (min-width: 900px) {
+  .page {
+    max-width: 980px;
+  }
+  .grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg,
+  .select,
+  .btn,
+  .emptyBtn,
+  .tileBtn { transition: none; }
+
+  /* Absent, not merely instant. */
+  .seg:hover,
+  .btn:hover,
+  .emptyBtn:hover,
+  .tileBtn:hover { transform: none; }
+}</code></pre>
+<p>Resolved highlights: page padding 12px 16px 88px, max 760 (≥900: 980). title 24px 700. seg min-height 44px padding 0 16px radius 8px border #1a1a1a #888888 14px 600; segOn rgba(242,240,228,.05) #f2f0e4 border #d4af37. select same chrome, hover #262626 border #d4af37 (no scale). grid auto-fill minmax(140px,1fr) gap 12px (≥900: 6 cols). tileBtn hover scale 1.02. qty 10px padding 2px 6px; multi 10px padding 2px 5px. empty card padding 32px 16px border rgba(212,175,55,.55) radius 12px #141414; emptyBtn hover #262626 border #d4af37 scale 1.05.</p>
+<h4>6. States</h4><p>loading / error / empty / populated; filter on/off; ghost tiles in "Tất cả"; focus-visible ring on tileBtn, seg, select, btn, emptyBtn, backLink.</p>
+<h4>7. Motion</h4><p>200ms transitions; reduced motion none.</p>
+<h4>8. Copy</h4><p>"← Bộ sưu tập", "Thẻ của tôi", "Lịch sử", "Bạn đang giữ N thẻ", "Lọc thẻ", "Đang giữ (N)", "Tất cả", "Sắp xếp", "Mới nhất", "Số lượng", "Tên", "Không tải được thẻ của bạn.", "Thử lại", "Chưa có thẻ nào", "Mỗi lượt mở luôn cho đúng một thẻ. Bạn nhận lượt mở từ cược thể thao đã kết toán.", "Về trang mở thẻ".</p>
+<h4>9–10</h4><p>Same store as /bo-suu-tap (read only). Tile button opens CardDetail.</p>
+</section>
+

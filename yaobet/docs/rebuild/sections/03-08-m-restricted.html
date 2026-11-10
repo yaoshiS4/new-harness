@@ -1,0 +1,487 @@
+<section>
+<h2 id="m-restricted">m-restricted — /game-han-che (bonus-restricted games) and the "Game hạn chế" tab</h2>
+
+<h3 id="m-route-game-han-che">Route /game-han-che</h3>
+<p><code>src/app/game-han-che/page.tsx</code> — Server Component that calls <code>redirect("/cuoc-hop-le?tab=han-che")</code>. No UI of its own; the list renders as the second tab of <a href="#m-route-cuoc-hop-le">/cuoc-hop-le</a>. Comment says "permanent redirect"; <code>redirect()</code> is temporary (307). The i18n key <code>restricted.metaTitle</code> ("Game hạn chế trong khuyến mãi — Yaobet") is never used; the tab inherits the rate page's title.</p>
+<p>Composition: identical frame to the rate tab. 375 — intro, search, category dropdown, provider dropdown (stacked), count, table (min-width 360px, sideways scroll at narrow widths), pager (2 pages), stamp. ≥768 — the two dropdowns share one row.</p>
+
+<h3 id="m-restricted-intro">RestrictedIntro</h3>
+<p><code>src/components/restricted/RestrictedIntro.tsx</code> (Server Component).</p>
+<pre><code class="lang-txt">header.intro
+├─ h1.title "Game hạn chế trong khuyến mãi"
+├─ p.lead   {restricted.lead}
+└─ p.note   → b.noteLabel "Lưu ý" + " — " + "Danh sách này dùng chung cho các ưu đãi có quy định đó."</code></pre>
+<table>
+<thead><tr><th>Vietnamese (verbatim)</th><th>Gloss</th></tr></thead>
+<tbody>
+<tr><td>Game hạn chế trong khuyến mãi</td><td>Games restricted in promotions</td></tr>
+<tr><td>Với những người chơi đang tham gia một khuyến mãi, sự kiện hoặc dùng mã quà tặng: một số game sẽ bị giới hạn để tránh lạm dụng. Trong thời gian nhận ưu đãi, cược ở các game này không được tính cho điều kiện của ưu đãi (ví dụ điều kiện vòng cược). Xong ưu đãi, bạn chơi lại bình thường.</td><td>For players in a promotion, event or using a gift code: some games are limited to prevent abuse. While the offer is active, bets on them don't count toward its conditions (e.g. wagering). After the offer you play normally.</td></tr>
+<tr><td>Lưu ý — Danh sách này dùng chung cho các ưu đãi có quy định đó.</td><td>Note — this list is shared by all offers that have that rule.</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.intro</td><td>flex column; gap 8px; min-width 0</td></tr>
+<tr><td>.title</td><td>#f2f0e4; body font; 24px; 600; lh 1.3</td></tr>
+<tr><td>.lead</td><td>#d6d3c7; 16px; lh 1.5</td></tr>
+<tr><td>.note</td><td>margin-top 8px; padding 12px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; #888888; 14px; lh 1.5</td></tr>
+<tr><td>.noteLabel</td><td>#f2f0e4; body font; 600</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/restricted/RestrictedIntro.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RestrictedIntro — sentence-case h1 on the BODY face (never the Cinzel display
+ * face); a lifted lead; a bordered "Lưu ý" note callout at the --text-mid AA
+ * floor. Tokens only — no raw hex / px / ms; no --loss / --error / --win /
+ * --text-dim / --brand-font-display.
+ * ==========================================================================*/
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-h1);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+}
+
+/* the lifted lead — what the list IS + why a bet may not count in a promo */
+.lead {
+  color: var(--text);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+}
+
+/* the load-bearing note — a bordered callout so it reads as guidance, not fine
+ * print (it prevents the "I can never play these" misread) */
+.note {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  min-width: 0;
+}
+
+.noteLabel {
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-semi);
+}
+</code></pre>
+</details>
+
+<h3 id="m-restricted-root">RestrictedRoot</h3>
+<p><strong>Purpose</strong> — island for the restricted list: search + category + provider filters, count line, notices, table. Same algorithm as ContributionRoot minus the bucket filter. <strong>Source</strong> — <code>src/components/restricted/RestrictedRoot.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">div.root
+├─ RestrictedFilters
+├─ p.status aria-live=polite → notFound ? span.srOnly {restricted.notFound} : span "{total} trò chơi"
+├─ [!index.ok] FilterNotice error "Không tải được tìm kiếm. Danh sách vẫn xem được đầy đủ trong bảng bên dưới." + "Thử lại"
+├─ [notFound]  FilterNotice empty "Chúng tôi chưa khớp được tên bạn gõ. Hãy thử gõ ngắn hơn, không dấu — ví dụ "baccarat"." + "Đặt lại" (clears query + filters)
+├─ [emptyFilter] FilterNotice empty "Không có trò chơi nào khớp với bộ lọc đang chọn." + "Xóa bộ lọc"
+└─ RestrictedTable rows stampDate version page pageCount onPage</code></pre>
+<p>Search tokens: name, prevNames, folded provider, folded category NAME (no aliases, unlike the rate tab). PAGE_SIZE 25. Sort: category (taxonomy order of present categories) → provider (codepoint) → folded name → id. Providers list: <code>localeCompare("vi")</code>.</p>
+<p><strong>Data</strong> (<code>getRestrictedGames()</code>): 30 titles from <code>BONUS_RESTRICTED_IDS</code>; categories present = Casino / Bàn chơi, Game bài đối kháng, Game nhanh; providers = Dream Gaming, Evolution, JILI, KingMaker, SA Gaming, Spribe, WM Casino; every row rate flat 0 → "0%"; version "26.8", effective 08/08/2026 10:00. Default: "30 trò chơi", pager "1 2".</p>
+<details><summary>All 30 rows in display order (computed from source)</summary>
+<table>
+<thead><tr><th>#</th><th>Tên trò chơi</th><th>Loại trò chơi</th><th>Nhà cung cấp</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Blackjack Kim Cương</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>2</td><td>Blackjack Thượng Hạng</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>3</td><td>Rồng Hổ Đại Gia</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>4</td><td>Rồng Hổ Hoàng Gia</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>5</td><td>Sicbo Hoàng Gia</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>6</td><td>Tài Xỉu Kim Cương</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>7</td><td>Tài Xỉu Thượng Hạng</td><td>Casino / Bàn chơi</td><td>Dream Gaming</td></tr>
+<tr><td>8</td><td>Baccarat Kim Cương</td><td>Casino / Bàn chơi</td><td>Evolution</td></tr>
+<tr><td>9</td><td>Baccarat Thượng Hạng</td><td>Casino / Bàn chơi</td><td>Evolution</td></tr>
+<tr><td>10</td><td>Poker Bàn Kim Cương</td><td>Casino / Bàn chơi</td><td>Evolution</td></tr>
+<tr><td>11</td><td>Poker Bàn Thượng Hạng</td><td>Casino / Bàn chơi</td><td>Evolution</td></tr>
+<tr><td>12</td><td>Roulette Kim Cương</td><td>Casino / Bàn chơi</td><td>Evolution</td></tr>
+<tr><td>13</td><td>Roulette Thượng Hạng</td><td>Casino / Bàn chơi</td><td>Evolution</td></tr>
+<tr><td>14</td><td>Baccarat Đại Gia</td><td>Casino / Bàn chơi</td><td>SA Gaming</td></tr>
+<tr><td>15</td><td>Baccarat Hoàng Gia</td><td>Casino / Bàn chơi</td><td>SA Gaming</td></tr>
+<tr><td>16</td><td>Poker Bàn Đại Gia</td><td>Casino / Bàn chơi</td><td>SA Gaming</td></tr>
+<tr><td>17</td><td>Poker Bàn Hoàng Gia</td><td>Casino / Bàn chơi</td><td>SA Gaming</td></tr>
+<tr><td>18</td><td>Roulette Đại Gia</td><td>Casino / Bàn chơi</td><td>SA Gaming</td></tr>
+<tr><td>19</td><td>Roulette Hoàng Gia</td><td>Casino / Bàn chơi</td><td>SA Gaming</td></tr>
+<tr><td>20</td><td>Blackjack Đại Gia</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>21</td><td>Blackjack Hoàng Gia</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>22</td><td>Rồng Hổ Kim Cương</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>23</td><td>Rồng Hổ Thượng Hạng</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>24</td><td>Sicbo Kim Cương</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>25</td><td>Sicbo Thượng Hạng</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>26</td><td>Tài Xỉu Hoàng Gia</td><td>Casino / Bàn chơi</td><td>WM Casino</td></tr>
+<tr><td>27</td><td>Poker Miền Nam</td><td>Game bài đối kháng</td><td>KingMaker</td></tr>
+<tr><td>28</td><td>Tiến Lên Miền Nam</td><td>Game bài đối kháng</td><td>KingMaker</td></tr>
+<tr><td>29</td><td>Crash May Mắn</td><td>Game nhanh</td><td>JILI</td></tr>
+<tr><td>30</td><td>Mini Poker May Mắn</td><td>Game nhanh</td><td>Spribe</td></tr>
+</tbody>
+</table>
+</details>
+<p>Styles: <code>.root</code> flex column gap 16px; <code>.status</code> #888888 14px lh 1.3 min-height 14px; <code>.srOnly</code> visually hidden.</p>
+<details><summary>Verbatim CSS — <code>src/components/restricted/RestrictedRoot.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RestrictedRoot — the island wrapper. Vertical rhythm only; it owns no chrome
+ * (the table, filters and notices carry their own surfaces). The aria-live
+ * status is one muted line at the --text-mid AA floor / --t-sm — no colour
+ * carries meaning, no percentage ever appears. Tokens only.
+ * ==========================================================================*/
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.status {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-tight);
+  min-height: var(--t-sm); /* reserve the line so a count landing shifts nothing */
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</code></pre>
+</details>
+<div class="callout warn">RestrictedRoot, RestrictedFilters, the i18n <code>restricted</code> comment ("this page never shows a rate") and the barrel all describe a RATE-FREE list, but RestrictedTable renders a "Tỷ lệ được tính" column (always "0%"). <code>RestrictedRow</code>'s comment and the CSS header agree with the rate column — the docs contradict each other.</div>
+
+<h3 id="m-restricted-filters">RestrictedFilters</h3>
+<p><code>src/components/restricted/RestrictedFilters.tsx</code>, <code>.module.css</code>. Identical structure and CSS values to <a href="#m-rate-filters">RateFilters</a> (own copy of <code>SelectFilter</code>; same trigger/menu/option rules) but WITHOUT the bucket pill group: <code>div.filters → div.searchWrap (SearchField) + div.filterBar → SelectFilter "Loại trò chơi" (options Tất cả + 3 categories) + SelectFilter "Nhà cung cấp" (Tất cả nhà cung cấp + 7 providers)</code>. ≥768: row, wrap, gap 12px 16px, each <code>.selectWrap</code> flex 1 1 auto.</p>
+<details><summary>Verbatim CSS — <code>src/components/restricted/RestrictedFilters.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RestrictedFilters — a full-width PRIMARY search on top; a SECONDARY bar with
+ * TWO dropdown filters (category · provider) that stack &lt;768 and wrap to a row
+ * ≥768. No rate-% pill group (this page has no rate). Tokens only — no raw hex /
+ * px / ms (the media-query breakpoint is the sanctioned literal).
+ * ==========================================================================*/
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ---- PRIMARY: full-width search ------------------------------------------- */
+.searchWrap {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---- SECONDARY: the two-filter bar ---------------------------------------- */
+.filterBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.selectWrap {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .filterBar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+  }
+  .selectWrap {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- dropdown trigger (category + provider) -------------------------------- */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+/* Colour shift only — NO hover scale: scaling a popover anchor moves it out from
+ * under the pointer mid-open (same exception as RateFilters/.trigger). */
+.trigger:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent-hairline);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.triggerLabel {
+  color: var(--text-mid);
+  flex: 0 0 auto;
+}
+
+.triggerValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-semi);
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: var(--text-mid);
+  font-size: var(--t-body);
+}
+
+/* ---- dropdown menu (inside ui/Dropdown's panel) --------------------------- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--surface-hover);
+  color: var(--text-hi);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.optionOn {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger {
+    transition: none;
+  }
+}
+</code></pre>
+</details>
+
+<h3 id="m-restricted-table">RestrictedTable and RestrictedFoot</h3>
+<p><code>src/components/restricted/RestrictedTable.tsx</code> — same DOM as <a href="#m-rate-table">RateTable</a> (same 4 columns, RateCell, Pager) except: Scroller label "Danh sách game hạn chế — vuốt ngang để xem thêm cột"; caption "Danh sách game hạn chế trong khuyến mãi, kèm tỷ lệ cược được tính theo từng trò chơi. Cập nhật {date}, phiên bản {version}."; table <code>min-width: 360px</code> (not 480); footer is <code>RestrictedFoot</code>; NO legend line. CSS rules otherwise identical to RateTable (minus the legend rules; header comment differs).</p>
+<details><summary>Verbatim CSS — <code>src/components/restricted/RestrictedTable.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RestrictedTable — frame + a11y table + frozen first column (mirrors RateTable
+ * §2.2/§5, now WITH the rate column as column 2). min-width:360px is the entire
+ * mechanism that forces the horizontal scroll on the narrowest breakpoint; the
+ * page body never
+ * scrolls (globals.css pins overflow-x:hidden) — the table scrolls inside its
+ * Scroller. No --lift / --halo / --glow-gold / gradient; no --loss / --error /
+ * --win / --text-dim / --brand-accent / --vip-*; no raw hex / px / ms (the
+ * media-query breakpoints are the sanctioned literals).
+ * ==========================================================================*/
+
+.frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.table {
+  border-collapse: separate; /* REQUIRED — sticky cells break under `collapse` */
+  border-spacing: 0;
+  width: 100%;
+  min-width: 360px; /* forces the horizontal scroll inside the Scroller */
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* module-local visually-hidden helper (there is no global one) */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.th,
+.td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--canvas); /* opaque — required for the sticky column */
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: left;
+  vertical-align: top;
+}
+
+tbody tr:last-child .td,
+tbody tr:last-child .rowHead {
+  border-bottom: none;
+}
+
+/* THIS is what actually freezes the column (not Scroller.freeze). Every cell
+ * is opaque so the pinned column occludes the scrolling body. */
+.rowHead {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-content);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2); /* a different surface from canvas + head */
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-semi);
+  font-size: var(--t-sm);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal; /* the ONE cell licensed to wrap (large-font @360) */
+  overflow-wrap: anywhere;
+}
+
+/* the game name — the wrapping text line in the frozen column */
+.rowName {
+  overflow-wrap: anywhere;
+}
+
+.headRow .th {
+  background: var(--surface-3); /* licensed as "raised panel / table head" */
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+
+.corner {
+  position: sticky;
+  left: 0;
+  z-index: calc(var(--z-sticky) + 1);
+  background: var(--surface-3);
+}
+
+/* the descriptive (Loại / Nhà cung cấp) cells read muted */
+.meta {
+  color: var(--text-mid);
+}
+
+/* ≥1024 pointer reading aid (not a state) — the whole row lifts on hover */
+@media (min-width: 1024px) {
+  tbody tr:hover .td {
+    background: var(--surface-hover);
+  }
+  tbody tr:hover .rowHead {
+    background: var(--surface-hover);
+  }
+}
+
+/* denser padding on narrow / mid widths */
+@media (max-width: 900px) {
+  .th,
+  .td,
+  .rowHead {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+</code></pre>
+</details>
+<p><code>RestrictedFoot</code>: <code>div.foot → p.stamp data-numeric "Cập nhật 08/08/2026 10:00 · Phiên bản 26.8"</code>. <code>.foot</code> border-top hairline, bg #1a1a1a, padding 12px 16px, #888888 14px lh 1.5, flex column gap 12px; ≥768 row, justify flex-end, stamp nowrap right.</p>
+<details><summary>Verbatim CSS — <code>src/components/restricted/RestrictedFoot.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * RestrictedFoot — inside the table frame border (--surface-2, top hairline).
+ * The stamp reads at the --text-mid AA floor / --t-sm with tabular numerals.
+ * Stamp sits right ≥768. Tokens only — no raw hex / px / ms.
+ * ==========================================================================*/
+
+.foot {
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stamp {
+  color: var(--text-mid);
+}
+
+@media (min-width: 768px) {
+  .foot {
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: flex-start;
+  }
+  .stamp {
+    white-space: nowrap;
+    text-align: right;
+  }
+}
+</code></pre>
+</details>
+</section>
+

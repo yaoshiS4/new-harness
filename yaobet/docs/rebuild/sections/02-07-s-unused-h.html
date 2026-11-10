@@ -1,0 +1,726 @@
+<section id="s-unused">
+<h2 id="s-unused-h">S7 · Unused / dead code in shell, home, discovery</h2>
+<table><thead><tr><th>Item</th><th>File</th><th>Status</th></tr></thead><tbody>
+<tr><td>AuthCluster</td><td>src/components/home/AuthCluster.tsx + .module.css</td><td>Exported from the barrel only; never rendered.</td></tr>
+<tr><td>PromoChips</td><td>src/components/home/PromoChips.tsx + .module.css</td><td>Barrel only.</td></tr>
+<tr><td>LiveGamesBand</td><td>src/components/home/LiveGamesBand.tsx + .module.css</td><td>Barrel only.</td></tr>
+<tr><td>JackpotTicker</td><td>src/components/home/JackpotTicker.tsx + .module.css</td><td>Used only by the dead LiveGamesBand.</td></tr>
+<tr><td>LiveMatchCard</td><td>src/components/home/LiveMatchCard.tsx + .module.css</td><td>Used only by the dead LiveGamesBand (category files mention it in comments only).</td></tr>
+<tr><td>VipAisle</td><td>src/components/home/VipAisle.tsx + .module.css</td><td>Barrel only; the home comment says "removed".</td></tr>
+<tr><td>PartnerBand</td><td>src/components/home/PartnerBand.tsx + .module.css</td><td>Barrel only; the home comment says "removed".</td></tr>
+<tr><td>HomeFooter</td><td>src/components/home/HomeFooter.tsx + .module.css</td><td>Replaced by layout/Footer; mentioned in comments only.</td></tr>
+<tr><td>AppShell <code>rightRail</code> prop</td><td>AppShell.tsx / ShellChrome.tsx</td><td>Never passed.</td></tr>
+<tr><td><code>.aaLine</code></td><td>Header.module.css</td><td>Class defined, never applied (no active underline exists).</td></tr>
+<tr><td><code>.active</code> (NavDropdown)</td><td>NavDropdown.module.css</td><td>Reachable only through the <code>active</code> prop, which Header never sets.</td></tr>
+<tr><td><code>.footerFull</code>, <code>.section</code>, <code>.sectionHead</code>, <code>.sectionTitle</code>, <code>.sectionLink</code></td><td>Home.module.css</td><td>Not used by page.tsx or loading.tsx.</td></tr>
+<tr><td><code>.featureWide</code></td><td>ProviderGameGrid.module.css</td><td>Never applied.</td></tr>
+<tr><td><code>--rail-overhang</code></td><td>HeroBand.module.css</td><td>Declared, never read.</td></tr>
+<tr><td>HeroBand <code>.slot</code> on slides</td><td>HeroBand.tsx</td><td>Unreachable: the page filters to banner images.</td></tr>
+<tr><td>StatsBar</td><td>StatsBar.tsx</td><td>Rendered, but always receives <code>absent</code>, so it never paints.</td></tr>
+<tr><td><code>--brand-logo</code>, <code>--frame-min</code>, <code>--feature-w</code> (used only by the dead LiveGamesBand), <code>--provider-w</code>/<code>--provider-h</code> (used only by the dead PartnerBand)</td><td>tokens.css</td><td>Never read by live shell/home code.</td></tr>
+<tr><td>Duplicate <code>usePrefersReducedMotion</code></td><td>layout/_internal/usePrefersReducedMotion.ts and lib/rg.ts</td><td>Two identical hooks (Countdown uses the first, HeroBand the second).</td></tr>
+<tr><td>Provider <code>logoSrc</code></td><td>lib/mock/games.ts</td><td>/assets/placeholders/tile.svg is set on every provider and never rendered.</td></tr>
+<tr><td>Sports <code>markets[1]</code>, <code>crestSrc</code>, <code>startsAt</code></td><td>lib/mock/lobby.ts</td><td>Not rendered by SportsMatchCard.</td></tr>
+<tr><td>getLiveMatch on home</td><td>—</td><td>Not fetched by "/"; used only by /sports.</td></tr>
+</tbody></table>
+<p>Specs for the dead home components follow, so a rebuild can restore them faithfully if asked. They are not part of the current UI.</p>
+
+<h3 id="s-unused-auth-cluster">AuthCluster (dead)</h3>
+<p>Guest: card with "Chào mừng đến Yaobet" (18px/700) + "Đăng ký để nhận hoàn trả không giới hạn." (14px #888888), then Button gold "Đăng ký" (register) + Button primary "Đăng nhập". Member: "Xin chào, {displayName}", a balance chip link to /vi-tien (aria "Số dư — mở ví"; wallet 16 + "Số dư:" + MoneyValue kind=balance + chevronRight 16), and Button gold icon=deposit "Nạp" → /vi-tien. From 768px it is a row with space-between.</p>
+<details><summary>Verbatim CSS — <code>src/components/home/AuthCluster.module.css</code></summary><pre><code class="lang-css">/* AuthCluster — guest auth pair / member balance chip + deposit. Tokens only. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--brand-accent-hairline);
+}
+
+.greet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.welcome {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+.sub {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.actions &gt; * {
+  flex: 1 1 auto;
+}
+
+/* member balance chip — a real link, ≥44px */
+.balanceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+  text-decoration: none;
+  color: var(--text);
+}
+.chipIcon {
+  color: var(--brand-accent);
+}
+.chipLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+.chipMoney {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+.chipChevron {
+  color: var(--text-mid);
+}
+
+@media (min-width: 768px) {
+  .cluster {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .actions {
+    flex: 0 0 auto;
+  }
+  .actions &gt; * {
+    flex: 0 0 auto;
+  }
+}
+</code></pre></details>
+
+<h3 id="s-unused-promo-chips">PromoChips (dead)</h3>
+<p>Head h2 "Khuyến mãi" + link "Tất cả" (chevronRight) to /khuyen-mai. A Scroller (snap=false, peek) of 200px-min chips, each with an uppercase category (12px gold) and a title (14px).</p>
+<details><summary>Verbatim CSS — <code>src/components/home/PromoChips.module.css</code></summary><pre><code class="lang-css">/* PromoChips — neutral chips row. Tokens only. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-sm);
+  color: var(--brand-accent);
+  text-decoration: none;
+  min-height: var(--tap-min);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Every chip is the SAME 200px min-width and hovers to the SAME scale(1.02),
+ * whatever promo it carries — no &quot;best value&quot; chip is rendered larger. */
+.chip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 200px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--brand-accent-hairline);
+  text-decoration: none;
+  scroll-snap-align: start;
+  min-height: var(--tap-min);
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.chip:hover {
+  transform: scale(1.02);
+  border-color: var(--brand-accent);
+  background: var(--surface-hover);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip:hover {
+    transform: none;
+  }
+}
+
+.chipCat {
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-accent);
+  font-weight: var(--weight-semi);
+}
+
+.chipTitle {
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+}
+</code></pre></details>
+
+<h3 id="s-unused-live-games-band">LiveGamesBand + JackpotTicker + LiveMatchCard (dead)</h3>
+<p>A <code>section aria-label="Đang diễn ra"</code> grid: 1 column, or 418px + auto from 768px. Jackpot cell: label (pool label, or "Hũ vàng") above an Odometer (size num-lg, gold text clipped from the background). Match card: Card linking to /?v=sports, head "TRỰC TIẾP" (8px red dot) or "Sắp diễn ra" + sports icon; two team rows, each a 32px crest disc, name, and odds cell (arrow glyph, or "tạm dừng" when stale).</p>
+<details><summary>Verbatim CSS — <code>src/components/home/LiveGamesBand.module.css</code></summary><pre><code class="lang-css">/* ============================================================================
+ * LiveGamesBand — J9 feature rail (02-J9-MEASUREMENTS §1 &quot;The rail split&quot;).
+ * J9: `.img-list{grid-template-columns:418px auto;gap:16px}` — a FIXED 418px
+ * feature column + the fluid remainder. Stacks @375; the 418px feature column
+ * engages at the desktop frame. Tokens only.
+ * ==========================================================================*/
+
+.band {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--band-gap);
+}
+
+.jackpotCell {
+  display: flex;
+  align-items: center;
+  padding: var(--card-pad-sm);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--brand-accent-hairline);
+  /* flat: a card gets a solid fill + the load-bearing gold hairline, never a
+   * gradient (permitted only as large background decoration). */
+  background: var(--surface);
+}
+
+.matchCell {
+  min-width: 0;
+}
+
+/* J9 418px feature column + auto remainder — the content-side big-feature rail */
+@media (min-width: 768px) {
+  .band {
+    grid-template-columns: var(--feature-w) auto;
+    align-items: stretch;
+  }
+}
+</code></pre></details>
+<details><summary>Verbatim CSS — <code>src/components/home/JackpotTicker.module.css</code></summary><pre><code class="lang-css">/* JackpotTicker — pool label + Odometer figure. Tokens only. */
+
+.ticker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+
+.label {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.pool {
+  /* gold reads as the brand accent; large figure only (≥18px) per A8 */
+  background: var(--brand-accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.skel {
+  display: inline-block;
+}
+</code></pre></details>
+<details><summary>Verbatim CSS — <code>src/components/home/LiveMatchCard.module.css</code></summary><pre><code class="lang-css">/* LiveMatchCard — crest slots + teams + equal-salience odds. Tokens only. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* live state = TEXT label (never color-only) + a dot affordance */
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  color: var(--text-hi);
+}
+.liveDot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--loss);
+}
+.pre {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.sportIcon {
+  color: var(--text-mid);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.team {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* crest SLOT awaiting licensed crest art — flat solid disc + gold hairline
+ * (was a radial gradient carrying a raw rgba() literal) */
+.crest {
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+}
+
+.teamName {
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oddsCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 6ch;
+  justify-content: flex-end;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
+
+/* equal salience: both arrows same weight; up=win hue, down=loss hue, but the
+ * GLYPH carries the meaning so it is never color-only. */
+.arrowUp {
+  color: var(--win);
+  transform: rotate(-90deg);
+}
+.arrowDown {
+  color: var(--loss);
+  transform: rotate(0deg);
+}
+
+.stale {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.skelRow {
+  margin-top: var(--space-2);
+}
+</code></pre></details>
+
+<h3 id="s-unused-vip-aisle">VipAisle (dead)</h3>
+<p>h2 "VIP" (vip icon) + "Chi tiết" link to /vip. Guest: Card vip "Tham gia VIP để nhận hoàn trả theo hạng." + Button gold "Đăng ký". Member: a progress panel (current tier, "Hạng tiếp theo: {name}", progress bar, "Còn {amount} để lên {name}" or "Bạn đang ở hạng cao nhất"; error "Không tải được tiến độ VIP"). Then a Scroller deck of 140px tier cards ("Hoàn trả {rate}%", with a decimal comma).</p>
+<details><summary>Verbatim CSS — <code>src/components/home/VipAisle.module.css</code></summary><pre><code class="lang-css">/* VipAisle — tier deck + auth-aware progress panel. Tokens only. */
+
+.aisle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+.titleIcon {
+  color: var(--brand-accent);
+}
+
+.all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-sm);
+  color: var(--brand-accent);
+  text-decoration: none;
+  min-height: var(--tap-min);
+}
+
+/* ---- progress panel (member) ---- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  border: 1px solid var(--brand-accent-hairline);
+}
+
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.curTier {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+}
+.nextTier {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.track {
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-disabled);
+  overflow: hidden;
+}
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  /* fill is a truthful static width; the transition is decorative only and is
+   * zeroed under reduced-motion (motion.css) — never a fake 5s climb. */
+  transition: width var(--dur-base) var(--ease-standard);
+}
+.skelBar {
+  display: block;
+}
+
+.remain {
+  font-size: var(--t-sm);
+  color: var(--text);
+}
+.remain strong {
+  color: var(--text-hi);
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- guest join card ---- */
+.joinCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  align-items: flex-start;
+}
+.joinCopy {
+  font-size: var(--t-body);
+  color: var(--text);
+}
+
+/* ---- tier deck ----
+ * RULING B1: every .tierCard is the SAME 140px box whatever the tier&#x27;s rate.
+ * Rank is carried by ladder POSITION, never by size, and no card scales on
+ * hover (they are display cards, not links). */
+.deck {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.deckItem {
+  flex: 0 0 auto;
+}
+.tierCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 140px;
+  padding: var(--space-4);
+  scroll-snap-align: start;
+}
+.badge {
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  color: var(--brand-accent);
+  /* flat: solid raised disc + gold hairline (was a raw-rgba radial fill) */
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+}
+.tierName {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+.rate {
+  font-size: var(--t-micro);
+  color: var(--brand-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
+  }
+}
+</code></pre></details>
+
+<h3 id="s-unused-partner-band">PartnerBand (dead)</h3>
+<p>h2 "Nhà cung cấp" (24px/600), then a grid of <code>repeat(auto-fill, 128px)</code> chips, each 128×48 with the first 2 letters uppercased and the name below in 14px.</p>
+<details><summary>Verbatim CSS — <code>src/components/home/PartnerBand.module.css</code></summary><pre><code class="lang-css">/* ============================================================================
+ * PartnerBand — J9 provider chip strip (02-J9-MEASUREMENTS §2 &quot;Provider chip&quot;).
+ * J9: `.provider_wrapper{grid-template-columns:repeat(auto-fill,128px);gap:16px}`
+ * with each `.provider-btn{height:48px;width:128px;border:1px solid #262833;
+ * border-radius:8px}` and a 14px name below. Fixed 128px cells — one chip size.
+ * Tokens only.
+ * ==========================================================================*/
+
+.band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* J9 section title = 24/600/.9 */
+.title {
+  font-size: var(--t-h1);
+  line-height: 1.5;
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+/* J9 fixed-cell provider grid — repeat(auto-fill, 128px), 16px gap */
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--provider-w));
+  gap: var(--band-gap);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: var(--provider-w);
+}
+
+/* the chip itself — J9 .provider-btn: 128×48, radius 8, 1px #262833 border */
+.logo {
+  width: var(--provider-w);
+  height: var(--provider-h);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--tile);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+/* every provider chip is the same fixed 128×48 cell and hovers identically */
+@media (hover: hover) and (pointer: fine) {
+  .item:hover .logo {
+    border-color: var(--brand-accent);
+    color: var(--text-hi);
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .item:hover .logo {
+    transform: none;
+  }
+}
+
+/* J9 .provider-name: width 128, 14px, white .6, lh 150% */
+.name {
+  width: var(--provider-w);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-mid);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</code></pre></details>
+
+<h3 id="s-unused-home-footer">HomeFooter (dead)</h3>
+<p>Three columns from 768px: "Yaobet" links (Khuyến mãi /khuyen-mai, VIP /vip, Hoàn trả /hoan-tra, Giới thiệu /gioi-thieu), "Hỗ trợ" links (Tin nhắn, Bảo mật, Lịch sử), and the RG column (a red-ring "18+" badge, the same five rows as Footer with self-exclusion pointing to /bao-mat, plus a one-line operator notice). Copyright "© {current year} Yaobet. Đã đăng ký bản quyền.".</p>
+<details><summary>Verbatim CSS — <code>src/components/home/HomeFooter.module.css</code></summary><pre><code class="lang-css">/* HomeFooter — columns + dedicated RG column. Stack @375 → columns ≥768. */
+
+.footer {
+  padding: var(--space-6) 0 var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  padding: 0 var(--space-4);
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.colTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.links a {
+  color: var(--text-mid);
+  text-decoration: none;
+  font-size: var(--t-sm);
+  display: inline-block;
+  min-height: var(--tap-min);
+  line-height: var(--tap-min);
+}
+.links a:hover {
+  color: var(--text-hi);
+}
+
+/* ---- RG column ---- */
+.rgIcon {
+  color: var(--brand-accent);
+}
+.ageMark {
+  display: inline-grid;
+  place-items: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--loss);
+  color: var(--loss);
+  font-weight: var(--weight-bold);
+  font-size: var(--t-sm);
+}
+.rgList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+.rgList a {
+  color: var(--text-mid);
+  text-decoration: underline;
+}
+.license {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+.copyright {
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-4) 0;
+  border-top: 1px solid var(--border);
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .cols {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+</code></pre></details>
+</section>

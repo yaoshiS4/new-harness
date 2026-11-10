@@ -1,0 +1,70 @@
+<section>
+<h2 id="m-overview">Member area &amp; account utilities — track M overview</h2>
+<p>This track covers the <code>(member)</code> route group (<code>/tai-khoan</code>, <code>/vi-tien</code>, <code>/tin-nhan</code>, <code>/gioi-thieu</code>, <code>/dai-ly</code>), the public trust pages <code>/cuoc-hop-le</code> (+ <code>/game-han-che</code> redirect), the redirects <code>/bao-mat</code>, <code>/hoan-tra</code>, <code>/lich-su</code> and the stub pages <code>/ho-tro</code>, <code>/tro-giup</code>, <code>/tai-app</code>, <code>/phong-cach</code>. Every page here renders inside the global shell (header, category nav, bottom tab bar, footer, QuickActionRail) — see <a href="#s-shell-h">#s-shell</a>. Primitives (<code>Button</code>, <code>Card</code>, <code>Badge</code>, <code>Pill</code>, <code>Tabs</code>, <code>Dropdown</code>, <code>Modal</code>, <code>Skeleton</code>, <code>EmptyState</code>, <code>ErrorState</code>, <code>MoneyValue</code>/<code>DeltaAmount</code>, <code>Scroller</code>, <code>Icon</code>) are specified by track F: <a href="#f-ui-button">#f-ui-button</a>, <a href="#f-ui-card">#f-ui-card</a>, <a href="#f-ui-badge">#f-ui-badge</a>, <a href="#f-ui-pill">#f-ui-pill</a>, <a href="#f-ui-tabs">#f-ui-tabs</a>, <a href="#f-ui-dropdown">#f-ui-dropdown</a>, <a href="#f-ui-modal">#f-ui-modal</a>, <a href="#f-ui-skeleton">#f-ui-skeleton</a>, <a href="#f-ui-empty-state">#f-ui-empty-state</a>, <a href="#f-ui-error-state">#f-ui-error-state</a>, <a href="#f-ui-money-value">#f-ui-money-value</a>, <a href="#f-ui-scroller">#f-ui-scroller</a>, <a href="#f-ui-icon">#f-ui-icon</a>. Tokens: <a href="#f-tokens">#f-tokens</a>.</p>
+
+<h3 id="m-token-quickref">Token quick-reference (values this track resolves)</h3>
+<p>Every value below is FACT from <code>src/styles/tokens.css</code> (default brand <code>yaobet</code>). Tables later in this track give token + literal; this list is the lookup.</p>
+<table>
+<thead><tr><th>Token</th><th>Resolved literal</th><th>Token</th><th>Resolved literal</th></tr></thead>
+<tbody>
+<tr><td><span class="tok">--canvas</span></td><td><span class="sw" style="background:#0a0a0a"></span> #0a0a0a</td><td><span class="tok">--shell</span></td><td><span class="sw" style="background:#050505"></span> #050505</td></tr>
+<tr><td><span class="tok">--surface</span></td><td><span class="sw" style="background:#141414"></span> #141414</td><td><span class="tok">--surface-2</span></td><td><span class="sw" style="background:#1a1a1a"></span> #1a1a1a</td></tr>
+<tr><td><span class="tok">--surface-3</span></td><td><span class="sw" style="background:#212121"></span> #212121</td><td><span class="tok">--tile</span></td><td><span class="sw" style="background:#171717"></span> #171717</td></tr>
+<tr><td><span class="tok">--surface-hover</span></td><td><span class="sw" style="background:#262626"></span> #262626</td><td><span class="tok">--surface-disabled</span></td><td><span class="sw" style="background:#303030"></span> #303030</td></tr>
+<tr><td><span class="tok">--border</span> / <span class="tok">--brand-accent-hairline</span></td><td>rgba(212, 175, 55, 0.55)</td><td><span class="tok">--tint</span></td><td>rgba(242, 240, 228, 0.05)</td></tr>
+<tr><td><span class="tok">--text-hi</span> / <span class="tok">--balance-text</span></td><td><span class="sw" style="background:#f2f0e4"></span> #f2f0e4</td><td><span class="tok">--text</span></td><td><span class="sw" style="background:#d6d3c7"></span> #d6d3c7</td></tr>
+<tr><td><span class="tok">--text-mid</span></td><td><span class="sw" style="background:#888888"></span> #888888</td><td><span class="tok">--text-dim</span></td><td><span class="sw" style="background:#6f6f6f"></span> #6f6f6f</td></tr>
+<tr><td><span class="tok">--brand-accent</span> / <span class="tok">--brand-accent-grad</span> (solid)</td><td><span class="sw" style="background:#d4af37"></span> #d4af37</td><td><span class="tok">--brand-accent-2</span></td><td><span class="sw" style="background:#b4952f"></span> #b4952f</td></tr>
+<tr><td><span class="tok">--brand-on-accent</span></td><td><span class="sw" style="background:#0a0a0a"></span> #0a0a0a</td><td><span class="tok">--brand-cta-accent</span></td><td><span class="sw" style="background:#f53f55"></span> #f53f55</td></tr>
+<tr><td><span class="tok">--win</span></td><td><span class="sw" style="background:#45c9a5"></span> #45c9a5</td><td><span class="tok">--loss</span></td><td><span class="sw" style="background:#f53f55"></span> #f53f55</td></tr>
+<tr><td><span class="tok">--error</span></td><td><span class="sw" style="background:#e42946"></span> #e42946</td><td><span class="tok">--green</span></td><td><span class="sw" style="background:#31bc69"></span> #31bc69</td></tr>
+<tr><td><span class="tok">--info</span></td><td><span class="sw" style="background:#018fff"></span> #018fff</td><td><span class="tok">--caution</span></td><td><span class="sw" style="background:#f5a623"></span> #f5a623</td></tr>
+<tr><td><span class="tok">--focus-ring</span></td><td><span class="sw" style="background:#6ea8ff"></span> #6ea8ff</td><td><span class="tok">--qr-surface</span> / <span class="tok">--progress-dot</span></td><td><span class="sw" style="background:#ffffff"></span> #ffffff</td></tr>
+<tr><td><span class="tok">--progress-track</span></td><td>hsla(0, 0%, 100%, 0.12)</td><td><span class="tok">--progress-fill</span>, <span class="tok">--progress-tag-text</span></td><td>#d4af37</td></tr>
+<tr><td><span class="tok">--progress-fill-grad</span></td><td>linear-gradient(90deg, #d4af37, #d4af37)</td><td><span class="tok">--member-canvas</span></td><td>#0a0a0a</td></tr>
+<tr><td><span class="tok">--t-micro</span></td><td>12px</td><td><span class="tok">--t-sm</span></td><td>14px</td></tr>
+<tr><td><span class="tok">--t-body</span> / <span class="tok">--t-num</span></td><td>16px</td><td><span class="tok">--t-h3</span></td><td>18px</td></tr>
+<tr><td><span class="tok">--t-h2</span></td><td>20px</td><td><span class="tok">--t-h1</span></td><td>24px</td></tr>
+<tr><td><span class="tok">--t-balance</span></td><td>28px</td><td><span class="tok">--t-num-lg</span> / <span class="tok">--t-display</span></td><td>32px</td></tr>
+<tr><td><span class="tok">--lh-body</span></td><td>1.5</td><td><span class="tok">--lh-tight</span></td><td>1.3</td></tr>
+<tr><td><span class="tok">--weight-reg</span> / <span class="tok">--weight-semi</span> / <span class="tok">--weight-bold</span></td><td>400 / 600 / 700</td><td><span class="tok">--space-1…8</span></td><td>4 / 8 / 12 / 16 / 24 / 32 / 40 / 48px</td></tr>
+<tr><td><span class="tok">--gap</span> / <span class="tok">--band-gap</span> / <span class="tok">--gutter</span> / <span class="tok">--card-pad-sm</span></td><td>16px</td><td><span class="tok">--gap-sm</span> / <span class="tok">--gap-xs</span></td><td>8px / 4px</td></tr>
+<tr><td><span class="tok">--card-pad</span></td><td>24px</td><td><span class="tok">--radius-sm / -md / -lg / -card / -pill</span></td><td>4 / 8 / 12 / 16 / 9999px</td></tr>
+<tr><td><span class="tok">--tap-min</span> / <span class="tok">--tap-bar</span></td><td>44px / 48px</td><td><span class="tok">--rail-w</span></td><td>304px</td></tr>
+<tr><td><span class="tok">--header-h</span> / <span class="tok">--nav-h</span></td><td>72px / 48px</td><td><span class="tok">--bottombar-h</span></td><td>56px</td></tr>
+<tr><td><span class="tok">--dur-fast</span> / <span class="tok">--dur-base</span> / <span class="tok">--dur-slow</span></td><td>200ms / 200ms / 300ms (all 0ms under reduced motion)</td><td><span class="tok">--ease-standard</span></td><td>cubic-bezier(0.645, 0.045, 0.355, 1)</td></tr>
+<tr><td><span class="tok">--ease-entrance</span></td><td>cubic-bezier(0.23, 1, 0.32, 1)</td><td><span class="tok">--z-content</span> / <span class="tok">--z-sticky</span></td><td>1 / 100</td></tr>
+<tr><td><span class="tok">--brand-font-body</span></td><td>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</td><td><span class="tok">--brand-font-num</span></td><td>var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif</td></tr>
+</tbody>
+</table>
+<p>Composite gradient tokens used here (verbatim from tokens.css, with <span class="tok">--brand-accent</span> = #d4af37):</p>
+<pre><code class="lang-css">--page-bloom:
+  radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--brand-accent) 6%, transparent) 0%, rgba(10, 10, 10, 0) 46%),
+  radial-gradient(140% 120% at 50% 120%, rgba(30, 61, 89, 0.25) 0%, rgba(10, 10, 10, 0) 55%),
+  var(--canvas);
+--header-card-grad:
+  radial-gradient(120% 140% at 14% 30%, color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%, rgba(20, 20, 20, 0) 52%),
+  var(--surface);
+--wallet-sheen-grad:
+  linear-gradient(118deg, rgba(242, 240, 228, 0.05) -10%, rgba(242, 240, 228, 0.012) 60%, transparent 100%);
+--card-sheen-grad:
+  radial-gradient(circle at 78% 26%, rgba(242, 240, 228, 0.04) 0%, rgba(242, 240, 228, 0.01) 57%, transparent 72%);</code></pre>
+<p>Global motion contract (FACT, <code>src/styles/motion.css</code>): under <code>@media (prefers-reduced-motion: reduce)</code> all <code>--dur-*</code> become <code>0ms</code> and <code>*, *::before, *::after</code> get <code>animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;</code>. Every transition in this track therefore collapses to instant under reduced motion even where the component does not opt out itself.</p>
+
+<h3 id="m-auth-model">Auth model used by every member surface</h3>
+<ul>
+<li><strong>Source</strong>: <code>src/lib/auth/session.tsx</code> (<code>MockAuthProvider</code>, <code>useAuth</code>), <code>src/lib/auth/guard.ts</code> (<code>useRequireAuth</code>), <code>src/lib/auth/fixtures.ts</code>.</li>
+<li><strong>Initial state</strong>: <code>src/app/providers.tsx</code> mounts <code>&lt;MockAuthProvider initialState="tiered"&gt;</code>, so the app boots LOGGED IN as the tiered user. Three states: <code>guest</code> | <code>level-0</code> | <code>tiered</code>. <code>isAuthenticated = state !== "guest"</code>.</li>
+<li><strong><code>useRequireAuth()</code></strong> returns <code>{ authState, allowed: isAuthenticated, promptAuth(resumeIntent?) }</code>. It NEVER redirects; <code>promptAuth</code> calls <code>openAuthModal({ mode: "login", resumeIntent })</code> (auth modal = track S). <code>ResumeIntent = { action: "deposit" | "withdraw" | "none"; isFirstDeposit?: boolean }</code>.</li>
+<li><strong>Logout</strong>: <code>signOut()</code> sets state to <code>guest</code> (pure client state; no navigation).</li>
+</ul>
+<table>
+<thead><tr><th>Fixture</th><th>id</th><th>displayName</th><th>memberId</th><th>vipLevel</th><th>vipTierName</th><th>verified</th><th>unreadMessages</th></tr></thead>
+<tbody>
+<tr><td>LEVEL_0_USER</td><td>u_new</td><td>Thành viên mới</td><td>YB-668812</td><td>0</td><td>Tân thủ</td><td>false</td><td>1</td></tr>
+<tr><td>TIERED_USER</td><td>u_vip</td><td>Nguyễn Văn An</td><td>YB-880066</td><td>3</td><td>Bạch Kim</td><td>true</td><td>2</td></tr>
+</tbody>
+</table>
+<p>All mock accessors (<code>src/lib/mock/*</code>) resolve immediately (<code>simulateFetch(value, ms = 0)</code> → <code>Promise.resolve</code>), so the route <code>loading.tsx</code> files only flash on client navigation (inference). <code>DEMO_EMPTY</code> (<code>src/lib/mock/helpers.ts</code>) is <code>false</code>; flipping it to <code>true</code> forces the honest-empty branches described per component.</p>
+</section>
+

@@ -1,0 +1,36 @@
+{
+  "_note": "Yaobet project policy for the Claude Code SOTA Harness. The root thread is the PM and never edits application code; builders (dev-fe, designer, debugger) edit only inside their allowed_files lease.",
+  "root_may_edit_code": false,
+  "slice_cap": 250,
+  "max_slices": 6,
+  "flood_limit": 50,
+  "outline_threshold": 400,
+  "read_once_threshold": 200,
+  "whole_read_ceiling": 2,
+  "read_strike_limit": 3,
+  "unedited_read_ceiling": 8,
+  "command_length_limit": 4000,
+  "subagent_prompt_limit": 6000,
+  "block_image_reads": true,
+  "ban_cd": false,
+  "require_modern_cli": "auto",
+  "teardown_file_threshold": 4,
+  "simplify_loc_threshold": 400,
+  "simplify_file_threshold": 8,
+  "context_degraded_pct": 55,
+  "context_compact_pct": 65,
+  "context_critical_pct": 75,
+  "notify": false,
+  "annotate_verification_exit_codes": true,
+  "verification_patterns": [
+    "^npm (run )?(lint|build|test|typecheck)\\b",
+    "^npx (tsc|eslint|vitest|playwright)\\b"
+  ],
+  "suppression_reference_roots": [
+    {
+      "_note": "An eslint-disable/ts-ignore line a builder adds is allowed only if the identical line exists in the original file at the same path under reference_root (exact rebuild D1, ruling PR-42).",
+      "target_root_regex": "^/Users/maxime/Documents/Technical/Projects/Harness Agents V1/yaobet(?:/\\.claude/worktrees/[^/]+)?/src/",
+      "reference_root": "/Users/maxime/Documents/Projects/Antigravity/Igaming-Agent-1/apps/web/src/"
+    }
+  ]
+}

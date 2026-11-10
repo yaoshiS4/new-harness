@@ -1,0 +1,37 @@
+/* ============================================================================
+ * Yaobet — [data-theme] hook
+ * ----------------------------------------------------------------------------
+ * The default (no [data-theme]) is Wine-Gold, authored on :root in tokens.css.
+ * [data-theme="obsidian"] is opt-in: <html> does not carry it, so nothing in
+ * this block applies unless a page sets the attribute. Any theme re-points
+ * GROUP-A surface/text tokens here (NOT in brands.css). Brand and theme are
+ * orthogonal axes: [data-brand] re-skins accent; [data-theme] re-skins canvas.
+ *
+ * Obsidian keeps the previous near-black ladder on the same names, plus its
+ * previous win / loss / error / focus-ring values. That legacy win/loss pair is
+ * not luminance-matched; it is kept by owner decision and stays out of the
+ * default. The pinned four are standalone literals here (lint A3).
+ * ==========================================================================*/
+
+[data-theme="obsidian"] {
+  --canvas:           #0a0a0a;
+  --shell:            #050505;
+  --surface:          #141414;
+  --surface-2:        #1a1a1a;
+  --surface-3:        #212121;
+  --tile:             #171717;
+  --surface-hover:    #262626;
+  --surface-disabled: #303030;
+  --scrim:            rgba(0, 0, 0, 0.7);
+  --text-hi:          #f2f0e4;
+  --text:             #d6d3c7;
+  --text-mid:         #888888;
+  --text-dim:         #6f6f6f;
+  --border:           rgba(212, 175, 55, 0.55);
+  --tint:             rgba(242, 240, 228, 0.05);
+  --header-bg:        #0a0a0a;
+  --win:              #45c9a5;
+  --loss:             #f53f55;
+  --error:            #e42946;
+  --focus-ring:       #6ea8ff;
+}

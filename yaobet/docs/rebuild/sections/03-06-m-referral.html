@@ -1,0 +1,861 @@
+<section>
+<h2 id="m-referral">m-referral — /gioi-thieu, /dai-ly and the referral components</h2>
+
+<h3 id="m-route-gioi-thieu">Route /gioi-thieu</h3>
+<dl>
+<dt>Page file</dt><dd><code>src/app/(member)/gioi-thieu/page.tsx</code> (async Server Component), <code>gioi-thieu.module.css</code>, <code>loading.tsx</code></dd>
+<dt>Metadata</dt><dd><code>title: "Giới thiệu bạn bè — Yaobet"</code></dd>
+<dt>Auth</dt><dd>Client-side per band (InviteTools + CommissionPanel have guest branches; KPI header has none).</dd>
+<dt>Data</dt><dd>Parallel <code>getReferral()</code>, <code>getReferralKpi()</code>, <code>getCommissions()</code>; <code>hasCommissions = commissions.length &gt; 0</code>.</dd>
+</dl>
+<pre><code class="lang-txt">div.page
+├─ div.topRow
+│  ├─ ReferralKpiHeader kpi          (left, 1.1fr)
+│  └─ InviteTools referral           (right, 1fr)
+├─ CommissionPanel commissions hideEmpty showHeldRow
+└─ StepExplainer intro={!hasCommissions}</code></pre>
+<table>
+<thead><tr><th>Selector</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.page</td><td>flex column; gap 24px; min-width 0</td><td>base</td></tr>
+<tr><td>.heading (loading only)</td><td>24px #f2f0e4 700</td><td>base</td></tr>
+<tr><td>.topRow</td><td>grid; columns 1fr; gap 24px; children min-width 0</td><td>base</td></tr>
+<tr><td>.topRow</td><td>grid-template-columns 1.1fr 1fr</td><td>min-width: 880px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/app/(member)/gioi-thieu/gioi-thieu.module.css</code></summary>
+<pre><code class="lang-css">/* Giới thiệu / referral page. Tokens only; mobile-first @375.
+ * Cloned from dai-ly.module.css — the page is a single content column inside
+ * the (member) layout's content area; the bands own their own surfaces. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+/* J9 top row: reward-overview (wider, left) + referral-method/QR (right) SIDE BY
+ * SIDE; stacks on mobile. Grid align-items:stretch makes the two cards equal
+ * height (J9's matched-pair top). */
+.topRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+.topRow &gt; * {
+  min-width: 0;
+}
+@media (min-width: 880px) {
+  .topRow {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}
+</code></pre>
+</details>
+<table>
+<thead><tr><th>Width</th><th>Composition</th></tr></thead>
+<tbody>
+<tr><td>375</td><td>Sidebar stack, then KPI card (2×2 stats), InviteTools (fields stacked, QR column centered beneath), CommissionPanel, steps (1 column, max 320px centered).</td></tr>
+<tr><td>768</td><td>Same order; InviteTools fields + QR side by side (≥640); steps 2×2 (214px cards).</td></tr>
+<tr><td>1024</td><td>Rail + column. topRow becomes 2 columns (≥880) inside the column (≈ 1024 − 32 gutter − 304 − 16 ≈ 672px minus any QuickActionRail reservation, inference) so each top card is ~300–350px wide.</td></tr>
+<tr><td>1440</td><td>Same as 1024 with a wider column.</td></tr>
+</tbody>
+</table>
+<p><strong>Loading</strong>: <code>div.page aria-busy="true" aria-label="Đang tải giới thiệu"</code> → <code>h1.heading "Giới thiệu bạn bè"</code> → Skeleton block 100%×120 → ×176 → ×96 → ×240 (stacked, ignores the 2-column top row).</p>
+<div class="callout warn">Page has no h1; only the loading state shows "Giới thiệu bạn bè". Page comment says the KPI band has "2 stats"; the component renders 4 (2×2). <code>CommissionPanel</code> (with its own guest prompt) and <code>InviteTools</code> gate on auth, but <code>ReferralKpiHeader</code> renders live figures to guests.</div>
+
+<h3 id="m-route-dai-ly">Route /dai-ly</h3>
+<dl>
+<dt>Page file</dt><dd><code>src/app/(member)/dai-ly/page.tsx</code>, <code>dai-ly.module.css</code>; no loading.tsx.</dd>
+<dt>Metadata</dt><dd><code>title: "Đại lý — Yaobet"</code></dd>
+<dt>Entry</dt><dd>Header utility link "CLB" (<code>Header.tsx</code> id <code>club</code>, track S). No sidebar tile → no active tile here.</dd>
+</dl>
+<pre><code class="lang-txt">div.page   (flex column; gap 24px; min-width 0)
+├─ ReferralKpiHeader kpi
+├─ AgentTiers currentLevel={0}
+├─ InviteTools referral
+├─ CommissionPanel commissions          (defaults: showHeldRow=false, hideEmpty=false)
+└─ StepExplainer                        (intro=false → "Cách hoạt động" title)</code></pre>
+<details><summary>Verbatim CSS — <code>src/app/(member)/dai-ly/dai-ly.module.css</code></summary>
+<pre><code class="lang-css">/* Đại lý / affiliate page. Tokens only; mobile-first @375. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+</code></pre>
+</details>
+<p>Composition: a single column at all widths (no topRow grid). <code>.heading</code> is defined but unused.</p>
+
+<h3 id="m-referral-kpi">ReferralKpiHeader — "Tổng quan thưởng"</h3>
+<p><strong>Purpose</strong> — four reward-overview stats with gold icons. <strong>Source</strong> — <code>src/components/referral/ReferralKpiHeader.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">status "absent" → null
+status "error"  → Card default .card → h2.panelTitle "Tổng quan thưởng" + ErrorState title="Không tải được số liệu giới thiệu" onRetry=router.refresh()
+status "loading"→ Card .card → h2.panelTitle + div.grid → div.stat ×4 → StatHead + Skeleton 8ch × 1.6em
+status "live"   →
+Card default .card
+├─ h2.panelTitle "Tổng quan thưởng"
+└─ div.grid
+   ├─ div.stat → StatHead(referral,"Giới thiệu hợp lệ trong tháng") + span.countValue {formatCount(effectiveInvites)}
+   ├─ div.stat → StatHead(chip,"Cược hợp lệ của tôi hôm nay")    + MoneyValue kind=balance size=num-lg .value
+   ├─ div.stat → StatHead(history,"Bạn bè cược tích lũy hôm nay") + MoneyValue …
+   └─ div.stat → StatHead(cashback,"Hoa hồng dự kiến ngày mai")   + MoneyValue …
+StatHead: span.statHead → Icon {icon} 16 .statIcon + span.label {label}</code></pre>
+<p>Fixture live values: 2 · 1.250.000 ₫ · 6.800.000 ₫ · 42.000 ₫ (freshness 60000ms). DEMO_EMPTY → absent → band omitted.</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.card</td><td>flex column; padding 24px</td></tr>
+<tr><td>.panelTitle</td><td>24px; #f2f0e4; 600; margin-bottom 24px</td></tr>
+<tr><td>.grid</td><td>grid 1fr 1fr; gap 24px (row) 16px (column)</td></tr>
+<tr><td>.stat</td><td>flex column; gap 4px; min-width 0</td></tr>
+<tr><td>.statHead / .statIcon</td><td>flex center gap 4px min-width 0 / flex 0 0 auto #d4af37</td></tr>
+<tr><td>.label</td><td>14px; #888888; lh 1.3; min-width 0</td></tr>
+<tr><td>.value</td><td>#f2f0e4 (MoneyValue num-lg 32px)</td></tr>
+<tr><td>.countValue</td><td>num font; 32px; 700; lh 1.1; #f2f0e4</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/referral/ReferralKpiHeader.module.css</code></summary>
+<pre><code class="lang-css">/* ReferralKpiHeader — reward-overview band. Tokens only; mobile-first @375.
+ * J9 .top_right (the WIDER 570px reward-overview panel): a panel title over a
+ * stat row. KPI numbers render near-WHITE (--text-hi), never gold — gold is
+ * chrome/CTA only (tokens §9); J9 .bonus_num is #fff. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-pad);
+}
+
+/* panel title — "Tổng quan thưởng". t-h1 24px, weight-semi, near-white. */
+.panelTitle {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  margin-bottom: var(--space-5);
+}
+
+/* 4 KPIs in a 2×2 grid (J9 奖励总览 — 2 columns × 2 rows). */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5) var(--space-4);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* icon + label row (J9 shows a small gold icon beside each stat label). */
+.statHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.statIcon {
+  flex: 0 0 auto;
+  color: var(--brand-accent);
+}
+
+.label {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+  min-width: 0;
+}
+
+.value {
+  color: var(--text-hi);
+}
+
+/* COUNT value (#1 本月截至今日有效新增) — a plain number, matched to the money
+ * num-lg size, near-white (gold is chrome only). */
+.countValue {
+  font-family: var(--brand-font-num);
+  font-size: var(--t-num-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  color: var(--text-hi);
+}
+</code></pre>
+</details>
+<div class="callout warn">At 375px each stat column is ≈ (343 − 48 − 16)/2 ≈ 140px (inference) and a 32px "6.800.000 ₫" (~180px) overflows its cell (no wrap/shrink rule). File header says "today's referred turnover + current commission" (2 figures) — 4 are rendered.</div>
+
+<h3 id="m-invite-tools">InviteTools — "Công cụ mời bạn bè"</h3>
+<p><strong>Purpose</strong> — referral code and link with copy buttons, plus a white QR tile and a (disabled) "save QR" button. <strong>Source</strong> — <code>src/components/referral/InviteTools.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">Card default .card
+├─ h2.title "Công cụ mời bạn bè"
+├─ div.layout
+│  ├─ div.fields
+│  │  ├─ div.field → span.fieldLabel "Mã giới thiệu"
+│  │  │             + div.inputRow → span.code {code} + Button ghost sm icon=copy {copied==="code" ? "Đã sao chép" : "Sao chép"}
+│  │  └─ div.field → span.fieldLabel "Liên kết giới thiệu"
+│  │                + div.inputRow → span.link {link} + Button ghost sm icon=copy {copied==="link" ? "Đã sao chép" : "Sao chép"}
+│  └─ div.qrCol
+│     ├─ span.qrTile → hasRealPoster ? next/image src={posterSrc} alt="Ảnh mời / mã QR" 90×90 .qrImg
+│     │                               : span.qrPlaceholder aria-hidden → Icon grid 32
+│     ├─ span.qrTitle "Ảnh mời / mã QR"
+│     ├─ Button ghost sm icon=deposit disabled={!hasRealPoster} "Lưu mã QR"   (no onClick)
+│     └─ [!hasRealPoster] span.qrHint "Ảnh chia sẻ sẽ hiển thị tại đây khi sẵn sàng."
+└─ [!allowed] p.guestNote "Đăng nhập để lấy mã giới thiệu của riêng bạn."</code></pre>
+<p>Behaviour: copy → if guest, <code>promptAuth()</code>; else clipboard write, label "Đã sao chép" for 2000ms. <code>hasRealPoster = posterSrc &amp;&amp; posterSrc !== "/assets/placeholders/poster.svg"</code>; the fixture IS that placeholder, so the placeholder glyph shows and save stays disabled. Fixture: code "YB668812", link "https://yaobet.example/r/YB668812".</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.card</td><td>flex column; gap 16px; padding 24px</td><td>base</td></tr>
+<tr><td>.title</td><td>18px #f2f0e4 600</td><td>base</td></tr>
+<tr><td>.layout</td><td>flex column; gap 24px</td><td>base</td></tr>
+<tr><td>.layout</td><td>row; align flex-start; gap 16px</td><td>min-width: 640px</td></tr>
+<tr><td>.fields</td><td>flex column; gap 16px; min-width 0 (≥640: flex 1 1 auto)</td><td>base / 640</td></tr>
+<tr><td>.field / .fieldLabel</td><td>flex column gap 8px / 14px #888888</td><td>base</td></tr>
+<tr><td>.inputRow</td><td>flex; center; gap 8px; padding 8px 12px; radius 8px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55)</td><td>base</td></tr>
+<tr><td>.code</td><td>flex 1; num font; tabular-nums; letter-spacing 0.02em; 18px; 700; #d4af37; min-width 0; ellipsis nowrap</td><td>base</td></tr>
+<tr><td>.link</td><td>flex 1; 14px; #d6d3c7; ellipsis nowrap; min-width 0</td><td>base</td></tr>
+<tr><td>.qrCol</td><td>flex column; align center; gap 8px (≥640: flex 0 0 auto; width 116px)</td><td>base / 640</td></tr>
+<tr><td>.qrTile</td><td>flex center; 84×84px; flex 0 0 auto; radius 8px; bg <span class="tok">--qr-surface</span> #ffffff</td><td>base</td></tr>
+<tr><td>.qrImg</td><td>90% × 90%; object-fit contain</td><td>base</td></tr>
+<tr><td>.qrPlaceholder</td><td>inline-flex center; color <span class="tok">--shell</span> #050505; opacity 0.35</td><td>base</td></tr>
+<tr><td>.qrTitle</td><td>14px #f2f0e4 600</td><td>base</td></tr>
+<tr><td>.qrHint</td><td>12px #888888 centered max-width 100%</td><td>base</td></tr>
+<tr><td>.guestNote</td><td>14px #888888</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/referral/InviteTools.module.css</code></summary>
+<pre><code class="lang-css">/* InviteTools — code/link/QR. Tokens only; mobile-first @375.
+ * J9 referral-method panel: code+link stacked LEFT (~71%), white QR tile RIGHT.
+ * The 2-col split is gated at the band breakpoint (640px) — it collapses to a
+ * stack in /dai-ly's narrow column (beside the 304px rail). */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--card-pad);
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+/* J9 2-col: .box_left (fields) + .box_right (QR). Stacks @375 / narrow column. */
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* code value — brand-accent GOLD, tabular (J9 .copy_conte Roboto 20px/500). */
+.code {
+  flex: 1;
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  min-width: 0;
+  /* clip rather than overflow onto the copy button (the broken overlap). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* link value — white-ish, ellipsised (J9 .copy_conte.url white-90 12px). */
+.link {
+  flex: 1;
+  font-size: var(--t-sm);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* RIGHT column — white QR tile + label + save action. */
+.qrCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* the single WHITE block on the page (J9 .box_right .QR-code: #fff, radius 8px,
+ * flex-center). A QR must sit on white to scan. */
+.qrTile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-md);
+  background: var(--qr-surface);
+}
+
+/* real QR fills ~90% of the white tile (J9 .qr_box 90%). */
+.qrImg {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+}
+
+/* honest placeholder INSIDE the white tile — a muted grid glyph, never a fake
+ * QR. Dark ink on the white surface so it reads as an empty scan slot. */
+.qrPlaceholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--shell);
+  opacity: 0.35;
+}
+
+.qrTitle {
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.qrHint {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  text-align: center;
+  /* wrap WITHIN the QR column — a wide max-width here balloons the flex:0-0-auto
+   * column and crushes the code/link fields beside it. */
+  max-width: 100%;
+}
+
+.guestNote {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* ≥640px: J9 2-col — fields LEFT (~71%) / QR tile RIGHT. The gate is the BAND
+ * width so /dai-ly's narrow column keeps the stack (the fields never crush). */
+@media (min-width: 640px) {
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  .fields {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .qrCol {
+    flex: 0 0 auto;
+    width: 116px; /* cap the QR column so the code/link fields keep their width */
+  }
+}
+</code></pre>
+</details>
+<p>Image: <code>/assets/placeholders/poster.svg</code> exists in <code>public/</code> but is treated as absent; when a real asset is supplied it renders at intrinsic 90×90 inside the 84px tile at 90% (≈75.6px), object-fit contain.</p>
+<div class="callout warn">Comments say the 2-column split is "gated at the BAND width" so /dai-ly keeps a stack — the gate is a viewport media query (640px), so /dai-ly and the narrow topRow cell also go 2-column. Guests still see the real code and link. The "Lưu mã QR" button has no handler even when enabled. Code "YB668812" equals the bank transfer memo and the level-0 member id digits (fixture coincidence).</div>
+
+<h3 id="m-commission-panel">CommissionPanel — "Hoa hồng giới thiệu"</h3>
+<p><strong>Purpose</strong> — earnings: optional held-commission head row, then per-referral rows (masked name, date, turnover, commission). <strong>Source</strong> — <code>src/components/referral/CommissionPanel.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">Card default .card
+├─ h2.title "Hoa hồng giới thiệu"
+├─ [showHeldRow] div.heldRow
+│  ├─ span.heldGroup → span.heldLabel "Hoa hồng hiện có" + [held] MoneyValue .heldValue
+│  └─ span.detailsLink aria-disabled="true" → "Chi tiết hoạt động" + Icon chevronRight 14
+└─ !allowed → div.guest → p.guestText "Đăng nhập để xem hoa hồng giới thiệu của bạn." + Button primary sm "Đăng nhập"
+   empty    → hideEmpty ? nothing : EmptyState icon=referral title="Chưa có hoa hồng"
+                message="Khi bạn bè được giới thiệu phát sinh doanh thu, hoa hồng sẽ hiển thị tại đây."
+   rows     → ul.list → li.row
+               ├─ div.who → span.name {referredName} + span.when {dd/mm/yyyy vi-VN}
+               └─ div.figures → span.turnover "Doanh thu " MoneyValue
+                                + span.commission "Hoa hồng " MoneyValue .commissionVal</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>commissions</td><td><code>Commission[] { id, referredName, turnover, commission, at }</code></td><td>required</td><td>rows; held = sum of commission amounts (null if none or guest)</td></tr>
+<tr><td>showHeldRow</td><td>boolean</td><td>false</td><td>renders held row (/gioi-thieu)</td></tr>
+<tr><td>hideEmpty</td><td>boolean</td><td>false</td><td>suppresses EmptyState (/gioi-thieu)</td></tr>
+</tbody>
+</table>
+<p>Fixture: "Trần***" turnover 3.800.000 ₫ commission 88.000 ₫ (2 h ago); "Lê***" 3.000.000 ₫ / 80.000 ₫ (680 min ago). Held = 168.000 ₫ (gold).</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.card</td><td>flex column; gap 16px; padding 24px</td></tr>
+<tr><td>.title</td><td>18px #f2f0e4 600</td></tr>
+<tr><td>.heldRow</td><td>flex; center; space-between; gap 12px; wrap</td></tr>
+<tr><td>.heldGroup / .heldLabel / .heldValue</td><td>inline-flex baseline gap 8px / 14px #888888 / #d4af37</td></tr>
+<tr><td>.detailsLink</td><td>inline-flex; center; gap 4px; 14px; #d4af37; nowrap (not a link)</td></tr>
+<tr><td>.list / .row</td><td>flex column gap 4px / flex center space-between gap 12px padding 12px 0 border-bottom hairline (last none)</td></tr>
+<tr><td>.who / .name / .when</td><td>flex column gap 4px / 16px #f2f0e4 600 / 12px #888888</td></tr>
+<tr><td>.figures</td><td>flex column; align flex-end; gap 4px</td></tr>
+<tr><td>.turnover</td><td>12px; #888888; inline-flex; gap 4px</td></tr>
+<tr><td>.commission / .commissionVal</td><td>14px #888888 inline-flex baseline gap 4px / #d4af37</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/referral/CommissionPanel.module.css</code></summary>
+<pre><code class="lang-css">/* CommissionPanel — earnings list. Tokens only; mobile-first @375.
+ * J9 .top_box head row (held commission + details link) is opt-in via showHeldRow. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--card-pad);
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+/* J9 .top_box — space-between held-commission head row (margin-top baked into
+ * the card gap). Left: label + gold held total. Right: low-salience details link. */
+.heldRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.heldGroup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.heldLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* held total — GOLD chrome (J9 head-row figure). Renders only when live. */
+.heldValue {
+  color: var(--brand-accent);
+}
+
+/* details link — low-salience gold (J9 .top_box .link). Non-navigating: it has
+ * no real route yet, so it is a quiet text+chevron affordance, not a &lt;Link&gt;. */
+.detailsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-sm);
+  color: var(--brand-accent);
+  white-space: nowrap;
+}
+
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.when {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.turnover {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.commission {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.commissionVal {
+  color: var(--brand-accent);
+}
+</code></pre>
+</details>
+<div class="callout warn">"Chi tiết hoạt động" is gold link-coloured but is a non-interactive <code>span</code> with <code>aria-disabled</code> (no route). For guests on /gioi-thieu the held row still shows its label (value omitted) above the login prompt.</div>
+
+<h3 id="m-step-explainer">StepExplainer — "Cách hoạt động"</h3>
+<p><strong>Purpose</strong> — four numbered "how it works" cards with a solid-colour banner, icon and faded number. <strong>Source</strong> — <code>src/components/referral/StepExplainer.tsx</code> (Server Component), <code>.module.css</code>.</p>
+<pre><code class="lang-txt">section.section aria-label="Cách hoạt động"
+├─ intro ? p.intro "Bạn chưa có bạn bè được giới thiệu — hãy mời bạn bè hoàn thành các bước để nhận thưởng."
+│        : h2.title "Cách hoạt động"
+└─ ol.grid → li.step ×4
+   ├─ span.banner.tone{i} aria-hidden → Icon {icon} 34 .bannerIcon + span.bannerNum {i+1}
+   └─ span.stepBody → span.stepNum "{i+1}." + " {body}"</code></pre>
+<table>
+<thead><tr><th>#</th><th>Icon</th><th>Banner fill</th><th>Ink</th><th>Body</th><th>Gloss</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>copy</td><td><span class="sw" style="background:#d4af37"></span> <span class="tok">--brand-accent</span> #d4af37</td><td>#0a0a0a</td><td>Gửi mã QR hoặc liên kết mời</td><td>Send the QR or invite link</td></tr>
+<tr><td>2</td><td>user</td><td><span class="sw" style="background:#018fff"></span> <span class="tok">--info</span> #018fff</td><td><span class="tok">--canvas</span> #0a0a0a</td><td>Bạn bè đăng ký và đăng nhập</td><td>Friend registers and logs in</td></tr>
+<tr><td>3</td><td>referral</td><td><span class="sw" style="background:#45c9a5"></span> <span class="tok">--win</span> #45c9a5</td><td>#0a0a0a</td><td>Bạn bè tham gia chơi</td><td>Friend plays</td></tr>
+<tr><td>4</td><td>cashback</td><td><span class="sw" style="background:#f53f55"></span> <span class="tok">--loss</span> #f53f55</td><td>#0a0a0a</td><td>Nhận hoa hồng theo điều khoản</td><td>Receive commission per the terms</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.section</td><td>flex column; gap 16px; align-items center</td><td>base</td></tr>
+<tr><td>.title</td><td>18px #f2f0e4 600; align-self flex-start</td><td>base</td></tr>
+<tr><td>.intro</td><td>16px #888888 centered lh 1.5 max-width 48ch margin 0 auto</td><td>base</td></tr>
+<tr><td>.grid</td><td>grid 1fr; gap 24px; width 100%; max-width 320px; margin 0 auto; no list styling</td><td>base</td></tr>
+<tr><td>.grid</td><td>repeat(2, 1fr); width fit-content; max-width none</td><td>min-width: 640px</td></tr>
+<tr><td>.step</td><td>flex column; center; gap 8px (≥640: width 214px)</td><td>base / 640</td></tr>
+<tr><td>.banner</td><td>relative; overflow hidden; flex center; width 100%; aspect-ratio 16 / 9; radius 8px; color #0a0a0a</td><td>base</td></tr>
+<tr><td>.bannerIcon</td><td>relative; z-index 1</td><td>base</td></tr>
+<tr><td>.bannerNum</td><td>absolute; right 10px; bottom −2px; num font; 46px; 700; lh 1; color inherit; opacity 0.22</td><td>base</td></tr>
+<tr><td>.stepBody / .stepNum</td><td>14px #888888 lh 1.5 centered / #d6d3c7 600</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/referral/StepExplainer.module.css</code></summary>
+<pre><code class="lang-css">/* StepExplainer — 4-step grid. Tokens only; @375 single col → 2-col centered.
+ * J9 .step_box: grid repeat(2,1fr), fit-content, centered (margin 0 auto), gap
+ * 24px. Each .step_item is a ~214px image-over-caption card; we own no J9
+ * banners, so the "image" is our own icon tile (radius-md). .step_tips caption
+ * is white-60, 14px, line-height 150%. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  align-self: flex-start;
+}
+
+/* lead-in onboarding headline (/gioi-thieu only) — the honest "no friends yet"
+ * line above the grid. Centered, muted, comfortable reading width. */
+.intro {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+  text-align: center;
+  line-height: var(--lh-body);
+  max-width: 48ch;
+  margin: 0 auto;
+}
+
+/* J9 .step_box — centered fit-content grid. Single column @375. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  list-style: none;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    width: fit-content;
+    max-width: none;
+  }
+}
+
+/* J9 .step_item — ~214px image-over-caption card. */
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .step {
+    width: 214px;
+  }
+}
+
+/* The banner — a flat colour BLOCK per step (J9's illustrated .step_img
+ * stand-in), carrying an icon and a faded number watermark.
+ *
+ * Was four `linear-gradient(135deg, …)` fills. This is a card face, and the flat
+ * system permits gradients only as large background decoration — so each tone is
+ * now a SOLID saturated fill. The step still reads as its own colour; it just
+ * stops pretending to have a light source.
+ *
+ * The ink flipped from --text-hi (champagne) to a dark ink, because champagne on
+ * these fills fails AA everywhere it matters:
+ *     #f2f0e4 on --brand-accent #d4af37 → 2.11:1   ✗
+ *     #f2f0e4 on --win        #45c9a5   → 1.81:1   ✗
+ *     #f2f0e4 on --info       #018fff   → 2.88:1   ✗
+ *     #f2f0e4 on --loss       #f53f55   → 3.21:1   ✗
+ * Dark ink #0a0a0a clears it on all four: 9.42 / 8.92 / 5.60 / 5.03:1.
+ * The three pinned-neutral fills take the LOCKED --canvas ink; the brand fill
+ * takes --brand-on-accent, so a re-branded accent carries its own ink with it. */
+.banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  color: var(--canvas);
+}
+.tone0 {
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+}
+.tone1 {
+  background: var(--info);
+}
+.tone2 {
+  background: var(--win);
+}
+.tone3 {
+  background: var(--loss);
+}
+/* No drop-shadow. A glow is a shadow renamed and so is a text shadow; the icon
+ * now separates by its own contrast against the flat fill, which is what the
+ * ink flip above bought. */
+.bannerIcon {
+  position: relative;
+  z-index: 1;
+}
+.bannerNum {
+  position: absolute;
+  right: 10px;
+  bottom: -2px;
+  font-family: var(--brand-font-num);
+  font-size: 46px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  color: inherit; /* the tone's dark ink — a watermark, never a second hue */
+  opacity: 0.22;
+}
+
+/* J9 .step_tips — caption beneath the image. white-60, 14px, line-height 150%. */
+.stepBody {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.stepNum {
+  color: var(--text);
+  font-weight: var(--weight-semi);
+}
+</code></pre>
+</details>
+<div class="callout warn">Literal 46px / 10px / −2px / 214px / 320px / 1.5 in a "tokens only" module. JSX comment still says "colorful gradient banner" — CSS now uses solid fills. Step 2 icon <code>user</code> and step 3 <code>referral</code> (comment-documented). The red <span class="tok">--loss</span> fill for "receive commission" reuses the loss outcome colour as decoration.</div>
+
+<h3 id="m-agent-tiers">AgentTiers — "Cấp đại lý" (/dai-ly only)</h3>
+<p><strong>Purpose</strong> — a vertical list of affiliate tiers with name, criteria and a "commission per programme terms" note. <strong>Source</strong> — <code>src/components/referral/AgentTiers.tsx</code> (Server Component), <code>.module.css</code>.</p>
+<pre><code class="lang-txt">section.section aria-label="Cấp đại lý"
+├─ h2.title "Cấp đại lý"
+└─ ul.list → li ×4 → Card variant=vip active={level===currentLevel} .tier
+                     ├─ span.badge aria-hidden → Icon trophy 22
+                     └─ div.body
+                        ├─ div.head → span.name {name} + [current] Badge tone=gold "Cấp hiện tại"
+                        ├─ span.criteria {criteria}
+                        └─ span.rate "Hoa hồng theo điều khoản chương trình"</code></pre>
+<table>
+<thead><tr><th>level</th><th>name</th><th>criteria (verbatim)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Đại lý Đồng</td><td>Bắt đầu khi có thành viên giới thiệu hoạt động.</td></tr>
+<tr><td>2</td><td>Đại lý Bạc</td><td>Đạt mốc thành viên hoạt động theo điều khoản.</td></tr>
+<tr><td>3</td><td>Đại lý Vàng</td><td>Mở rộng mạng lưới giới thiệu ổn định.</td></tr>
+<tr><td>5</td><td>Đại lý Bạch kim</td><td>Mạng lưới giới thiệu quy mô lớn, hoa hồng cao nhất.</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.section / .title</td><td>flex column gap 16px / 18px #f2f0e4 600</td></tr>
+<tr><td>.list</td><td>flex column; gap 12px; no list styling</td></tr>
+<tr><td>.tier (on Card vip)</td><td>flex; align flex-start; gap 12px; padding 16px</td></tr>
+<tr><td>.badge</td><td>inline-flex center; 44×44px; flex 0 0 auto; radius 8px; bg rgba(212,175,55,0.55); color #d4af37</td></tr>
+<tr><td>.body / .head</td><td>flex column gap 4px min-width 0 / flex center gap 8px wrap</td></tr>
+<tr><td>.name / .criteria / .rate</td><td>16px #f2f0e4 700 / 14px #888888 lh 1.5 / 12px #888888</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/referral/AgentTiers.module.css</code></summary>
+<pre><code class="lang-css">/* AgentTiers — affiliate tier ladder. Tokens only; mobile-first @375. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tier {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-md);
+  background: var(--brand-accent-hairline);
+  color: var(--brand-accent);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.name {
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.criteria {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+/* --text-mid, not --text-dim: the commission rate is functional copy, and
+ * --text-dim (#6f6f6f) is declared DECORATIVE-ONLY in tokens.css — it measures
+ * 3.67:1 on the card's --surface, below the 4.5:1 AA floor. --text-mid is 5.20:1. */
+.rate {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+</code></pre>
+</details>
+<div class="callout warn">Levels jump 1, 2, 3, 5 (no 4). <code>currentLevel</code> is hard-coded 0 on /dai-ly, so no card is ever <code>active</code> and "Cấp hiện tại" never shows. The trophy (gold #d4af37) sits on a 0.55-alpha gold fill — low contrast. All copy hard-coded (not in i18n). The tier name "Bạch kim" uses a lowercase k while the rest of the app writes "Bạch Kim".</div>
+</section>
+

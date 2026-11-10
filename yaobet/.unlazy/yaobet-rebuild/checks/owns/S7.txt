@@ -1,0 +1,3 @@
+src/components/category/**
+src/app/[vertical]/**
+src/styles/areas/vertical.css

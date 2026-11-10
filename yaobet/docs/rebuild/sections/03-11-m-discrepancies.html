@@ -1,0 +1,13 @@
+<section>
+<h2 id="m-discrepancies">m-discrepancies — roll-up of contradictions in track M</h2>
+<div class="callout warn"><ol>
+<li><strong>Navigation dead-ends</strong>: sidebar "Hoàn trả"/"Sinh lời"/"Trung tâm nhiệm vụ" → /hoan-tra → /khuyen-mai; "Lịch sử" → /lich-su → /tai-khoan (Hồ sơ); /bao-mat → /tai-khoan (not #bao-mat). No UI link reaches <code>#ngan-hang</code>, <code>#vi-tien-ao</code> or <code>#ho-so</code>.</li>
+<li><strong>Guest leakage</strong>: SecurityCenter, BankAccounts, CryptoAddresses and ReferralKpiHeader render fixture data to guests; MessageCenter shows the unread count and bulk actions to guests; InviteTools shows the code/link.</li>
+<li><strong>Wallet bugs</strong>: double "₫" in Chuyển quỹ source options; withdraw destination is the house deposit account; no amount validation on deposit; first-deposit offer unreachable; non-keyboard-reachable wallet tabs (roving tabindex without arrow keys).</li>
+<li><strong>Truthfulness claims vs code</strong>: sidebar shows "Số dư: 0 ₫" for a non-live balance and a hard-coded "0" waiting count; progress caption says "Nạp tích lũy" for a turnover metric; level-0 user sees Bạch Kim progress and Nguyễn Văn An as real name.</li>
+<li><strong>Doc/code drift</strong>: "permanent redirect" comments on 307 redirects; restricted list documented as rate-free but shows a rate column; ResultStatus documented as silent on default view but always shows the count; "2 stats" vs 4 KPIs; viewport media query documented as band-width gating; Cinzel references after Montserrat swap; loading.tsx skeletons/h1s that do not match their pages (and an undefined <code>.heading</code> class on /tai-khoan).</li>
+<li><strong>Token contract</strong>: literal px/ms/line-heights in "tokens only" modules (MemberSidebar 44/18/86/6/4/2/11/3px, 1.6s; ProfileBasic 56px; SecurityCenter 36px/8px; LinkedAccounts 40px; DepositPanel 160px/36ch; FundTransfer 40px; StepExplainer 46/10/214/320px; InviteTools 84/116px; AgentTiers 44px; stub 1.6; MessageCenter 3px/8px) and one inline layout style (tin-nhan loading).</li>
+<li><strong>i18n contract</strong>: <code>lib/i18n.ts</code> claims "No component holds a hardcoded VN string"; most wallet, logout, linked-account, agent-tier, stub and sidebar-guest strings are hard-coded. Spelling drift: "Huỷ"/"huỷ" vs "Hủy"; "Bạch kim" vs "Bạch Kim".</li>
+</ol></div>
+</section>
+

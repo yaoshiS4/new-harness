@@ -1,0 +1,135 @@
+/* Points store — rules kept as selectors: the type roles, the RedeemDialog
+ * cost card's data-tone states and the StoreTerms accordion's data-open
+ * states. */
+
+/* Heading and numeral type roles. Headings keep 0 tracking; h3 and h4 take
+ * the body face. Numerals are single-line tabular figures. */
+.store-type-h1 {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  letter-spacing: 0;
+}
+
+.store-type-h3 {
+  font-family: var(--type-h3-family);
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-leading);
+  font-weight: var(--type-h3-weight);
+  letter-spacing: 0;
+}
+
+.store-type-h4 {
+  font-family: var(--type-h4-family);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-leading);
+  font-weight: var(--type-h4-weight);
+  letter-spacing: 0;
+}
+
+.store-type-num-lg {
+  font-family: var(--type-num-lg-family);
+  font-size: var(--type-num-lg-size);
+  line-height: var(--type-num-lg-leading);
+  font-weight: var(--type-num-lg-weight);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.store-type-num-md {
+  font-family: var(--type-num-md-family);
+  font-size: var(--type-num-md-size);
+  line-height: var(--type-num-md-leading);
+  font-weight: var(--type-num-md-weight);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---- Cost — hero fact on a NEUTRAL card (no muddy amber fill) ----------- */
+.store-redeem-dialog-cost {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* The HERO numeral — dominates every other figure in the dialog. State-driven
+   colour: --text-hi base / --caution early / --loss unaffordable. */
+.store-redeem-dialog-cost-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--t-hero);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+}
+
+/* Escalated (early) — colour lives on the NUMBER + a hairline, not a fill. */
+.store-redeem-dialog-cost[data-tone="caution"] {
+  border-color: color-mix(in srgb, var(--caution) 45%, var(--border));
+}
+.store-redeem-dialog-cost[data-tone="caution"] .store-redeem-dialog-cost-value {
+  color: var(--caution);
+}
+
+/* Unaffordable — red. */
+.store-redeem-dialog-cost[data-tone="alert"] {
+  border-color: color-mix(in srgb, var(--loss) 45%, var(--border));
+}
+.store-redeem-dialog-cost[data-tone="alert"] .store-redeem-dialog-cost-value {
+  color: var(--loss);
+}
+
+/* ---- Accordion list ---------------------------------------------------- */
+.store-terms-item {
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  border: 1px solid transparent;
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+
+.store-terms-item[data-open="true"] {
+  border-color: var(--brand-accent-hairline);
+}
+
+/* hover = a colour shift, not a lift. No scale: these are full-width accordion
+ * rows, and every row answers identically whether open or closed. */
+.store-terms-item:hover {
+  border-color: var(--brand-accent-hairline);
+}
+
+.store-terms-chevron {
+  flex: none;
+  color: var(--fg-muted-raised); /* the rows sit on --surface-3 */
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.store-terms-trigger:hover .store-terms-chevron {
+  transform: scale(1.1); /* the uniform icon step */
+}
+.store-terms-item[data-open="true"] .store-terms-trigger:hover .store-terms-chevron {
+  transform: rotate(180deg) scale(1.1);
+}
+
+.store-terms-item[data-open="true"] .store-terms-chevron {
+  transform: rotate(180deg);
+  color: var(--brand-accent-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-terms-chevron,
+  .store-terms-item {
+    transition: none;
+  }
+  /* absent, not instant — the open/closed rotation stays (it is state, not
+   * decoration); only the hover magnification goes. */
+  .store-terms-trigger:hover .store-terms-chevron {
+    transform: none;
+  }
+  .store-terms-item[data-open="true"] .store-terms-trigger:hover .store-terms-chevron {
+    transform: rotate(180deg);
+  }
+}

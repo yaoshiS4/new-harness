@@ -1,0 +1,1344 @@
+/* Base rules of the src/ui primitives, ported from each primitive's original
+ * module CSS with class renames only (.btn -> .ui-btn, .gold -> .ui-btn-gold),
+ * so every selector keeps its specificity. The keyframes they use are declared
+ * once in src/styles/keyframes.css. */
+
+/* ---- Icon ---- */
+.ui-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.125em;
+  color: inherit;
+}
+
+/* ---- Badge ---- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+/* ---- subtle (tinted) ----------------------------------------------------
+ * Every tone sits on ONE fixed dark ground, --shell, so the contrast is a
+ * property of the Badge and not of the surface it lands on. Every subtle tone
+ * is light-on-dark, so the darkest ground gives each ratio its most headroom.
+ * A `currentColor` hairline keeps the chip's shape legible on any parent.
+ * The ratios below are each tone on --shell; the lowest is --error at 6.40:1. */
+.ui-badge-subtle {
+  background: var(--shell);
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+}
+.ui-badge-subtle.ui-badge-neutral {
+  color: var(--text); /* 8.08:1 */
+}
+.ui-badge-subtle.ui-badge-gold {
+  /* Gold text reads the text accent; --brand-accent is a fill. */
+  color: var(--brand-accent-fg); /* 10.71:1 */
+}
+.ui-badge-subtle.ui-badge-info {
+  color: var(--info); /* 6.91:1 */
+}
+.ui-badge-subtle.ui-badge-win {
+  color: var(--win); /* 7.86:1 */
+}
+.ui-badge-subtle.ui-badge-loss {
+  color: var(--loss); /* 7.88:1 */
+}
+.ui-badge-subtle.ui-badge-caution {
+  color: var(--caution); /* 6.99:1 */
+}
+/* The tightest subtle pair: --error on --shell. --error is GROUP-A PINNED
+ * and owned by src/styles. */
+.ui-badge-subtle.ui-badge-danger {
+  color: var(--error); /* 6.40:1 */
+}
+
+/* ---- solid --------------------------------------------------------------
+ * Every light chromatic fill takes the dark --shell ink, so no tone is a
+ * special case. The warning tone is the exception: it reads as --caution text
+ * on the warning tint (MAPPING colour row --on-caution). Ratios are ink on
+ * fill. */
+.ui-badge-solid.ui-badge-neutral {
+  background: var(--surface-3);
+  color: var(--text-hi); /* 10.93:1 */
+}
+.ui-badge-solid.ui-badge-gold {
+  background: var(--brand-accent);
+  color: var(--brand-on-accent); /* 7.97:1, MAPPING colour row --text-on-gold */
+}
+.ui-badge-solid.ui-badge-info {
+  background: var(--info);
+  color: var(--shell); /* 6.91:1 */
+}
+.ui-badge-solid.ui-badge-win {
+  background: var(--win);
+  color: var(--shell); /* 7.86:1 */
+}
+.ui-badge-solid.ui-badge-loss {
+  background: var(--loss);
+  color: var(--shell); /* 7.88:1 */
+}
+.ui-badge-solid.ui-badge-caution {
+  /* --on-caution holds the warning tint step (feedback.tint.warning). */
+  background: var(--on-caution);
+  color: var(--caution); /* 5.84:1, MAPPING colour row --on-caution */
+}
+.ui-badge-solid.ui-badge-danger {
+  background: var(--error);
+  color: var(--shell); /* 6.40:1 */
+}
+
+/* ---- Button ---- */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm); /* controls take the control radius */
+  font-family: var(--brand-font-body);
+  /* The label reads the body role at every size step except sm. */
+  font-size: var(--type-body-size);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  /* Hover is a transform plus a colour shift; the transition list holds no
+   * box-shadow and no filter (border-color carries the ghost variant, color
+   * the destructive label). */
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* UNIFORM hover — every button scales 1.05, regardless of variant, size or
+ * prominence. Declared ONCE on .btn so no variant can differentiate itself.
+ * Placed before the variant rules so their :active scale(.98) still wins. */
+@media (hover: hover) and (pointer: fine) {
+  .ui-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+  }
+}
+
+/* Focus: the --focus-ring outline outside a 2px gap in the focus gap colour
+ * (--canvas, DS focus.gap), so the ring reads on any surface. */
+.ui-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
+.ui-btn-label {
+  display: inline-block;
+}
+
+.ui-btn-icon {
+  font-size: 1.25em;
+}
+
+/* ---- sizes -------------------------------------------------------------- */
+.ui-btn-sm {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  font-size: var(--type-body-sm-size);
+}
+.ui-btn-md {
+  min-height: var(--tap-min);
+}
+.ui-btn-lg {
+  min-height: 52px;
+  padding: 0 var(--space-6);
+}
+.ui-btn-bar {
+  min-height: var(--tap-bar);
+}
+
+.ui-btn-full {
+  width: 100%;
+}
+
+/* ---- variant: gold (premium / claim / VIP CTA) --------------------------
+ * A flat --brand-accent fill; the sheen belongs to .ui-btn-primary only
+ * (MAPPING colour row --brand-accent-grad). Hover = colour shift; :active =
+ * the pressed step. */
+.ui-btn-gold {
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+}
+.ui-btn-gold:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-accent) 85%, var(--text-hi));
+}
+.ui-btn-gold:active:not(:disabled) {
+  transform: scale(0.98);
+  background: var(--brand-accent-2);
+}
+
+/* ---- variant: primary (the gold primary — login/submit) ----------------
+ * The sheen (--brand-accent-grad) paints over the flat --brand-accent fill,
+ * which is also the fallback. The label is --brand-on-accent: 7.97:1 on the
+ * fill (MAPPING colour rows --text-on-gold and --cta-grad). Hover drops the
+ * sheen and lifts the flat fill 15% toward --text-hi (a colour shift that
+ * survives reduced motion; label 8.76:1); :active takes the pressed step
+ * --brand-accent-2 (6.31:1). */
+.ui-btn-primary {
+  background-color: var(--brand-accent);
+  background-image: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+}
+.ui-btn-primary:hover:not(:disabled) {
+  background-image: none;
+  background-color: color-mix(in srgb, var(--brand-accent) 85%, var(--text-hi));
+}
+.ui-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+  background-image: none;
+  background-color: var(--brand-accent-2);
+}
+
+/* ---- variant: danger (the register accent) -----------------------------
+ * Fills with --brand-cta-accent, the gold primary under the default brand.
+ * The ink is --shell: 8.33:1 on that fill (MAPPING colour row --cta-accent). */
+.ui-btn-danger {
+  background: var(--brand-cta-accent);
+  color: var(--shell);
+}
+.ui-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-cta-accent) 85%, var(--text-hi));
+}
+.ui-btn-danger:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ---- variant: destructive (logout, delete, irreversible actions) -------
+ * An outline in the danger hue on a transparent fill, so it never competes
+ * with the gold primary. Label and edge read --error: 6.40:1 on --canvas,
+ * 5.83:1 on --surface, 4.61:1 on --surface-3. Hover and :active fill solid
+ * --error under a --shell label (6.40:1 on every surface, the solid danger
+ * badge pairing); the edge stays --error and focus is the shared ring and
+ * gap. */
+.ui-btn-destructive {
+  background: transparent;
+  border-color: var(--error);
+  color: var(--error);
+}
+.ui-btn-destructive:hover:not(:disabled),
+.ui-btn-destructive:active:not(:disabled) {
+  background-color: var(--error);
+  color: var(--shell);
+}
+.ui-btn-destructive:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ---- variant: ghost (the quiet action) ----------------------------------
+ * DS button.ghost: an ivory --text-hi label with no edge on every state; gold
+ * stays reserved for the primary fill and the secondary label and edge. Hover
+ * lays the ghost hover step --surface-hover under the label (DS
+ * action.ghost.hover.bg). */
+.ui-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-hi);
+}
+.ui-btn-ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: transparent;
+}
+.ui-btn-ghost:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ---- disabled ----------------------------------------------------------- */
+/* Disabled labels on this surface carry REAL information — "Tạm hết hàng",
+ * "Hết lượt đổi", "Thiếu 10.750 điểm" — so they are read, not skipped, and the
+ * WCAG 1.4.3 exemption for inactive controls is the wrong thing to lean on.
+ * On --surface-disabled, --text-mid alone measures 4.68:1; the 75% --text-mid
+ * + 25% --text-hi mix measures 6.18:1 and still reads as muted. Both inputs
+ * are semantic tokens, so this follows a re-brand or re-theme. */
+.ui-btn:disabled {
+  background: var(--surface-disabled);
+  color: color-mix(in srgb, var(--text-mid) 75%, var(--text-hi));
+  border-color: transparent;
+  cursor: not-allowed;
+  transform: none;
+}
+.ui-btn[data-loading] {
+  cursor: progress;
+}
+
+/* ---- loading spinner ---------------------------------------------------- */
+.ui-btn-spinner {
+  width: 1.1em;
+  height: 1.1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--radius-pill);
+  animation: ui-spin var(--dur-ambient) linear infinite;
+}
+
+/* Reduced-motion: EVERY transform added above is disabled; the colour shift
+ * (which is not motion) is all that remains as hover feedback. The spinner
+ * holds still (motion.css zeroes --dur-ambient); its open ring, cursor and
+ * aria-busy still mark the loading state. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn {
+    transition: none;
+  }
+  .ui-btn:hover:not(:disabled),
+  .ui-btn:active:not(:disabled) {
+    transform: none;
+  }
+  .ui-btn-spinner {
+    animation: none;
+  }
+}
+
+/* ---- Card ---- */
+.ui-card {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  background: var(--card-bg);
+  /* Decorative hairline: the surface step and the --lift shadow carry the
+   * edge (MAPPING colour row --border). */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--lift); /* elevation level 1 */
+  color: var(--text-hi);
+  text-align: left;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+/* One shadow level per branch: a card inside a card, a modal or a sheet sits
+ * on an elevated parent and takes no shadow of its own. */
+.ui-card .ui-card,
+.ui-modal-panel .ui-card,
+.ui-sheet-panel .ui-card {
+  box-shadow: none;
+}
+
+/* button reset when card renders as <button> */
+button.ui-card {
+  width: 100%;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ---- variants: padding / aspect cues ------------------------------------ */
+.ui-card-default {
+  padding: var(--space-4);
+}
+.ui-card-rail {
+  padding: var(--space-3);
+}
+.ui-card-promo {
+  padding: 0;
+}
+.ui-card-product {
+  padding: 0;
+}
+.ui-card-vip {
+  padding: var(--space-5);
+}
+.ui-card-tile {
+  padding: 0;
+  border-radius: var(--radius-md); /* game-tile corner = 8px (not 12) */
+}
+
+/* ---- interactive -------------------------------------------------------- */
+.ui-card-interactive {
+  cursor: pointer;
+  transition:
+    transform var(--dur-base) var(--ease-standard),
+    background-color var(--dur-base) var(--ease-standard),
+    border-color var(--dur-base) var(--ease-standard);
+}
+
+/* Icons inside an interactive card ride the card's hover at 1.10. Targets the
+ * stable [data-icon] hook the Icon primitive stamps on its <svg>, because a
+ * CSS-Module class from the Icon stylesheet is hashed and unreachable from here. */
+.ui-card-interactive [data-icon] {
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+
+/* pointer (mouse) → UNIFORM scale(1.02) + a border COLOUR shift. Hover adds
+ * no shadow and no glow: the gold border is the lit signal, and --glow-gold is
+ * a gold colour slot with no box-shadow use. */
+@media (hover: hover) and (pointer: fine) {
+  .ui-card-interactive:hover {
+    border-color: var(--brand-accent);
+    transform: scale(1.02);
+  }
+  .ui-card-interactive:hover [data-icon] {
+    transform: scale(1.1);
+  }
+}
+
+/* touch → press scale, no hover lift */
+@media (hover: none) {
+  .ui-card-interactive:active {
+    transform: scale(0.98);
+  }
+}
+
+.ui-card-interactive:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas); /* focus gap */
+}
+
+/* Lit/active state: a solid accent border plus an 8% accent film over
+ * --surface, a SOLID computed colour (color-mix, not a gradient).
+ * Accent gold, never --focus-ring: the focus ring is reserved for focus. */
+.ui-card-active {
+  border-color: var(--brand-accent);
+  background: color-mix(in srgb, var(--brand-accent) 8%, var(--surface));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-card-interactive,
+  .ui-card-interactive [data-icon] {
+    transition: border-color var(--dur-base) var(--ease-standard);
+  }
+  .ui-card-interactive:hover,
+  .ui-card-interactive:active,
+  .ui-card-interactive:hover [data-icon] {
+    transform: none;
+  }
+}
+
+/* ---- Pill ---- */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* Pill renders a <button>, so it takes the UNIFORM button hover: scale(1.05)
+ * plus a colour shift. Same values as Button — no per-component variation. */
+@media (hover: hover) and (pointer: fine) {
+  .ui-pill:hover:not(:disabled) {
+    transform: scale(1.05);
+  }
+}
+
+.ui-pill:hover:not(:disabled) {
+  border-color: var(--brand-accent-hairline);
+  color: var(--text-hi);
+}
+
+.ui-pill:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas); /* focus gap */
+}
+
+/* Selected chip: a 12% accent film over --surface-2 (a solid computed colour,
+ * not a gradient) under the gold text accent, 6.93:1. Accent gold, never
+ * --focus-ring: the focus ring is reserved for focus. */
+.ui-pill-active {
+  background: color-mix(in srgb, var(--brand-accent) 12%, var(--surface-2));
+  border-color: var(--brand-accent);
+  color: var(--brand-accent-fg);
+}
+
+.ui-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-pill-icon {
+  font-size: 1.1em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-pill {
+    transition: none;
+  }
+  .ui-pill:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---- MoneyValue ---- */
+/* The `.money` role — composed from the type + win/loss tokens. */
+.ui-money {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  white-space: nowrap;
+}
+
+.ui-money-num {
+  font-size: var(--t-num);
+}
+
+/* gold treatment is allowed on large figures only (≥18px) — never small text */
+.ui-money-num-lg {
+  font-size: var(--t-num-lg);
+  font-weight: var(--weight-bold);
+}
+
+/* ---- win / loss — luminance-matched, EQUAL salience -------- */
+.ui-money-win {
+  color: var(--win);
+}
+.ui-money-loss {
+  color: var(--loss);
+}
+
+/* ---- stale — explicitly labelled, never silently shown as live -----
+ * The paused status pair: the "tạm dừng" label carries the state, 5.66:1 on
+ * its tint (the --status-paused-fg on --status-paused-bg pair); the tint is
+ * decorative. */
+.ui-money-stale {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--status-paused-bg);
+  color: var(--status-paused-fg);
+  font-weight: var(--weight-reg);
+}
+
+/* ---- Skeleton ---- */
+.ui-skeleton {
+  display: inline-block;
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--surface-hover) 50%,
+    var(--surface-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: ui-sweep var(--dur-ambient) linear infinite; /* ambient step: skeleton shimmer */
+}
+
+.ui-skeleton-text {
+  border-radius: var(--radius-sm);
+}
+
+.ui-skeleton-pill {
+  border-radius: var(--radius-pill);
+}
+
+.ui-skeleton-block {
+  border-radius: var(--radius-card);
+}
+
+/* Reduced-motion: static branded tint, no sweep. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation: none;
+    background: var(--surface-2);
+  }
+}
+
+/* ---- TileSkeleton ---- */
+/* TileSkeleton — pinned to the game-tile footprint (--tile-h 205px, radius 8,
+ * --tile fill) so it occupies a grid cell identically to a real <Tile fill>.
+ * In a grid with grid-auto-rows:var(--tile-h) the height is the row; height:100%
+ * also keeps it exact when used standalone. */
+.ui-tile-skeleton {
+  height: 100%;
+  min-height: var(--tile-h);
+  width: 100%;
+  border-radius: var(--radius-md); /* tile corner = 8px */
+  background: var(--tile); /* game-tile surface */
+}
+
+/* loading — branded gradient sweep (NEVER generic gray) */
+.ui-tile-skeleton-loading {
+  background: linear-gradient(
+    100deg,
+    var(--tile) 30%,
+    var(--surface-hover) 50%,
+    var(--tile) 70%
+  );
+  background-size: 200% 100%;
+  animation: ui-tile-sweep var(--dur-ambient) linear infinite;
+}
+
+/* filler — a quiet, inert pad-tile (no sweep). A tile is a card, so it takes
+ * a solid fill; the gold hairline plus the reduced opacity carry the "empty
+ * slot" read without a texture. */
+.ui-tile-skeleton-filler {
+  border: 1px solid var(--brand-accent-hairline);
+  background: var(--tile);
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-tile-skeleton-loading {
+    animation: none;
+    background: var(--tile);
+  }
+}
+
+/* ---- EmptyState ---- */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  background: var(--surface-2);
+  /* The --surface-2 step lifts the panel off --canvas; the --border hairline
+   * is decorative. The panel takes no shadow, so it can sit inside a card. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--text-mid);
+}
+
+.ui-empty-icon {
+  color: var(--text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.ui-empty-title {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text);
+}
+
+.ui-empty-message {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  max-width: 40ch;
+}
+
+.ui-empty-action {
+  margin-top: var(--space-3);
+}
+
+/* ---- ErrorState ---- */
+.ui-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  background: var(--surface-2);
+  /* Same edge treatment as EmptyState: the surface step plus a decorative
+   * --border hairline, no shadow. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.ui-error-icon {
+  color: var(--error);
+  margin-bottom: var(--space-1);
+}
+
+.ui-error-title {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+
+.ui-error-message {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  max-width: 40ch;
+}
+
+.ui-error-action {
+  margin-top: var(--space-3);
+}
+
+/* ---- Countdown ---- */
+.ui-countdown {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-weight: var(--weight-semi);
+  font-size: var(--t-num);
+  color: var(--text-hi);
+}
+
+.ui-countdown-seg {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: center;
+}
+
+.ui-countdown-colon {
+  color: var(--text-mid);
+}
+
+.ui-countdown-ended {
+  color: var(--text-mid);
+  font-weight: var(--weight-reg);
+}
+
+/* ---- Odometer ---- */
+.ui-odometer {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+  /* Gold treatment allowed — these are large hero figures (≥18px). Painted as
+   * a plain text colour in the gold text accent (10.71:1 on --canvas, 9.75:1
+   * on --surface). A plain colour, not background-clip:text, keeps the figure
+   * visible under forced-colors and print. */
+  color: var(--brand-accent-fg);
+}
+
+.ui-odometer-num {
+  font-size: var(--t-num);
+}
+
+.ui-odometer-num-lg {
+  font-size: var(--t-num-lg);
+}
+
+/* ---- Scroller ---- */
+.ui-scroller {
+  position: relative;
+  width: 100%;
+}
+
+.ui-scroller-rail {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain; /* no scroll-hijack onto the page */
+}
+.ui-scroller-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.ui-scroller-rail:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas); /* focus gap */
+}
+
+/* 16px peek of the next item via end padding (--gutter). */
+.ui-scroller-peek {
+  padding-right: var(--gutter);
+  scroll-padding-left: var(--gutter);
+}
+
+.ui-scroller-snap {
+  scroll-snap-type: x mandatory;
+}
+.ui-scroller-snap > * {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+}
+
+/* Matrix mode: pin the first child column. Children should be rows/columns
+ * laid out so the first cell stays put while the rest scrolls. */
+.ui-scroller-freeze {
+  scroll-snap-type: none;
+}
+.ui-scroller-freeze > :first-child {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-content);
+  background: var(--surface-3);
+}
+
+/* Edge fades — affordance that more content exists either side. */
+.ui-scroller-fade-start::before,
+.ui-scroller-fade-end::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--space-6);
+  pointer-events: none;
+  z-index: var(--z-content);
+}
+.ui-scroller-fade-start::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--canvas), transparent);
+}
+.ui-scroller-fade-end::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--canvas), transparent);
+}
+
+/* ---- Tabs ---- */
+.ui-tabs {
+  width: 100%;
+}
+
+.ui-tabs-list {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-tabs-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--tab-text-rest);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.ui-tabs-tab:hover:not(:disabled) {
+  color: var(--text-hi);
+}
+
+/* Inset ring: the gap sits inside the outline, in the focus gap colour. */
+.ui-tabs-tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 4px var(--canvas);
+}
+
+.ui-tabs-active {
+  color: var(--tab-text-active);
+  border-bottom-color: var(--brand-accent);
+}
+
+.ui-tabs-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-tabs-tab {
+    transition: none;
+  }
+}
+
+/* ---- Tile ---- */
+.ui-tile {
+  display: flex;
+  flex-direction: column;
+  /* fill the fixed grid cell — game tiles are pinned by the grid, never width:100% in 1fr */
+  height: 100%;
+}
+
+/* the image box. Width fills the FIXED grid cell (not viewport-fluid). Height is
+ * driven either by `aspectRatio` (banner/landscape tiles) or by the grid cell's
+ * own fixed height (game lobby = the 205px li) when the tile is set to flex-fill. */
+.ui-tile-media {
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto;
+  background: var(--tile); /* game-tile surface */
+  border-radius: var(--radius-md); /* tile corner = 8px */
+  overflow: hidden;
+}
+
+.ui-tile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* full-bleed cover, zero letterbox on landscape key-art */
+  display: block;
+}
+
+/* PLACEHOLDER SLOT — a solid fill (no external asset). A Tile IS a card (it
+ * renders inside Card variant="tile"), and cards take solid fills only. The
+ * uppercase label carries the "awaiting art" read. */
+.ui-tile-slot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--brand-accent-hairline);
+}
+
+.ui-tile-slot-label {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-mid);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ui-tile-badge-slot {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-content);
+}
+
+/* The label sits OVER the bottom of the cover art on a dark scrim, so the tile is
+ * one fixed-height art cell (not art + a separate label block that breaks 205px).
+ * The scrim is a DEEP gradient tall enough to carry both the 2-line name and the
+ * provider so they read cleanly over busy art, never on the raw key-art. This is
+ * a legibility scrim over photographic content — permitted as large background
+ * decoration; it is not a card fill and carries no depth cue.
+ *
+ * Every stop is a token. --scrim at the 45% stop keeps --text-hi at 6.00:1
+ * over worst-case white key-art, with no text-shadow. */
+.ui-tile-scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: var(--z-content);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  /* taller, deeper scrim: most of the fade is empty, the dark base sits under text */
+  padding: var(--space-5) var(--space-3) var(--space-3);
+  background: linear-gradient(180deg, transparent 0%, var(--scrim) 45%, var(--shell) 100%);
+}
+
+/* Title reserves EXACTLY 2 lines (line-clamp:2 + a 2-line fixed height) so a
+ * 1-line and a 2-line title yield the SAME label-block height — every 1×1 tile
+ * stays uniform regardless of name length. height (not min-height) pins the block
+ * at two --t-sm × --lh-tight lines even when the title is one line, so a missing
+ * caption can never shrink the block either. Bolder weight + the deepened scrim
+ * (not a text-shadow) lift the name off busy art. */
+.ui-tile-name {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-tight);
+  color: var(--text-hi);
+  /* reserve two lines: clamp to 2 and FIX the block to a 2-line height */
+  height: calc(var(--t-sm) * var(--lh-tight) * 2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+/* provider line — the semantic --text token, with no text-shadow. It sits on
+ * the deepest part of the scrim (--shell), where it measures 8.08:1. */
+.ui-tile-caption {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- ComingSoonTile ---- */
+/* ============================================================================
+ * ComingSoonTile — premium gold-on-obsidian "Sắp ra mắt" filler.
+ * Token-only (no raw ramp hex, no px literals beyond hairline widths). The box
+ * is byte-identical in size to a 1×1 Tile: it fills the grid cell's fixed
+ * --tile-h height with --radius-md corners, so appending it never shifts layout.
+ * ==========================================================================*/
+
+.ui-coming-soon-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md); /* tile corner = 8px */
+  /* A solid --tile fill with no glow: --glow-gold is a gold colour slot with
+   * no box-shadow use. The gold hairline draws the edge and the gold
+   * lock/label carry the premium read. */
+  background: var(--tile);
+  border: 1px solid var(--brand-accent-hairline);
+}
+
+.ui-coming-soon-tile-inner {
+  position: relative; /* above the sheen */
+  z-index: var(--z-content);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+/* gold ring around the lock glyph — a solid 12% accent film reads as a lit
+ * disc without simulating light falloff. */
+.ui-coming-soon-tile-lock-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  color: var(--brand-accent-fg);
+  background: color-mix(in srgb, var(--brand-accent) 12%, var(--tile));
+  border: 1px solid var(--brand-accent-hairline);
+}
+.ui-coming-soon-tile-lock-icon {
+  color: var(--brand-accent-fg);
+}
+
+.ui-coming-soon-tile-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ui-coming-soon-tile-label {
+  font-family: var(--brand-font-body);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: 0.02em;
+  color: var(--brand-accent-fg); /* 9.75:1 on --tile */
+}
+
+.ui-coming-soon-tile-teaser {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+  letter-spacing: 0.02em;
+  color: var(--text-mid);
+}
+
+/* The tile carries no motion (an animated gold band sweeping a card is a
+ * glow), so it is reduced-motion safe by construction rather than by opt-out. */
+
+/* ---- Modal ---- */
+.ui-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+}
+
+.ui-modal-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: ui-fade var(--dur-base) var(--ease-standard);
+}
+
+/* Muted copy inside a modal or sheet sits on --surface-3, where --text-mid
+ * misses AA. Both panels re-point it to --fg-muted-raised, the muted step for
+ * that surface (tokens.css text ladder). */
+.ui-modal-panel,
+.ui-sheet-panel {
+  --text-mid: var(--fg-muted-raised);
+}
+
+.ui-modal-panel {
+  position: relative;
+  width: 100%;
+  max-height: calc(100vh - var(--space-8));
+  display: flex;
+  flex-direction: column;
+  /* The overlay surface step, the control-edge border and the level 3
+   * shadow separate the panel from the scrim. */
+  background: var(--surface-3);
+  border: 1px solid var(--modal-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--halo); /* elevation level 3 */
+  animation: ui-pop var(--dur-base) var(--ease-entrance);
+  outline: none;
+}
+
+.ui-modal-sm {
+  max-width: 360px;
+}
+.ui-modal-md {
+  max-width: 480px;
+}
+.ui-modal-lg {
+  max-width: 640px;
+}
+
+.ui-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-modal-title {
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  margin: 0;
+}
+
+.ui-modal-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--modal-meta); /* muted copy on the overlay surface, 5.83:1 */
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+/* UNIFORM button hover: scale(1.05) + a colour shift — same as every Button. */
+.ui-modal-close-btn:hover {
+  color: var(--text-hi);
+  background: var(--surface-hover);
+  transform: scale(1.05);
+}
+.ui-modal-close-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas); /* focus gap */
+}
+
+.ui-modal-content {
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.ui-modal-footer {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+/* Bottom-sheet presentation <640. */
+@media (max-width: 639px) {
+  .ui-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .ui-modal-panel {
+    max-width: none;
+    max-height: 90vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: ui-slide-up var(--dur-base) var(--ease-entrance);
+  }
+}
+
+.ui-modal[data-reduced] .ui-modal-panel,
+.ui-modal[data-reduced] .ui-modal-scrim {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-modal-panel,
+  .ui-modal-scrim {
+    animation: none;
+  }
+  .ui-modal-close-btn {
+    transition: none;
+  }
+  .ui-modal-close-btn:hover {
+    transform: none;
+  }
+}
+
+/* ---- Sheet ---- */
+.ui-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* SOLID scrim — never backdrop-filter:blur (lint). */
+.ui-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: ui-fade var(--dur-base) var(--ease-standard);
+}
+
+.ui-sheet-panel {
+  position: relative;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  /* Same surface, edge and level 3 shadow as the modal panel. Only the top
+   * edge shows; the other three sides sit at the viewport edge. */
+  background: var(--surface-3);
+  border-top-left-radius: var(--radius-card);
+  border-top-right-radius: var(--radius-card);
+  border-top: 1px solid var(--modal-border);
+  box-shadow: var(--halo); /* elevation level 3 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  animation: ui-slide-up var(--dur-base) var(--ease-entrance);
+  outline: none;
+}
+
+.ui-sheet-handle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-2);
+  touch-action: none;
+  cursor: grab;
+}
+
+.ui-sheet-grip {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--modal-border);
+}
+
+.ui-sheet-close-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--modal-meta); /* muted copy on the overlay surface, 5.83:1 */
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+/* UNIFORM button hover: scale(1.05) + a colour shift — same as every Button. */
+.ui-sheet-close-btn:hover {
+  color: var(--text-hi);
+  background: var(--surface-hover);
+  transform: scale(1.05);
+}
+.ui-sheet-close-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas); /* focus gap */
+}
+
+.ui-sheet-content {
+  overflow-y: auto;
+  padding: 0 var(--gutter) var(--space-5);
+}
+
+/* Reduced-motion: instant mount, no slide. */
+.ui-sheet[data-reduced] .ui-sheet-panel,
+.ui-sheet[data-reduced] .ui-sheet-scrim {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-sheet-panel,
+  .ui-sheet-scrim {
+    animation: none;
+  }
+  .ui-sheet-close-btn {
+    transition: none;
+  }
+  .ui-sheet-close-btn:hover {
+    transform: none;
+  }
+}
+
+/* ---- Dropdown ---- */
+.ui-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-dropdown-trigger-wrap {
+  display: contents;
+}
+
+.ui-dropdown-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  min-width: 200px;
+  max-width: min(90vw, 360px);
+  z-index: var(--z-dropdown);
+  background: var(--surface-3);
+  /* A menu floats over arbitrary content: the level 2 shadow and the
+   * control edge --line-default set it apart from what is underneath. */
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2); /* elevation level 2 */
+  padding: var(--space-2);
+  outline: none;
+  animation: ui-drop var(--dur-fast) var(--ease-entrance);
+}
+
+.ui-dropdown-bottom-start {
+  left: 0;
+}
+.ui-dropdown-bottom-end {
+  right: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-dropdown-panel {
+    animation: none;
+  }
+}

@@ -1,0 +1,603 @@
+<section id="s-vertical">
+<h2 id="s-vertical-h">S4 · Vertical landing "/[vertical]"</h2>
+
+<h3 id="s-vertical-route">Route template: /[vertical]</h3>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>URL</td><td><code>/{slug}</code>, where slug is one of the 9 <code>Vertical.id</code> values below. Any other slug that does not match a static route → <code>notFound()</code>.</td></tr>
+<tr><td>Page file</td><td><code>src/app/[vertical]/page.tsx</code>; also <code>loading.tsx</code>, <code>not-found.tsx</code>, <code>Route.module.css</code></td></tr>
+<tr><td>Metadata</td><td>title "{label} — Yaobet", description "{label} tại Yaobet — nhà cái trực tuyến." Unknown slug: title "Không tìm thấy — Yaobet".</td></tr>
+<tr><td>Auth gating</td><td>None. Game launch is gated (guest → login modal).</td></tr>
+<tr><td>Data</td><td><code>resolveVertical(slug)</code> finds the slug in getVerticals(). <code>getCategoryPayload</code> returns <code>{vertical, providers, games, odds}</code>, where odds = getLiveMatch() only for "sports", otherwise null. Every vertical receives the same 6 providers and the same 16 games (there is no per-vertical filtering).</td></tr>
+<tr><td>Section order</td><td>CategoryBanner → (sports only) LiveOddsBoard → CategoryGrid (tabs, toolbar, grid)</td></tr>
+<tr><td>375</td><td>Banner min-height 140px, padding 24px 16px, title 32px. Toolbar stacked (search full width, then sort pills). Grid 3 columns × 205px rows. Odds board full width.</td></tr>
+<tr><td>768</td><td>Banner min-height 200px, padding 32px, title 40px. Toolbar in a row (search 0 1 320px, pills on the right). Grid 4 columns.</td></tr>
+<tr><td>1024</td><td>Grid 6 columns (≥992). Content 932px.</td></tr>
+<tr><td>1440</td><td>Grid 8 columns (≥1424). Content 1332px, so tiles are about 152.5px wide (inference). No RightRail.</td></tr>
+<tr><td>Loading</td><td><code>div.page aria-busy aria-label="Đang tải hạng mục"</code>: Skeleton block 100%×140 · <code>div.toolbarSkel</code> with 4 × Skeleton pill 72×36 · Skeleton block 100%×44 · <code>div.gridSkel</code> with 12 × Skeleton block 100%×160 (renders 160px tall: the inline height from <code>Skeleton.tsx:33-35</code> beats <code>.gridSkel &gt; *</code>; 3/4/6/8 columns).</td></tr>
+<tr><td>Not found</td><td><code>div.notFound</code>: <code>span.code aria-hidden "404"</code> (40px, #d4af37, numeric face) · <code>h1.heading "Không tìm thấy hạng mục"</code> (24px) · <code>p.body</code> (16px #888888, max-width 36ch) "Hạng mục bạn tìm không tồn tại hoặc đã được di chuyển. Hãy quay lại trang chủ để chọn một hạng mục khác." · <code>div.actions</code> Button gold icon=home "Về trang chủ" → router.push("/").</td></tr>
+</tbody></table>
+<p><strong>Slugs and per-slug variation.</strong></p>
+<table><thead><tr><th>slug (id)</th><th>label</th><th>Nav icon (verticalIcon)</th><th>Banner icon (resolveIcon)</th><th>Banner kicker</th><th>Live odds board</th><th>Nav href that the shell actually uses</th></tr></thead><tbody>
+<tr><td>casino</td><td>Casino</td><td>chip</td><td>card</td><td>Sòng bài trực tiếp đẳng cấp</td><td>no</td><td>/?v=casino</td></tr>
+<tr><td>slots</td><td>Nổ hũ</td><td>slots</td><td>slots</td><td>Quay là trúng, nổ hũ mỗi ngày</td><td>no</td><td>/?v=slots</td></tr>
+<tr><td>sports</td><td>Thể thao</td><td>sports</td><td>sports</td><td>Kèo bóng đá &amp; thể thao trực tiếp</td><td><strong>yes</strong></td><td>/?v=sports</td></tr>
+<tr><td>fishing</td><td>Bắn cá</td><td>fish</td><td>live</td><td>Săn cá thưởng lớn</td><td>no</td><td>/?v=fishing</td></tr>
+<tr><td>card</td><td>Game bài</td><td>card</td><td>card</td><td>Game bài dân gian quen thuộc</td><td>no</td><td>/?v=card</td></tr>
+<tr><td>lottery</td><td>Xổ số</td><td>ticket</td><td>grid</td><td>Xổ số &amp; lô đề đa dạng</td><td>no</td><td>/?v=lottery</td></tr>
+<tr><td>cockfight</td><td>Đá gà</td><td>rooster</td><td>trophy</td><td>Trường gà trực tiếp</td><td>no</td><td>/?v=cockfight</td></tr>
+<tr><td>table</td><td>Bàn chơi</td><td>table</td><td>grid</td><td>Bàn chơi cổ điển</td><td>no</td><td>/?v=table</td></tr>
+<tr><td>arcade</td><td>Game nhanh</td><td>fast</td><td>slots</td><td>Game nhanh giải trí tức thì</td><td>no</td><td>/?v=arcade</td></tr>
+</tbody></table>
+<div class="callout warn"><strong>The vertical route is unreachable from the UI.</strong> Every nav surface (Tier-2, CategorySheet, CategoryLauncher) links to <code>/?v={id}</code> (the home page with a query string the page ignores), not to <code>/{id}</code>. Only typing the URL reaches this route. On it, a member tile tap goes to <code>/{id}?game={gameId}</code>, which is the same page again. Also, <code>CategoryBanner</code> carries its own icon map that disagrees with the shell's <code>verticalIcon</code> (casino: card vs chip, fishing: live vs fish, and so on). Its comment says "Different verticals tint the wash hue via data-vertical", but no CSS reads <code>[data-vertical]</code>. Every vertical shows the same 16 casino games.</div>
+<p>Style table: <code>src/app/[vertical]/Route.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.page</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.toolbarSkel</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.toolbarSkel</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.gridSkel</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.gridSkel</code></td><td>grid-template-columns</td><td><code>repeat(3, 1fr)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.gridSkel</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.gridSkel &gt; *</code></td><td>height</td><td><code>var(<span class="tok">--tile-h</span>)</code></td><td>205px (no effect: overridden by the Skeleton inline <code>height: 160px</code>)</td><td>all</td></tr>
+<tr><td><code>.gridSkel</code></td><td>grid-template-columns</td><td><code>repeat(4, 1fr)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.gridSkel</code></td><td>grid-template-columns</td><td><code>repeat(6, 1fr)</code></td><td>(literal)</td><td>(min-width: 992px)</td></tr>
+<tr><td><code>.gridSkel</code></td><td>grid-template-columns</td><td><code>repeat(8, 1fr)</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+<tr><td><code>.notFound</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.notFound</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.notFound</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.notFound</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.notFound</code></td><td>padding</td><td><code>var(<span class="tok">--space-8</span>) var(<span class="tok">--gutter</span>)</code></td><td>48px 16px</td><td>all</td></tr>
+<tr><td><code>.notFound</code></td><td>text-align</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.code</code></td><td>font-size</td><td><code>var(<span class="tok">--t-hero</span>)</code></td><td>40px</td><td>all</td></tr>
+<tr><td><code>.code</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.code</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.code</code></td><td>font-family</td><td><code>var(<span class="tok">--brand-font-num</span>)</code></td><td>&quot;Be Vietnam Pro&quot; (next/font, hashed family), ui-monospace, &quot;DIN Alternate&quot;, &quot;Segoe UI&quot;, sans-serif</td><td>all</td></tr>
+<tr><td><code>.heading</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h1</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.heading</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.heading</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>max-width</td><td><code>36ch</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.actions</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.actions</code></td><td>flex-wrap</td><td><code>wrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.actions</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.actions</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+</tbody></table>
+
+
+<h3 id="s-category-page">CategoryPage</h3>
+<p><strong>Purpose.</strong> The column layout for a vertical landing. <strong>Source.</strong> <code>src/components/category/CategoryPage.tsx</code>, <code>CategoryPage.module.css</code>, <code>data.ts</code>.</p>
+<p><strong>Structure.</strong> <code>div.page</code> (flex column, gap 16px, min-width 0) containing CategoryBanner, then <code>{odds &amp;&amp; LiveOddsBoard}</code>, then CategoryGrid verticalId providers games.</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>payload</td><td>CategoryPayload {vertical, providers, games, odds: Envelope&lt;LiveMatch&gt; | null}</td><td>See route.</td></tr></tbody></table>
+<p><strong>Styles.</strong> <code>.page{display:flex; flex-direction:column; gap:var(--band-gap) /*16px*/; min-width:0}</code>. No states, motion or copy of its own.</p>
+
+<h3 id="s-category-banner">CategoryBanner</h3>
+<p><strong>Purpose.</strong> A gradient placeholder hero with the vertical icon tile, the vertical name as h1, and a one-line kicker.</p>
+<p><strong>Source.</strong> <code>src/components/category/CategoryBanner.tsx</code>, <code>CategoryBanner.module.css</code>.</p>
+<p><strong>Structure.</strong> <code>section.banner data-vertical={id} aria-label={label}</code> containing <code>span.slot aria-hidden</code> and <code>div.content</code> [<code>span.iconWrap aria-hidden</code> with Icon {resolveIcon} 28; <code>h1.title {label}</code>; <code>p.kicker {KICKERS[id]}</code> when present].</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>vertical</td><td>Vertical</td><td>Label, id, iconId.</td></tr></tbody></table>
+<p>Style table: <code>src/components/category/CategoryBanner.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.banner</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>align-items</td><td><code>flex-end</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>min-height</td><td><code>140px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>padding</td><td><code>var(<span class="tok">--space-5</span>) var(<span class="tok">--gutter</span>)</code></td><td>24px 16px</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-card</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>border</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>isolation</td><td><code>isolate</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slot</code></td><td>position</td><td><code>absolute</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slot</code></td><td>inset</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slot</code></td><td>z-index</td><td><code>-1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slot</code></td><td>background</td><td><code>radial-gradient(130% 120% at 85% 0%, var(<span class="tok">--brand-accent-hairline</span>), transparent 55%), linear-gradient(135deg, var(<span class="tok">--surface</span>) 0%, var(<span class="tok">--surface-3</span>) 100%)</code></td><td>radial-gradient(130% 120% at 85% 0%, rgba(212, 175, 55, 0.55), transparent 55%), linear-gradient(135deg, #141414 0%, #212121 100%)</td><td>all</td></tr>
+<tr><td><code>.content</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.content</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.content</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.content</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>width</td><td><code>44px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>height</td><td><code>44px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>background</td><td><code>var(<span class="tok">--surface</span>)</code></td><td><span class="sw" style="background:#141414"></span>#141414</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>border</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-display</span>)</code></td><td>32px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.kicker</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.kicker</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.banner</code></td><td>min-height</td><td><code>200px</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.banner</code></td><td>padding</td><td><code>var(<span class="tok">--space-6</span>) var(<span class="tok">--space-6</span>)</code></td><td>32px 32px</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-hero</span>)</code></td><td>40px</td><td>(min-width: 768px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/category/CategoryBanner.module.css</code></summary><pre><code class="lang-css">/* CategoryBanner — token-derived gradient SLOT hero. Tokens only. */
+
+.banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 140px;
+  padding: var(--space-5) var(--gutter);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--brand-accent-hairline);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* the placeholder art slot — gradient derived from the surface ladder + a
+ * brand-accent wash. Different verticals tint the wash hue via data-vertical. */
+.slot {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(130% 120% at 85% 0%, var(--brand-accent-hairline), transparent 55%),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-3) 100%);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.iconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--brand-accent-hairline);
+  color: var(--brand-accent);
+}
+
+.title {
+  font-size: var(--t-display);
+  line-height: var(--lh-tight);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+
+.kicker {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+}
+
+@media (min-width: 768px) {
+  .banner {
+    min-height: 200px;
+    padding: var(--space-6) var(--space-6);
+  }
+  .title {
+    font-size: var(--t-hero);
+  }
+}
+</code></pre></details>
+<p><strong>States / Motion.</strong> None (static). <strong>Copy.</strong> The label and kicker per slug (table above).</p>
+
+<h3 id="s-category-grid">CategoryGrid</h3>
+<p><strong>Purpose.</strong> Provider tabs, a search box and sort pills over a fixed-tile game grid, padded to 2 full rows with coming-soon tiles.</p>
+<p><strong>Source.</strong> <code>src/components/category/CategoryGrid.tsx</code>, <code>CategoryGrid.module.css</code>; primitives Tabs, Tile, ComingSoonTile, <a href="#f-ui-pill">Pill</a>, EmptyState, Icon; <code>useGridFill</code> (F).</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">section.section aria-label="Trò chơi"
+  Tabs items=[Tất cả, …provider names] active onChange label="Nhà cung cấp"
+  div.toolbar
+    label.search
+      Icon search 18 .searchIcon label="Tìm"
+      input.searchInput type=search inputMode=search placeholder="Tìm trò chơi" aria-label="Tìm trò chơi"
+    div.sorts role="group" aria-label="Sắp xếp"
+      Pill active={sort===id} onClick  x3: "Mặc định" | "Tên A→Z" | "Nhà cung cấp"
+  IF filtered.length===0:
+    EmptyState variant={isFiltered ? "filtered" : "default"}
+               message={isFiltered ? "Không tìm thấy trò chơi phù hợp." : "Chưa có trò chơi cho hạng mục này."}
+               onReset={isFiltered ? reset : undefined}
+  ELSE:
+    ul.grid ref
+      li.cell x N   Tile label caption imageSrc fill onClick=onTile
+      li.cell x fillerCount   ComingSoonTile</code></pre>
+<p><strong>Logic.</strong> Filter by provider, then by case-insensitive substring of the name. Sort "name" uses <code>localeCompare(…, "vi")</code> on the name; sort "provider" does the same on the provider; "default" keeps fixture order. <code>isFiltered</code> = provider ≠ all or a non-empty query. Reset sets all three back to their defaults. Filler: every tile is 1×1, so fillers fill up to max(ceil(N/cols), 2) rows (no feature tile here).</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>verticalId</td><td>string</td><td>Member launch target <code>/{verticalId}?game={id}</code>.</td></tr><tr><td>providers</td><td>Provider[]</td><td>Tabs.</td></tr><tr><td>games</td><td>GameTile[]</td><td>Tiles.</td></tr></tbody></table>
+<p>Style table: <code>src/components/category/CategoryGrid.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.section</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.toolbar</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.toolbar</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.toolbar</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>padding</td><td><code>1px calc(var(<span class="tok">--space-3</span>) + 1px)</code></td><td>1px calc(12px + 1px)</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>border</td><td><code>1px solid var(<span class="tok">--border</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>transition</td><td><code>border-color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>border-color 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.search:focus-within</code></td><td>border-width</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.search:focus-within</code></td><td>border-color</td><td><code>var(<span class="tok">--focus-ring</span>)</code></td><td><span class="sw" style="background:#6ea8ff"></span>#6ea8ff</td><td>all</td></tr>
+<tr><td><code>.search:focus-within</code></td><td>padding</td><td><code>0 var(<span class="tok">--space-3</span>)</code></td><td>0 12px</td><td>all</td></tr>
+<tr><td><code>.search</code></td><td>transition</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.searchIcon</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.searchIcon</code></td><td>flex</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>flex</td><td><code>1 1 auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>border</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>outline</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.searchInput</code></td><td>font-family</td><td><code>var(<span class="tok">--brand-font-body</span>)</code></td><td>&quot;Be Vietnam Pro&quot; (next/font, hashed family), system-ui, &quot;Segoe UI&quot;, Roboto, Arial, sans-serif</td><td>all</td></tr>
+<tr><td><code>.searchInput::placeholder</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.sorts</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sorts</code></td><td>flex-wrap</td><td><code>wrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sorts</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(3, 1fr)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-auto-rows</td><td><code>var(<span class="tok">--tile-h</span>)</code></td><td>205px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell &gt; *</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.toolbar</code></td><td>flex-direction</td><td><code>row</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.toolbar</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.toolbar</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.search</code></td><td>flex</td><td><code>0 1 320px</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(4, 1fr)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(6, 1fr)</code></td><td>(literal)</td><td>(min-width: 992px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(8, 1fr)</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/category/CategoryGrid.module.css</code></summary><pre><code class="lang-css">/* CategoryGrid — tab strip + filter/sort bar + game grid. 3/4/6 responsive.
+ * Tokens only; the page never scrolls horizontally (strips scroll in Scroller). */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---- filter / sort bar ---- */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Input contract (30-PM-DESIGN-SYSTEM, as CORRECTED 2026-08-17):
+ *   resting = filled --surface-3 PLUS a 1px --border hairline;
+ *   focus   = 2px SOLID accent border, no glow ring.
+ *
+ * The rule originally said &quot;no resting border&quot;. Reversed by the PM: --surface-3
+ * on this page ground is ~1.1:1, so a border-less field has no boundary and
+ * fails WCAG 1.4.11&#x27;s 3:1 floor for UI component edges. The flat system strips
+ * shadow, gradient and border at once — in a dark palette the border is the only
+ * survivor, for fields exactly as for cards. DO NOT remove it again.
+ *
+ * TWO separate bugs were fixed here, do not conflate them:
+ *   1. this rule painted --focus-ring as the :focus-WITHIN border — blue is
+ *      reserved for :focus-visible and nothing else, so it moved to the accent;
+ *   2. the resting border then went missing under the original rule 6, and is
+ *      restored above.
+ * Focus is a WEIGHT change in the same hue (1px 55%-alpha gold → 2px solid),
+ * with padding compensating so the box does not reflow. */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 1px calc(var(--space-3) + 1px);
+  min-height: var(--tap-min);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.search:focus-within {
+  border-width: 2px;
+  /* FOCUS IS BLUE, EVERYWHERE — PM ruling, reconciling a split between two
+     sweep areas (one used --brand-accent here, one used --focus-ring).
+     Focus is ONE affordance and gets ONE colour: a user learns &quot;blue = where I
+     am&quot; once, or not at all. Two reinforcing reasons for blue over gold:
+       · --focus-ring is the PINNED, AA-guaranteed indicator (8.21:1 vs canvas),
+         locked identical across brands. Gold is not.
+       · On this product gold is REWARD chrome. Focus is not a reward, and the
+         trust surfaces (contribution/restricted) already forbid brand accent
+         for exactly that reason.
+     The design system&#x27;s &quot;border-2 solid Primary&quot; was written for a light
+     palette where Primary WAS the focus blue and the two coincided. In dark
+     gold they diverge, and the accessibility token wins. */
+  border-color: var(--focus-ring);
+  padding: 0 var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search {
+    transition: none;
+  }
+}
+.searchIcon {
+  color: var(--text-mid);
+  flex: none;
+}
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-hi);
+  font-size: var(--t-body);
+  font-family: var(--brand-font-body);
+}
+.searchInput::placeholder {
+  color: var(--text-mid);
+}
+
+.sorts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- J9 FIXED-TILE game grid: pinned 205px rows, 8-up at the frame ----
+ * Mirrors the home lobby (.game-list repeat(8,1fr) gap16, li height 205px).
+ * grid-auto-rows pins the cell height so a tile is one physical size — never
+ * width:100% fluid in a 1fr grid. Ladder: 3 → 4 → 6 → 8. */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: var(--tile-h);
+  gap: var(--band-gap);
+}
+.cell {
+  min-width: 0;
+  display: flex;
+}
+.cell &gt; * {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .search {
+    flex: 0 1 320px;
+  }
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  .grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (min-width: 1424px) {
+  .grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Search rest: bg #212121, 1px gold hairline, padding 1px 13px. Focus-within: 2px #6ea8ff border, padding 0 12px. Placeholder #888888. Sort pill active per Pill (F). Empty and filtered-empty as above. Guest tile tap → login modal.</p>
+<p><strong>Motion.</strong> Search border-color 200ms. Reduced motion: none.</p>
+<p><strong>Copy.</strong> Trò chơi, Nhà cung cấp, Tất cả, Tìm (icon label), Tìm trò chơi (Search games), Sắp xếp (Sort), Mặc định (Default), Tên A→Z (Name A→Z), Nhà cung cấp (Provider), Không tìm thấy trò chơi phù hợp. (No matching games found.), Chưa có trò chơi cho hạng mục này. (No games in this category yet.).</p>
+<div class="callout warn">The comment block says the old <code>--focus-ring</code> focus border "moved to the accent". The code still uses <code>border-color: var(--focus-ring)</code>, and the inner comment says blue was chosen deliberately. The file header says "6/4/3 responsive"; the CSS is 3/4/6/8.</div>
+
+<h3 id="s-live-odds-board">LiveOddsBoard (sports only)</h3>
+<p><strong>Purpose.</strong> A "Trận đấu trực tiếp" card showing one live match: two team rows with decimal odds and up/down arrows. It switches to "tạm dừng" once the data is older than 10s.</p>
+<p><strong>Source.</strong> <code>src/components/category/LiveOddsBoard.tsx</code>, <code>LiveOddsBoard.module.css</code>; Card, MoneyValue kind="odds", Skeleton, ErrorState, Icon.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">IF odds.status==="absent" → null
+section.section aria-label="Tỷ lệ trực tiếp"
+  h2.title "Trận đấu trực tiếp"
+  loading → Card.board  Skeleton 40%×1.4em, 2 × Skeleton 100%×2.2em .skelRow
+  error   → Card.board  ErrorState message="Không tải được tỷ lệ trực tiếp." onRetry=router.refresh()
+  live    → Card.board
+              div.head  live → span.liveTag (span.liveDot + "TRỰC TIẾP") | pre → span.preTag "Sắp diễn ra"
+              ul.rows
+                li.row x2 (home, away)
+                  span.team {name}
+                  stale → span.stale "tạm dừng"
+                  else  → span.oddsVal data-dir
+                            {dir!=="flat" &amp;&amp; Icon (up: chevronRight rotated -90deg .up / down: chevronDown .down) 14 label "tăng"|"giảm"}
+                            MoneyValue value={{amount: odds, currency:"VND"}} kind="odds"</code></pre>
+<p><strong>Data.</strong> getLiveMatch: {id "m1", home "Hà Nội FC" 1.86 up, away "Bình Dương" 1.98 down, phase "live", startsAt 12 minutes ago, freshnessMs 10000}. Staleness is evaluated once per render (<code>isStale</code>); there is no timer, so a page left open never flips to stale without a re-render.</p>
+<p>Style table: <code>src/components/category/LiveOddsBoard.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.section</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h2</span>)</code></td><td>20px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.board</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.board</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.board</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.board</code></td><td>padding</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>letter-spacing</td><td><code>0.04em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>width</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>height</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>background</td><td><code>var(<span class="tok">--loss</span>)</code></td><td><span class="sw" style="background:#f53f55"></span>#f53f55</td><td>all</td></tr>
+<tr><td><code>.preTag</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.preTag</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.preTag</code></td><td>letter-spacing</td><td><code>0.04em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.preTag</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.rows</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rows</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rows</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rows</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rows</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rows</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>padding</td><td><code>var(<span class="tok">--space-2</span>) 0</code></td><td>8px 0</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>border-bottom</td><td><code>1px solid var(<span class="tok">--border</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.row:last-child</code></td><td>border-bottom</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>color</td><td><code>var(<span class="tok">--text</span>)</code></td><td><span class="sw" style="background:#d6d3c7"></span>#d6d3c7</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>text-overflow</td><td><code>ellipsis</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>white-space</td><td><code>nowrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>) var(<span class="tok">--space-3</span>)</code></td><td>4px 12px</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-sm</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.oddsVal</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.up</code></td><td>color</td><td><code>var(<span class="tok">--win</span>)</code></td><td><span class="sw" style="background:#45c9a5"></span>#45c9a5</td><td>all</td></tr>
+<tr><td><code>.up</code></td><td>transform</td><td><code>rotate(-90deg)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.down</code></td><td>color</td><td><code>var(<span class="tok">--loss</span>)</code></td><td><span class="sw" style="background:#f53f55"></span>#f53f55</td><td>all</td></tr>
+<tr><td><code>.stale</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.stale</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.skelRow</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/category/LiveOddsBoard.module.css</code></summary><pre><code class="lang-css">/* LiveOddsBoard — inline truthful live-odds board. Tokens only. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.liveTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  color: var(--text-hi);
+}
+.liveDot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  /* loss hue = a luminance-matched semantic color; the &quot;TRỰC TIẾP&quot; TEXT label
+   * carries the meaning, the dot is a non-load-bearing accent. */
+  background: var(--loss);
+}
+.preTag {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  min-height: var(--tap-min);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.team {
+  font-size: var(--t-body);
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oddsVal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  font-weight: var(--weight-semi);
+}
+/* equal-salience: win/loss are luminance-matched; the GLYPH (not just color)
+ * encodes direction so it reads without color perception. */
+.up {
+  color: var(--win);
+  transform: rotate(-90deg);
+}
+.down {
+  color: var(--loss);
+}
+.stale {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.skelRow {
+  display: block;
+}
+</code></pre></details>
+<p><strong>Copy.</strong> Tỷ lệ trực tiếp (Live odds, aria), Trận đấu trực tiếp (Live match), TRỰC TIẾP (LIVE), Sắp diễn ra (Upcoming), tạm dừng (paused), tăng / giảm (up / down), Không tải được tỷ lệ trực tiếp. (Could not load live odds.). <strong>Motion:</strong> none.</p>
+</section>
+

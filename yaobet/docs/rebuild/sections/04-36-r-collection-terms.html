@@ -1,0 +1,176 @@
+<section>
+<h2 id="r-collection-terms">CollectionTerms</h2>
+<h4>1–3</h4><p>Plain terms document shown in the "Điều khoản" sheet. <code>src/components/collection/CollectionTerms.tsx</code>, <code>terms.module.css</code>.</p>
+<pre><code class="lang-txt">div.terms
+  h3 "Cách nhận lượt mở"  ul li × 5
+  h3 "Mở thẻ"             ul li × 4
+  h3 "Tỷ lệ công bố"       ul li × 5   (ratio "1.8", backstop 12)
+  h3 "Đổi thưởng"          ul li × 6
+  h3 "Những điều không áp dụng" ul li × 3
+  p.provisional
+  p.footer (sticky bottom)  Link.footerLink "/bo-suu-tap/cua-toi?tab=lich-su" "Xem lịch sử →"</code></pre>
+<h4>5. Styles (verbatim)</h4><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — BỘ SƯU TẬP · terms. A document, not a panel: no border, no card
+ * background, no width of its own. Whoever mounts it owns the container.
+ * ==========================================================================*/
+
+.terms { display: grid; gap: var(--space-2); }
+
+.terms h3 {
+  margin: var(--space-3) 0 0;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+
+.terms h3:first-child { margin-top: 0; }
+
+.terms ul { margin: 0; padding-left: 1.15em; display: grid; gap: 8px; }
+
+/* --t-micro was defensible while this was a footnote at the bottom of a page.
+   It is not defensible now that this is the only place the terms exist. */
+.terms li {
+  font-size: var(--t-sm);
+  color: var(--text);
+  line-height: var(--lh-body);
+}
+
+.terms strong {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+}
+
+.provisional {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border);
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+  line-height: var(--lh-body);
+}
+
+/* Pinned by sticking to the bottom of whatever scrollport holds it — so it is
+   a pinned footer inside the sheet and an ordinary last line on a page. */
+.footer {
+  position: sticky;
+  bottom: 0;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.footerLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  text-decoration: none;
+}
+
+.footerLink:hover { text-decoration: underline; }
+
+.footerLink:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }</code></pre>
+<h4>8. Copy (verbatim JSX)</h4><pre><code class="lang-tsx">export function CollectionTerms() {
+  return (
+    &lt;div className={styles.terms}&gt;
+      &lt;h3&gt;Cách nhận lượt mở&lt;/h3&gt;
+      &lt;ul&gt;
+        &lt;li&gt;Mỗi cược thể thao đã &lt;strong&gt;kết toán&lt;/strong&gt; và hợp lệ sẽ cộng vào một bộ đếm chung.&lt;/li&gt;
+        &lt;li&gt;Mỗi khi bộ đếm đạt mức quy định, bạn nhận &lt;strong&gt;một lượt mở&lt;/strong&gt;. Đơn vị tính là số tiền cược, không phải số phiếu cược — chia nhỏ cược không làm tăng số lượt.&lt;/li&gt;
+        &lt;li&gt;Cược bị &lt;strong&gt;hủy, hoàn hoặc hòa&lt;/strong&gt; sẽ thu hồi lượt mở tạm ghi.&lt;/li&gt;
+        &lt;li&gt;Chỉ nạp tiền mà không đặt cược thì &lt;strong&gt;không&lt;/strong&gt; nhận được lượt mở.&lt;/li&gt;
+        &lt;li&gt;Cược bằng số dư khuyến mãi không được tính.&lt;/li&gt;
+      &lt;/ul&gt;
+
+      &lt;h3&gt;Mở thẻ&lt;/h3&gt;
+      &lt;ul&gt;
+        &lt;li&gt;Mỗi lượt mở luôn cho &lt;strong&gt;đúng một thẻ&lt;/strong&gt;. Không có trường hợp mở ra mà không nhận được gì.&lt;/li&gt;
+        {/* R5.2 — the shard clause published a term the product cannot honour:
+            there is no way to spend a mảnh and no balance shown anywhere. What
+            a duplicate actually does is stated instead. */}
+        &lt;li&gt;Thẻ đã có sẽ &lt;strong&gt;không được tính thêm&lt;/strong&gt; vào bộ. Bạn vẫn giữ toàn bộ số thẻ đã nhận.&lt;/li&gt;
+        &lt;li&gt;Một thẻ có thể thuộc &lt;strong&gt;nhiều bộ&lt;/strong&gt; cùng lúc.&lt;/li&gt;
+        &lt;li&gt;Việc bạn chọn túi nào &lt;strong&gt;không&lt;/strong&gt; ảnh hưởng đến thẻ nhận được — kết quả đã được xác định trước.&lt;/li&gt;
+      &lt;/ul&gt;
+
+      &lt;h3&gt;Tỷ lệ công bố&lt;/h3&gt;
+      &lt;ul&gt;
+        {/* SET-SCOPED, deliberately. The engine allocates each open to a set
+            and rolls inside it, so a whole-pool percentage is the probability
+            of no open anyone actually receives. What IS stable across every set
+            is the ratio between the tiers, because renormalising divides both
+            by the same total — so that is what gets published here, and the
+            exact per-set number lives on the card itself. */}
+        &lt;li&gt;
+          Mỗi lượt mở được tính cho &lt;strong&gt;một bộ&lt;/strong&gt;, và thẻ được quay trong
+          phạm vi bộ đó. Vì vậy tỷ lệ của một thẻ &lt;strong&gt;phụ thuộc vào bộ&lt;/strong&gt; đang
+          được mở — xem tỷ lệ chính xác ngay trên từng thẻ.
+        &lt;/li&gt;
+        &lt;li&gt;
+          Trong mọi bộ, thẻ thường có khả năng ra &lt;strong&gt;cao gấp khoảng{" "}
+          {(COMMON.drawRate / RARE.drawRate).toFixed(1)} lần&lt;/strong&gt; thẻ hiếm.
+        &lt;/li&gt;
+        &lt;li&gt;Tổng tỷ lệ của tất cả thẻ trong &lt;strong&gt;cùng một bộ&lt;/strong&gt; luôn bằng &lt;strong&gt;100%&lt;/strong&gt;. Tỷ lệ hiển thị chính là tỷ lệ hệ thống quay.&lt;/li&gt;
+        &lt;li&gt;
+          Bảo chứng thẻ hiếm: sau &lt;strong&gt;{DEMO_PITY_BACKSTOP} lượt mở&lt;/strong&gt; liên tiếp không ra
+          thẻ hiếm, lượt kế tiếp &lt;strong&gt;chắc chắn&lt;/strong&gt; ra thẻ hiếm.
+        &lt;/li&gt;
+        &lt;li&gt;Tỷ lệ và nội dung bộ không thay đổi khi mùa đang diễn ra.&lt;/li&gt;
+      &lt;/ul&gt;
+
+      &lt;h3&gt;Đổi thưởng&lt;/h3&gt;
+      &lt;ul&gt;
+        &lt;li&gt;Bạn cần sở hữu &lt;strong&gt;toàn bộ thẻ&lt;/strong&gt; trong một bộ mới đổi được thưởng của bộ đó.&lt;/li&gt;
+        {/* Sets are REPEATABLE and the exchange is DESTRUCTIVE. Both clauses
+            here previously said the opposite — that cards were never consumed
+            and that a set paid once per season. Publishing a term the product
+            contradicts is worse than publishing nothing. */}
+        &lt;li&gt;
+          Đổi thưởng sẽ &lt;strong&gt;dùng hết một thẻ mỗi loại&lt;/strong&gt; trong bộ. Bộ trở về{" "}
+          &lt;strong&gt;0&lt;/strong&gt; và bạn sưu tầm lại từ đầu.
+        &lt;/li&gt;
+        &lt;li&gt;
+          Một thẻ thuộc &lt;strong&gt;nhiều bộ&lt;/strong&gt;, nên dùng thẻ cho bộ này cũng làm
+          &lt;strong&gt; giảm tiến độ các bộ khác&lt;/strong&gt; — trừ khi bạn có thẻ dự phòng.
+          Màn hình xác nhận luôn hiển thị đầy đủ trước khi bạn đồng ý.
+        &lt;/li&gt;
+        &lt;li&gt;
+          &lt;strong&gt;Thẻ trùng là thẻ dự phòng.&lt;/strong&gt; Giữ thẻ trùng để không mất tiến
+          độ ở các bộ khác khi đổi thưởng.
+        &lt;/li&gt;
+        &lt;li&gt;Mỗi bộ có thể đổi thưởng &lt;strong&gt;nhiều lần&lt;/strong&gt;, mỗi lần cần sưu tầm lại đủ bộ.&lt;/li&gt;
+        &lt;li&gt;Thưởng được cộng vào &lt;strong&gt;ví chính&lt;/strong&gt;, dùng được ngay, &lt;strong&gt;không kèm điều kiện cược&lt;/strong&gt;, và có mã giao dịch để đối chiếu.&lt;/li&gt;
+      &lt;/ul&gt;
+
+      &lt;h3&gt;Những điều không áp dụng&lt;/h3&gt;
+      &lt;ul&gt;
+        &lt;li&gt;Không bán lượt mở dưới bất kỳ hình thức nào.&lt;/li&gt;
+        &lt;li&gt;Không trao đổi, tặng hoặc chuyển thẻ giữa các tài khoản.&lt;/li&gt;
+        &lt;li&gt;Không thay đổi tỷ lệ hoặc nội dung bộ khi mùa đang diễn ra.&lt;/li&gt;
+      &lt;/ul&gt;
+
+      &lt;p className={styles.provisional}&gt;
+        Đây là bản demo. Tỷ lệ, phần thưởng và mức nhận lượt là số liệu tạm tính,
+        chưa phải điều khoản công bố chính thức.
+      &lt;/p&gt;
+
+      {/* History is NOT in this panel. It is unbounded, it is what support
+          reads, and it needs a URL — "gửi cho tôi đường dẫn lịch sử" is a real
+          support sentence and a modal has no link. */}
+      &lt;p className={styles.footer}&gt;
+        &lt;Link className={styles.footerLink} href="/bo-suu-tap/cua-toi?tab=lich-su"&gt;
+          Xem lịch sử →
+        &lt;/Link&gt;
+      &lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+<p>Rendered values: "cao gấp khoảng 1.8 lần" and "sau 12 lượt mở".</p>
+<div class="callout warn">"1.8" uses a decimal point in Vietnamese copy. The opens rule says opens come from settled sports bets, while the demo mints opens from the "+1 lượt mở" button and the history labels them "lượt mở từ cược đã kết toán". The backstop rule is not implemented (see r-collection-lib).</div>
+<h4>6–7, 9–10</h4><p>No states/motion. Footer is <code>position: sticky; bottom: 0</code> with #141414 background so it pins inside the sheet's scroll body.</p>
+</section>
+

@@ -1,0 +1,420 @@
+/* ============================================================================
+ * Auth area partial — the AuthField and AuthModal rules, in their original
+ * load order (AuthField first). Plain class rules only; the components layer
+ * comes from the import line in globals.css.
+ * ==========================================================================*/
+
+/* AuthField — TextField analog for the auth modal.
+ *
+ * Input contract:
+ *   resting → a filled --surface-2 step plus a 1px --line-default control edge;
+ *   focus   → a 2px solid --focus-ring edge. Never a glow or shadow ring.
+ *
+ * The fill and the edge are both load-bearing. The field sits on the auth
+ * form panel's --surface, where the decorative --border hairline alone gives
+ * no WCAG 1.4.11 boundary; --line-default is the control edge that clears 3:1.
+ *
+ * Focus is a weight change (1px → 2px) in the shared --focus-ring hue, the
+ * same indicator every control uses. Padding compensates the extra border
+ * pixel so the box geometry is identical in both states — no reflow on focus.
+ *
+ * Text roles: the label reads --input-label, the typed value --input-text,
+ * the placeholder and the prefix and reveal glyphs --input-helper, and the
+ * validation row --input-error-text. */
+
+.auth-field {
+  margin-bottom: var(--space-2);
+}
+
+.auth-field-label {
+  display: block;
+  font-size: var(--t-sm);
+  color: var(--input-label);
+  margin-bottom: var(--space-1);
+  line-height: var(--lh-tight);
+}
+
+.auth-field-star {
+  color: var(--brand-accent-fg);
+}
+
+.auth-field-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  /* +1px on each side compensates the 1px resting border, so the CONTENT box is
+   * identical at rest (1 border + 1 pad) and at focus (2 border + 0 pad). */
+  padding: 1px calc(var(--space-3) + 1px);
+  background: var(--surface-2);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.auth-field-box:focus-within {
+  border-width: 2px;
+  /* Focus is one affordance with one colour: --focus-ring is the pinned AA
+     indicator, identical across brands. Gold stays reward chrome and is
+     never the focus colour. */
+  border-color: var(--focus-ring);
+  padding: 0 var(--space-3);
+}
+
+.auth-field-box-error {
+  border-color: var(--error);
+}
+.auth-field-box-error:focus-within {
+  border-color: var(--error);
+}
+
+.auth-field-prefix {
+  color: var(--input-helper);
+  flex: none;
+}
+
+.auth-field-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--input-text);
+  font: inherit;
+  font-size: var(--t-body);
+  outline: none;
+  height: var(--tap-min);
+}
+/* the placeholder is the field's only hint before typing, so it reads the AA
+ * helper ink, never a decorative step. */
+.auth-field-input::placeholder {
+  color: var(--input-helper);
+}
+
+.auth-field-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin-right: calc(var(--space-3) * -1);
+  border: 0;
+  background: transparent;
+  color: var(--input-helper);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+/* the house uniform hover: button 1.05, its glyph 1.10 — never differentiated
+ * by prominence. */
+.auth-field-eye:hover {
+  color: var(--input-text);
+  transform: scale(1.05);
+}
+.auth-field-eye:hover svg {
+  transform: scale(1.1);
+}
+.auth-field-eye svg {
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.auth-field-eye:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-field-box,
+  .auth-field-eye,
+  .auth-field-eye svg {
+    transition: none;
+  }
+  /* ABSENT, not merely instant — snapping a control 5% larger with a zero-length
+   * transition is the same jolt the query exists to avoid. */
+  .auth-field-eye:hover,
+  .auth-field-eye:hover svg {
+    transform: none;
+  }
+}
+
+/* reserved error row — always present so no layout shift on error appearance */
+.auth-field-error-row {
+  min-height: var(--t-micro);
+  margin: var(--space-1) 0 0;
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--input-error-text);
+}
+
+/* AuthModal — 2-zone centred dialog (desktop) / single-zone sheet (mobile).
+ * The desktop panel width (720px for the 2-zone layout) is set via the
+ * Overlay `desktopMaxWidth` prop, NOT here.
+ *
+ * PASSWORD-ONLY: no method tabs / no OTP. The left brand panel is a
+ * filled logo + tagline + trust-bullet column — no empty placeholder boxes. */
+
+.auth-modal-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+/* brand zone — hidden on mobile (sheet shows the form only) */
+.auth-modal-brand-zone {
+  display: none;
+}
+
+.auth-modal-form-zone {
+  padding: var(--space-2) var(--space-5) var(--space-4);
+}
+
+.auth-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.auth-modal-title {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+}
+
+.auth-modal-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin-right: calc(var(--space-2) * -1);
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.auth-modal-close-btn svg {
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+/* uniform hover — button 1.05 / glyph 1.10, identical for every control here */
+.auth-modal-close-btn:hover {
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+.auth-modal-close-btn:hover svg {
+  transform: scale(1.1);
+}
+.auth-modal-close-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.auth-modal-form {
+  margin-bottom: var(--space-3);
+}
+
+/* the single honest register confirmation — equal-salience, no win-juice */
+.auth-modal-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.auth-modal-success-icon {
+  color: var(--win); /* neutral success, NOT brand-juiced */
+}
+.auth-modal-success-text {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.auth-modal-switch {
+  text-align: center;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+.auth-modal-switch-btn {
+  border: 0;
+  background: transparent;
+  color: var(--brand-cta);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  padding: var(--space-1);
+  min-height: var(--tap-min);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.auth-modal-switch-btn:hover {
+  transform: scale(1.05);
+}
+.auth-modal-switch-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* LOGIN: "Quên mật khẩu?" — right-aligned just under the password field */
+.auth-modal-forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(var(--space-2) * -1);
+  margin-bottom: var(--space-2);
+}
+.auth-modal-forgot-link {
+  border: 0;
+  background: transparent;
+  color: var(--brand-cta);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  padding: var(--space-1);
+  min-height: var(--tap-min);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.auth-modal-forgot-link:hover {
+  text-decoration: underline;
+  transform: scale(1.05);
+}
+.auth-modal-forgot-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-modal-close-btn,
+  .auth-modal-close-btn svg,
+  .auth-modal-switch-btn,
+  .auth-modal-forgot-link {
+    transition: none;
+  }
+  /* absent, not instant */
+  .auth-modal-close-btn:hover,
+  .auth-modal-close-btn:hover svg,
+  .auth-modal-switch-btn:hover,
+  .auth-modal-forgot-link:hover {
+    transform: none;
+  }
+}
+
+/* FORGOT: the email-or-phone instruction above the reset field */
+.auth-modal-reset-prompt {
+  margin-bottom: var(--space-4);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---- DESKTOP: 2-zone side-by-side ≥640 ---- */
+@media (min-width: 640px) {
+  .auth-modal-layout {
+    flex-direction: row;
+    align-items: stretch; /* both zones share the tallest height */
+  }
+
+  /* BRAND PANEL — a filled column: logo + tagline pinned top, trust bullets
+   *  spread to the bottom so the panel reads as one solid gold-on-dark surface
+   *  with no dead space. */
+  .auth-modal-brand-zone {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--space-5);
+    width: 280px;
+    flex: none;
+    padding: var(--space-6) var(--space-5);
+    /* A structural panel takes a solid fill, never a gradient. The one
+     * gradient in this file is .auth-modal-brand-art, which is decoration,
+     * not a panel, card or button. */
+    background: var(--surface-3);
+    border-right: 1px solid var(--brand-accent-hairline);
+  }
+
+  .auth-modal-brand-top {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .auth-modal-brand-logo {
+    display: block;
+    width: 132px;
+    height: auto;
+  }
+  .auth-modal-brand-tag {
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    color: var(--text-hi);
+    font-weight: var(--weight-semi);
+  }
+
+  /* trust bullets — a COMPACT, top-anchored group (fixed rhythm). The variable
+   *  leftover height is filled by .auth-modal-brand-art below, NOT by stretching these
+   *  bullets apart — so they never go sparse beside the tall 5-field register. */
+  .auth-modal-trust-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .auth-modal-trust-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* decorative brand fill — grows to consume the height the form leaves so the
+   *  panel is a finished surface at any modal height (no void, no sparse list).
+   *  A soft gold spotlight + a faint casino-chip mark; purely decorative. */
+  .auth-modal-brand-art {
+    flex: 1 1 auto;
+    min-height: 64px;
+    margin-top: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    /* The system permits gradients ONLY as large background decoration — this
+     * is that: an inert art slot that grows to fill the panel's leftover height.
+     * The tint derives from --brand-accent, so it tracks the brand fill. */
+    background: radial-gradient(
+      62% 60% at 50% 58%,
+      color-mix(in srgb, var(--brand-accent) 13%, transparent),
+      transparent 70%
+    );
+  }
+  .auth-modal-brand-art-mark {
+    width: clamp(84px, 46%, 156px);
+    height: auto;
+    color: var(--brand-accent);
+    opacity: 0.17;
+  }
+  .auth-modal-trust-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
+    color: var(--brand-accent);
+  }
+  .auth-modal-trust-text {
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+    color: var(--text-mid);
+  }
+
+  .auth-modal-form-zone {
+    flex: 1;
+    padding: var(--space-5) var(--space-6) var(--space-6);
+  }
+}

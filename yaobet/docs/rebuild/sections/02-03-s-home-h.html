@@ -1,0 +1,1763 @@
+<section id="s-home">
+<h2 id="s-home-h">S3 · Home route "/"</h2>
+
+<h3 id="s-home-route">Route template: /</h3>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>URL</td><td><code>/</code> (query strings such as <code>?v=casino</code>, <code>?game=g1</code>, <code>?v=sports&amp;p=saba</code> are produced by the nav but ignored: the page does not read <code>searchParams</code>)</td></tr>
+<tr><td>Page file</td><td><code>src/app/page.tsx</code> (async server component); layout CSS <code>src/components/home/Home.module.css</code>; loading <code>src/app/loading.tsx</code></td></tr>
+<tr><td>Metadata</td><td>Inherits the root: title "Yaobet"</td></tr>
+<tr><td>Auth gating</td><td>None. Guest/member differences live inside the bands (game launch is gated).</td></tr>
+<tr><td>Data</td><td><code>Promise.all</code>: getPromos, getVerticals, getJackpot, getMemberDayCountdown, getLeaderboard, getSportsMatches, getProviders, getGames. <code>stats = {status:"absent"}</code> (hard-coded).</td></tr>
+</tbody></table>
+<p><strong>Section order (top to bottom).</strong></p>
+<pre><code class="lang-txt">div.page
+  DevAuthToggle                         (fixed; non-production only)  #s-dev-auth-toggle
+  div.main                              (flex column, gap 16px)
+    1 HeroBand slides = promos where imageSrc startsWith "/assets/banners/"  → 5 slides (pr1, pr2, pr3, pr7, pr8)   #s-hero-band
+    2 CategoryLauncher verticals        (hidden ≥768)                                                              #s-category-launcher
+    3 StatsBar stats={status:"absent"}  → renders nothing                                                          #s-stats-bar
+    4 ProviderGameGrid providers games                                                                             #s-provider-game-grid
+    5 SportsLifestyle matches=sportsMatches                                                                        #s-sports-lifestyle
+  RightRail memberDay jackpot leaderboard                                                                          #s-right-rail
+(Footer comes from the root layout)</code></pre>
+<table><thead><tr><th>Viewport</th><th>Composition (browser-measured where a px value is given)</th></tr></thead><tbody>
+<tr><td>375</td><td>Content 343px. Hero viewport 343px wide (1px gold border), viewport 343×138.4 (slide 341×136.4, aspect 5/2). Progress row 24px. Navigator row scrolls horizontally with 168px cells. CategoryLauncher 5-column grid, 2 rows (5+4). Game grid 3 columns × 205px rows, first tile spans 2 columns × 1 row. Sports 1 column. RightRail and QuickActionRail hidden. BottomTabBar visible.</td></tr>
+<tr><td>768</td><td>Content 736px. Viewport 736×294.5 (slide 734×292.5) (aspect 1556/620). Progress and navigator share a 5-column grid. Launcher hidden. Game grid 4 columns, hero tile 2×2. Sports 2 columns. Tier-2 visible. BottomTabBar hidden.</td></tr>
+<tr><td>1024</td><td>Content 932px (frame right padding 76). Viewport 932×372.6. Game grid 6 columns (≥992). Sports 4 columns. QuickActionRail visible.</td></tr>
+<tr><td>1440</td><td><code>.page</code> grid: main 1012px + 16 gap + RightRail 304. Viewport 1012×404.4. Game grid 8 columns (≥1424), each tile about 112.5px wide × 205px. Sports columns about 241px; life cards about 241×135.6.</td></tr>
+</tbody></table>
+<p><strong>Loading state</strong> (<code>src/app/loading.tsx</code>, also used by every route without its own loading file, including /khuyen-mai): <code>div.page aria-busy="true" aria-label="Đang tải trang chủ"</code> &gt; <code>div.main</code> containing: Skeleton block 100%×200 · <code>div.skelRow</code> with 5 × Skeleton pill 64×64 · Skeleton block 100%×140 · Skeleton text 40%×1.6em · <code>div.skelGrid</code> with 6 × Skeleton block 100%×120 (renders 120px tall: <code>Skeleton.tsx:33-35</code> writes the height as an inline style, which beats the <code>.skelGrid &gt; *</code> rule) · Skeleton block 100%×160.</p>
+<p><strong>Empty / error.</strong> No page-level error boundary (<code>(not found in source)</code>). Each band hides itself when its data is absent. With empty promos, HeroBand shows one placeholder slide with the label "Yaobet".</p>
+<p><strong>Home layout styles.</strong></p>
+<p>Style table: <code>src/components/home/Home.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.page</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.main</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.main</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.main</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.main</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.footerFull</code></td><td>margin-top</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+<tr><td><code>.page</code></td><td>grid-template-columns</td><td><code>minmax(0, 1fr) var(<span class="tok">--rail-w</span>)</code></td><td>minmax(0, 1fr) 304px</td><td>(min-width: 1424px)</td></tr>
+<tr><td><code>.page</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>(min-width: 1424px)</td></tr>
+<tr><td><code>.page</code></td><td>align-items</td><td><code>start</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+<tr><td><code>.footerFull</code></td><td>grid-column</td><td><code>1 / -1</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+<tr><td><code>.section</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.sectionHead</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sectionHead</code></td><td>align-items</td><td><code>baseline</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sectionHead</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sectionHead</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h1</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>line-height</td><td><code>1.5</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.sectionLink</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.skelRow</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.skelRow</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.skelRow</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.skelGrid</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.skelGrid</code></td><td>grid-template-columns</td><td><code>repeat(3, 1fr)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.skelGrid</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.skelGrid &gt; *</code></td><td>height</td><td><code>var(<span class="tok">--tile-h</span>)</code></td><td>205px (no effect: overridden by the Skeleton inline <code>height: 120px</code>)</td><td>all</td></tr>
+<tr><td><code>.skelGrid</code></td><td>grid-template-columns</td><td><code>repeat(4, 1fr)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.skelGrid</code></td><td>grid-template-columns</td><td><code>repeat(6, 1fr)</code></td><td>(literal)</td><td>(min-width: 992px)</td></tr>
+<tr><td><code>.skelGrid</code></td><td>grid-template-columns</td><td><code>repeat(8, 1fr)</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/home/Home.module.css</code></summary><pre><code class="lang-css">/* ============================================================================
+ * HOME / LOBBY — page layout (SPEC-03 §home; SPEC-05 §3.1 order).
+ * Mobile-first @375: a single vertical stack of bands. ≥1240 (--frame-w): the
+ * desktop right rail (RightRail surfaces) sits beside the main column; below
+ * 1240 those figures fold inline at their authored band positions (so the rail
+ * is simply not rendered on mobile — see SPEC-03 §home RightRail).
+ *
+ * Tokens only — no raw hex/px/duration. The page body never scrolls
+ * horizontally (globals.css); wide strips scroll inside their own Scroller.
+ * ==========================================================================*/
+
+.page {
+  display: block;
+}
+
+/* main column: the authored band stack — J9 band beat = 16px (the dominant gap,
+ * NOT 32px). The flex gap owns ALL vertical band rhythm; bands set no own margin,
+ * so an omitted band (Decree-174) collapses the gap rather than leaving a hole. */
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-gap);
+  min-width: 0;
+}
+
+/* footer wrapper — must span the FULL 1424 frame (J9 .footer-box{width:1424px}),
+ * so on the desktop grid it stretches across BOTH the main column and the rail.
+ * On mobile (.page is display:block) it is naturally full width. The top gap to
+ * the last band is the standard J9 16px band beat. */
+.footerFull {
+  margin-top: var(--band-gap);
+}
+
+/* desktop two-column: main + right rail at the J9 fixed frame (1424). Rail gutter
+ * = the J9 16px gap, not 24px. The footer row spans both columns. */
+@media (min-width: 1424px) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    gap: var(--band-gap);
+    align-items: start;
+  }
+  .footerFull {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- generic section scaffold reused by bands ---- */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* J9 section title = 24px / 600 / 150% / white .9 (the dominant heading) */
+.sectionTitle {
+  font-size: var(--t-h1);
+  line-height: 1.5;
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.sectionLink {
+  font-size: var(--t-sm);
+  color: var(--brand-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  text-decoration: none;
+}
+
+/* ---- skeleton scaffolds (loading.tsx) ---- */
+.skelRow {
+  display: flex;
+  gap: var(--space-3);
+  overflow: hidden;
+}
+
+/* skeleton mirrors the J9 lobby column ladder: 3-up @375 → 4-up → 6-up → 8-up */
+.skelGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--band-gap);
+}
+.skelGrid &gt; * {
+  height: var(--tile-h);
+}
+
+@media (min-width: 768px) {
+  .skelGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (min-width: 992px) {
+  .skelGrid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+@media (min-width: 1424px) {
+  .skelGrid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}
+</code></pre></details>
+<div class="callout warn">The page comment lists "promo chips", "auth/identity" and "live-games band" in the band order, and loading.tsx still draws a "vip aisle" skeleton. None of these are rendered: PromoChips, AuthCluster, LiveGamesBand and VipAisle are dead (<a href="#s-unused">#s-unused</a>). The loading skeleton's 5 × 64px pills do not match the launcher's 56px discs (9 items), and its 6 × 120px blocks stay 120px tall, shorter than the 205px tiles they stand in for (the inline height beats <code>.skelGrid &gt; *</code>).</div>
+
+<h3 id="s-hero-band">HeroBand (hero carousel + progress line + navigator)</h3>
+<p><strong>Purpose.</strong> A swipeable, auto-advancing banner carousel of 5 promo images. Below it sits a thin progress line with a node per slide, then a row of thumbnail+title items that select a slide.</p>
+<p><strong>Source.</strong> <code>src/components/home/HeroBand.tsx</code>, <code>HeroBand.module.css</code>; reduced-motion hook <code>src/lib/rg.ts</code> <code>usePrefersReducedMotion</code>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">IF slides.length===0:
+  section.hero aria-label="Khuyến mãi nổi bật"
+    div.viewport  div.slide.slotEmpty aria-hidden  span.slotLabel "Yaobet"
+ELSE:
+section.hero aria-label="Khuyến mãi nổi bật" aria-roledescription="carousel"
+  div.viewport ref  onMouseEnter=pause onMouseLeave=resume onFocusCapture=pause onBlurCapture=resume
+                    onPointerDown/Move/Up/Cancel (drag)
+    ul.track  inline style: transform translateX(calc(-{index*100}% + {dragging ? dragDX : 0}px)); transition {dragging ? none : (css)}
+      li.cell x N  aria-hidden={i!==index} aria-roledescription="slide" aria-label="{i+1} / {N}"
+        a.slide[.slot if !imageSrc] href={s.href} aria-label={s.title} tabIndex={i===index ? 0 : -1} draggable=false
+           onClick: if |dragDX|&gt;4 preventDefault
+          img.slideImg src={s.imageSrc} alt="" aria-hidden draggable=false loading={i===0 ? "eager" : "lazy"}
+  IF N&gt;1:
+  div.progress role="tablist" aria-label="Chọn khuyến mãi" inline style --n:N
+    span.rail aria-hidden
+    span.railFill[.railFillStatic if reduced] key="seg-{index}-{tick}" aria-hidden inline style --seg-i:index; --seg-dur:{reduced ? 0ms : 6000ms}
+    button.node[.nodeOn if i&lt;=index] x N type=button role="tab" aria-selected={i===index} aria-label="Khuyến mãi {i+1}" onClick=go(i)
+      span.dot aria-hidden
+  IF N&gt;1:
+  ul.nav role="tablist" aria-label="Chọn khuyến mãi" inline style --n:N
+    li.navCell x N
+      button.navItem[.navItemOn] type=button role="tab" aria-selected onClick=go(i)
+        span.navThumb  img src={s.imageSrc} alt="" aria-hidden loading=lazy
+        span.navTitle  {s.title}</code></pre>
+<p><strong>Slides (data, in order).</strong></p>
+<table><thead><tr><th>#</th><th>id</th><th>Image (1556×620 JPG, object-fit:cover, object-position:center)</th><th>href</th><th>Title (aria-label + navigator text)</th></tr></thead><tbody>
+<tr><td>1</td><td>pr1</td><td>/assets/banners/hero-banner-1.jpg (eager)</td><td>/khuyen-mai/pr1</td><td>Thưởng chào mừng thành viên mới</td></tr>
+<tr><td>2</td><td>pr2</td><td>/assets/banners/pc-hero-banner-UCLfinal.jpg</td><td>/khuyen-mai/pr2</td><td>Cúp C1 Châu Âu — Đặt cược nhận thưởng</td></tr>
+<tr><td>3</td><td>pr3</td><td>/assets/banners/pc-banner-vpn.jpg</td><td>/khuyen-mai/pr3</td><td>Tải app — Tăng tốc &amp; bảo mật</td></tr>
+<tr><td>4</td><td>pr7</td><td>/assets/banners/hero-banner-1.jpg</td><td>/khuyen-mai/pr7</td><td>Hoàn trả mỗi ngày — Cược càng nhiều, nhận càng cao</td></tr>
+<tr><td>5</td><td>pr8</td><td>/assets/banners/pc-hero-banner-UCLfinal.jpg</td><td>/khuyen-mai/pr8</td><td>Vòng quay vàng — Trúng thưởng cực lớn</td></tr>
+</tbody></table>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead><tbody><tr><td>slides</td><td>Promo[]</td><td>—</td><td>0 → placeholder; 1 → no autoplay, drag, progress or navigator; ≥2 → full carousel.</td></tr></tbody></table>
+<p><strong>Timings and behaviour.</strong></p>
+<table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody>
+<tr><td>Autoplay dwell</td><td><code>DWELL_MS = 6000</code>. <code>setInterval</code> advances index (i+1) % N and restarts the timer on every manual turn (the effect depends on <code>tick</code>).</td></tr>
+<tr><td>Autoplay off when</td><td>reduced motion, paused (mouse over the viewport, or focus inside it), dragging, or N ≤ 1.</td></tr>
+<tr><td>Slide transition</td><td><code>.track</code> transform <span class="tok">--dur-slow</span> 300ms <code>cubic-bezier(0.645, 0.045, 0.355, 1)</code>; none while dragging.</td></tr>
+<tr><td>Drag</td><td>Pointer capture on the viewport. The track follows dx live. On release: dx ≤ -48 → next; dx ≥ 48 → previous (<code>SWIPE_THRESHOLD = 48</code>), wrapping. Otherwise snap back and restart the dwell. <code>touch-action: pan-y</code>. Cursor grab, grabbing while active. A click is cancelled when |dragDX| &gt; 4.</td></tr>
+<tr><td>Progress fill</td><td>Remounts on every turn (key). It animates its width from the active node centre to the next node centre over 6000ms <code>linear forwards</code>, capped at the last node. Mobile (<code>heroSeg</code>): fraction <code>index/(N-1)</code> of <code>(100% - 10px)</code>, starting at left 5px. ≥768 (<code>heroSegGrid</code>): column pitch <code>(100% + 8px)/N</code>, half-node 22px; from = 22px + index×pitch, to = 22px + (index+1)×pitch, max = 22px + (N-1)×pitch.</td></tr>
+<tr><td>Nodes</td><td>44×24 hit area with an 8px dot. Inactive dot #6f6f6f. Reached/active nodes (i ≤ index) #d4af37 at scale(1.4). Mobile: flex space-between with 5px side padding. ≥768: grid of N equal columns, gap 8px, each node <code>justify-self:start</code>, so it sits above its thumbnail.</td></tr>
+<tr><td>Navigator</td><td>Mobile: horizontal scroll (scrollbar hidden), cells 168px, gap 8px. ≥768: grid of N equal columns, gap 8px. Each item: 44×44 thumb (radius 4px, bg #171717, cover), title 12px (14px from 768), 2-line clamp, line-height 1.3. Item opacity 0.62, hover 0.85, active 1, with the active title #f2f0e4 weight 600.</td></tr>
+</tbody></table>
+<p><strong>Styles.</strong></p>
+<p>Style table: <code>src/components/home/HeroBand.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.hero</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>border</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>touch-action</td><td><code>pan-y</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>cursor</td><td><code>grab</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>-webkit-user-select</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport</code></td><td>user-select</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.viewport:active</code></td><td>cursor</td><td><code>grabbing</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.track</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.track</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.track</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.track</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.track</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-slow</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 300ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.track</code></td><td>will-change</td><td><code>transform</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>flex</td><td><code>0 0 100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>aspect-ratio</td><td><code>5 / 2</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>position</td><td><code>absolute</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>inset</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>height</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>object-fit</td><td><code>cover</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>object-position</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slideImg</code></td><td>pointer-events</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slot, .slotEmpty</code></td><td>background</td><td><code>radial-gradient(120% 120% at 85% 15%, var(<span class="tok">--brand-accent-hairline</span>), transparent 60%), linear-gradient(135deg, var(<span class="tok">--surface</span>) 0%, var(<span class="tok">--surface-3</span>) 100%)</code></td><td>radial-gradient(120% 120% at 85% 15%, rgba(212, 175, 55, 0.55), transparent 60%), linear-gradient(135deg, #141414 0%, #212121 100%)</td><td>all</td></tr>
+<tr><td><code>.slotEmpty</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slotEmpty</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slotEmpty</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slotLabel</code></td><td>font-size</td><td><code>var(<span class="tok">--t-display</span>)</code></td><td>32px</td><td>all</td></tr>
+<tr><td><code>.slotLabel</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.slotLabel</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.slotLabel</code></td><td>opacity</td><td><code>0.9</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.slide</code></td><td>aspect-ratio</td><td><code>1556 / 620</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.progress</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.progress</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.progress</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.progress</code></td><td>padding</td><td><code>0 5px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.progress</code></td><td>--seg-frac</td><td><code>calc(var(<span class="tok">--seg-i</span>) / (var(<span class="tok">--n</span>) - 1))</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.progress</code></td><td>--seg-frac-next</td><td><code>calc((var(<span class="tok">--seg-i</span>) + 1) / (var(<span class="tok">--n</span>) - 1))</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>position</td><td><code>absolute</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>left</td><td><code>5px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>right</td><td><code>5px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>top</td><td><code>50%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>height</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>transform</td><td><code>translateY(-50%)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>background</td><td><code>var(<span class="tok">--progress-track</span>)</code></td><td>hsla(0, 0%, 100%, 0.12)</td><td>all</td></tr>
+<tr><td><code>.rail</code></td><td>pointer-events</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>position</td><td><code>absolute</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>left</td><td><code>5px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>top</td><td><code>50%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>height</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>transform</td><td><code>translateY(-50%)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>pointer-events</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>width</td><td><code>calc((100% - 10px) * var(<span class="tok">--seg-frac</span>))</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>max-width</td><td><code>calc(100% - 10px)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFill</code></td><td>animation</td><td><code>heroSeg var(<span class="tok">--seg-dur</span>) linear forwards</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFillStatic</code></td><td>animation</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.railFillStatic</code></td><td>width</td><td><code>calc((100% - 10px) * var(<span class="tok">--seg-frac</span>))</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>z-index</td><td><code>var(<span class="tok">--z-content</span>)</code></td><td>1</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>flex</td><td><code>0 0 auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>width</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>height</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>place-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>border</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.dot</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.dot</code></td><td>width</td><td><code>8px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.dot</code></td><td>height</td><td><code>8px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.dot</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.dot</code></td><td>background</td><td><code>var(<span class="tok">--text-dim</span>)</code></td><td><span class="sw" style="background:#6f6f6f"></span>#6f6f6f</td><td>all</td></tr>
+<tr><td><code>.dot</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), background var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1), background 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.nodeOn .dot</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.nodeOn .dot</code></td><td>transform</td><td><code>scale(1.4)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.node:focus-visible</code></td><td>outline-offset</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.node:focus-visible</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>gap</td><td><code>var(<span class="tok">--gap-sm</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>overflow-x</td><td><code>auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>scrollbar-width</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>-webkit-overflow-scrolling</td><td><code>touch</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.nav::-webkit-scrollbar</code></td><td>display</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navCell</code></td><td>flex</td><td><code>0 0 auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navCell</code></td><td>width</td><td><code>168px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>align-items</td><td><code>flex-start</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>height</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>) 0</code></td><td>4px 0</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>border</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>text-align</td><td><code>left</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>color</td><td><code>var(<span class="tok">--text</span>)</code></td><td><span class="sw" style="background:#d6d3c7"></span>#d6d3c7</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>opacity</td><td><code>0.62</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem</code></td><td>transition</td><td><code>opacity var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>opacity 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.navItem:hover</code></td><td>opacity</td><td><code>0.85</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItemOn</code></td><td>opacity</td><td><code>1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItemOn .navTitle</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.navItemOn .navTitle</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.navItem:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.navItem:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navItem:focus-visible</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-sm</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.navThumb</code></td><td>flex</td><td><code>0 0 auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb</code></td><td>width</td><td><code>44px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb</code></td><td>height</td><td><code>44px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-sm</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.navThumb</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb</code></td><td>background</td><td><code>var(<span class="tok">--tile</span>)</code></td><td><span class="sw" style="background:#171717"></span>#171717</td><td>all</td></tr>
+<tr><td><code>.navThumb img</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb img</code></td><td>height</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb img</code></td><td>object-fit</td><td><code>cover</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navThumb img</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-reg</span>)</code></td><td>400</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>color</td><td><code>var(<span class="tok">--text</span>)</code></td><td><span class="sw" style="background:#d6d3c7"></span>#d6d3c7</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>display</td><td><code>-webkit-box</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>-webkit-line-clamp</td><td><code>2</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>line-clamp</td><td><code>2</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>-webkit-box-orient</td><td><code>vertical</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.navTitle</code></td><td>transition</td><td><code>color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>color 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.nav</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.nav</code></td><td>grid-template-columns</td><td><code>repeat(var(<span class="tok">--n</span>), minmax(0, 1fr))</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.nav</code></td><td>overflow-x</td><td><code>visible</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.navCell</code></td><td>width</td><td><code>auto</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.navCell</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.navTitle</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>grid-template-columns</td><td><code>repeat(var(<span class="tok">--n</span>), minmax(0, 1fr))</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>column-gap</td><td><code>var(<span class="tok">--gap-sm</span>)</code></td><td>8px</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>--half</td><td><code>calc(var(<span class="tok">--tap-min</span>) / 2)</code></td><td>calc(44px / 2)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>--col-pitch</td><td><code>calc((100% + var(<span class="tok">--gap-sm</span>)) / var(<span class="tok">--n</span>))</code></td><td>calc((100% + 8px) / var(--n))</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.progress</code></td><td>--rail-overhang</td><td><code>18px</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.node</code></td><td>justify-self</td><td><code>start</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.rail</code></td><td>left</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.rail</code></td><td>right</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.rail</code></td><td>width</td><td><code>auto</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFill</code></td><td>left</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFill</code></td><td>--fill-from</td><td><code>calc(var(<span class="tok">--half</span>) + var(<span class="tok">--seg-i</span>) * var(<span class="tok">--col-pitch</span>))</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFill</code></td><td>--fill-to</td><td><code>calc(var(<span class="tok">--half</span>) + (var(<span class="tok">--seg-i</span>) + 1) * var(<span class="tok">--col-pitch</span>))</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFill</code></td><td>width</td><td><code>var(<span class="tok">--fill-from</span>)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFill</code></td><td>max-width</td><td><code>calc(var(<span class="tok">--half</span>) + (var(<span class="tok">--n</span>) - 1) * var(<span class="tok">--col-pitch</span>))</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFill</code></td><td>animation</td><td><code>heroSegGrid var(<span class="tok">--seg-dur</span>) linear forwards</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFillStatic</code></td><td>animation</td><td><code>none</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.railFillStatic</code></td><td>width</td><td><code>var(<span class="tok">--fill-from</span>)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.track</code></td><td>transition</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.railFill</code></td><td>animation</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.dot</code></td><td>transition</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+</tbody></table>
+<p>Keyframes in this module: <code>heroSeg</code>, <code>heroSegGrid</code> (verbatim in the CSS block).</p>
+
+<details><summary>Verbatim CSS — <code>src/components/home/HeroBand.module.css</code></summary><pre><code class="lang-css">/* HeroBand — J9-EXACT banner-box swiper + progress-line + promo/news ticker.
+ * Tokens only (no raw hex/px/durations); J9 source values noted inline. */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  /* defect-3: banner + progress-line + promo row read as ONE snug block —
+   *  a hairline gap, not the prior large step. The progress/ticker rows trim
+   *  their own vertical padding to keep the stack tight. */
+  gap: var(--space-1);
+}
+
+/* J9 .banner-box{border-radius:8px;overflow:hidden} — the swiper viewport. */
+.viewport {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--brand-accent-hairline);
+  touch-action: pan-y; /* let vertical page-scroll through; we own horizontal drag */
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.viewport:active {
+  cursor: grabbing;
+}
+
+.track {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  transition: transform var(--dur-slow) var(--ease-standard);
+  will-change: transform;
+}
+
+.cell {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+.slide {
+  position: relative;
+  display: block;
+  /* J9 banner native ratio = 1556/620 ≈ 2.5:1. Mobile keeps it a touch taller
+   * (5/2); desktop uses the native crop (§3.2). The slide is JUST the banner
+   * image now — no overlay text — so no padding/inner layout (defect-2). */
+  aspect-ratio: 5 / 2;
+  text-decoration: none;
+  color: var(--text-hi);
+  overflow: hidden;
+}
+
+/* full-bleed banner art — J9 object-fit:cover, fills the cell edge-to-edge */
+.slideImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+}
+
+/* image SLOT — the honest fallback when no banner art (only the empty-state
+ *  branch uses this now; banner slides are image-only). This is a FULL-BLEED
+ *  hero backdrop, the one place the flat system still allows a directional
+ *  gradient — but the raw rgba() literal is gone, it reads --brand-accent-
+ *  hairline like every other component-level accent tint. */
+.slot,
+.slotEmpty {
+  background:
+    radial-gradient(120% 120% at 85% 15%, var(--brand-accent-hairline), transparent 60%),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-3) 100%);
+}
+
+.slotEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slotLabel {
+  font-size: var(--t-display);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  opacity: 0.9;
+}
+
+@media (min-width: 768px) {
+  .slide {
+    /* J9 native banner ratio 1556×620 ≈ 2.5:1 — full art, no letterbox */
+    aspect-ratio: 1556 / 620;
+  }
+}
+
+/* ===========================================================================
+ * (a) ANIMATED PROGRESS-LINE INDICATOR  (J9-EXACT)
+ * A thin FULL-WIDTH track with one node dot per slide; the ACTIVE node is a
+ * larger filled BRAND-ACCENT dot, and a brand-accent SEGMENT advances rightward
+ * over the autoplay dwell from the active node toward the next node. Nodes
+ * double as the clickable navigation (defect-2: arrows removed).
+ *
+ * WAS --info (blue). Blue means FOCUS and only focus in this system: a blue
+ * playhead sitting next to a blue :focus-visible ring made &quot;the slide you are
+ * on&quot; and &quot;the control your keyboard is on&quot; the same colour. Selected/active
+ * state is --brand-accent; --focus-ring stays exclusive to :focus-visible.
+ * Inactive nodes = muted grey; the base rail is a hairline. Static under
+ * reduced-motion.
+ * ======================================================================== */
+.progress {
+  position: relative;
+  /* MOBILE base: nodes distribute edge-to-edge (the nav row scrolls
+   *  independently here, so node-over-thumb sync isn&#x27;t attempted). DESKTOP
+   *  (≥768) overrides this to the SAME N-column grid as .nav so each node sits
+   *  directly above its item&#x27;s thumbnail (FIX 2). */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* node radius (5px) of horizontal inset so the end dots aren&#x27;t clipped.
+   *  defect-3: no extra vertical padding — the node&#x27;s own tap-area defines the
+   *  row height, keeping the progress-line snug under the banner. */
+  padding: 0 5px;
+  /* --seg-frac = active node center as a fraction of the rail span. MOBILE
+   *  (edge-distributed): index/(n-1). DESKTOP grid recomputes this below. */
+  --seg-frac: calc(var(--seg-i) / (var(--n) - 1));
+  --seg-frac-next: calc((var(--seg-i) + 1) / (var(--n) - 1));
+}
+
+/* continuous hairline rail behind the nodes (centered between the end dots) */
+.rail {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--progress-track); /* locked neutral hairline groove on dark */
+  pointer-events: none;
+}
+
+/* the advancing brand-accent segment. It starts at the rail&#x27;s left and grows to the
+ * active node&#x27;s center (--seg-frac), then advances one inter-node span across
+ * the dwell (--seg-dur). --seg-frac/-next are resolved per breakpoint so the
+ * fill always lands under the active node (FIX 2). */
+.railFill {
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent); /* SELECTED-state colour — never --focus-ring */
+  pointer-events: none;
+  width: calc((100% - 10px) * var(--seg-frac));
+  /* never overshoot the rail (last slide: --seg-frac=1, no further node) */
+  max-width: calc(100% - 10px);
+  animation: heroSeg var(--seg-dur) linear forwards;
+}
+@keyframes heroSeg {
+  from {
+    width: calc((100% - 10px) * var(--seg-frac));
+  }
+  to {
+    width: calc((100% - 10px) * var(--seg-frac-next));
+  }
+}
+/* reduced motion / single-frame: fill only up to the active node (no advance) */
+.railFillStatic {
+  animation: none;
+  width: calc((100% - 10px) * var(--seg-frac));
+}
+
+/* clickable node — comfy tap target around the visible dot */
+.node {
+  position: relative;
+  z-index: var(--z-content);
+  flex: 0 0 auto;
+  width: var(--tap-min); /* 44px horizontal hit area (full tap width kept) */
+  /* defect-3: short row so the progress-line is a thin band hugging the banner,
+   *  not a tall 44px gap — the 44px WIDTH preserves a comfortable tap target. */
+  height: var(--space-5);
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* the visible dot — small muted grey by default */
+.dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--text-dim);
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+/* reached/active nodes → larger filled ACCENT dot (active reads as the playhead) */
+.nodeOn .dot {
+  background: var(--brand-accent);
+  transform: scale(1.4);
+}
+
+.node:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+  border-radius: var(--radius-pill);
+}
+
+/* ===========================================================================
+ * (c) PROMO NAVIGATOR ROW — the under-hero items ARE the hero slides (1:1).
+ * J9-style: a de-carded thumb + short title in a horizontal row on the track —
+ * NO card border / box / background. Tapping item i navigates the hero to
+ * slide i; the active item is highlighted (synced with the current slide +
+ * progress node). Horizontally scrollable on narrow viewports so the page body
+ * never scrolls sideways.
+ * ======================================================================== */
+.nav {
+  display: flex;
+  gap: var(--gap-sm);
+  list-style: none;
+  margin: 0;
+  /* defect-3 + defect-4: zero horizontal inset so the row&#x27;s left/right edges
+   *  line up exactly with the hero banner; zero vertical padding keeps it snug
+   *  under the progress-line. */
+  padding: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.navCell {
+  flex: 0 0 auto;
+  /* on mobile show ~2.2 items; desktop the row distributes across the band */
+  width: 168px;
+}
+
+/* DE-CARDED item — J9 navigator: just a thumb + title in a row, no box.
+ * FIX 3: TOP-aligned (align-items:flex-start) so the title&#x27;s first line sits at
+ * the TOP of the thumbnail (J9), not vertically centered. */
+.navItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  /* small inner padding for the tap target only — NO border/background/box */
+  padding: var(--space-1) 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.62; /* inactive items recede; the active one reads as selected */
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.navItem:hover {
+  opacity: 0.85;
+}
+
+/* active item (synced with the current slide + progress node) */
+.navItemOn {
+  opacity: 1;
+}
+.navItemOn .navTitle {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* small thumb cut from the slide&#x27;s own banner art (the only rounded element) */
+.navThumb {
+  flex: 0 0 auto;
+  width: 44px; /* J9 below-hero promo thumbnail ≈ 44px square */
+  height: 44px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--tile);
+}
+.navThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* short title — the slide&#x27;s own promo title, clamped to 2 lines */
+.navTitle {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  font-weight: var(--weight-reg);
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+@media (min-width: 768px) {
+  /* FIX 2 — node row + item row share ONE N-equal-column grid so each node&#x27;s
+   *  center sits directly above its item&#x27;s THUMBNAIL center. Both .progress and
+   *  .nav use the identical track (repeat(--n, minmax(0,1fr)) + the same
+   *  --gap-sm gutter), so column i occupies the exact same x-range in both
+   *  rows. Within a nav column the 44px thumb sits at the LEFT (thumb center =
+   *  colLeft + 22px); within a progress column the node is justify-self:start
+   *  (dot center = colLeft + 22px) → node i is directly above thumb i. */
+  .nav {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    overflow-x: visible;
+  }
+  .navCell {
+    /* the grid sizes the columns now — no flex basis / fixed width */
+    width: auto;
+    min-width: 0;
+  }
+  .navTitle {
+    font-size: var(--t-sm);
+  }
+
+  /* progress row → the SAME grid as .nav. Column geometry (shared by the rail
+   *  + fill below):
+   *    --half      = half a thumb/node = the node-center inset within a column
+   *    --col-pitch = x-distance between adjacent column lefts = adjacent node
+   *                  centers = (100% + gap) / n  (derived: c+g where
+   *                  c=(100% - (n-1)g)/n)  */
+  .progress {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    column-gap: var(--gap-sm);
+    padding: 0;
+    --half: calc(var(--tap-min) / 2);
+    --col-pitch: calc((100% + var(--gap-sm)) / var(--n));
+    /* the line extends this far BEFORE the first dot and AFTER the last dot so
+     *  the ends aren&#x27;t dead-ends (J9). */
+    --rail-overhang: 18px;
+  }
+  .node {
+    /* left-align the node in its column so the dot center = colLeft + 22px,
+     *  matching the thumbnail center in the nav column above. */
+    justify-self: start;
+  }
+
+  /* FULL hero-banner width: the line spans the entire .progress track (which is
+   *  edge-aligned to the banner), so the tail reaches the banner&#x27;s right edge
+   *  and the head its left edge — no dead-ends. */
+  .rail {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
+  /* fill is anchored at the first node center (--half) and grows in absolute
+   *  column-pitch units to the active node, then advances one pitch over the
+   *  dwell — so it always lands under the active node (FIX 2). */
+  .railFill {
+    /* blue grows from the LEFT edge (0) to the active node center
+     *  (= --half + seg-i·pitch); the trailing run to the banner&#x27;s right edge
+     *  stays grey (J9). */
+    left: 0;
+    --fill-from: calc(var(--half) + var(--seg-i) * var(--col-pitch));
+    --fill-to: calc(var(--half) + (var(--seg-i) + 1) * var(--col-pitch));
+    width: var(--fill-from);
+    max-width: calc(var(--half) + (var(--n) - 1) * var(--col-pitch));
+    animation: heroSegGrid var(--seg-dur) linear forwards;
+  }
+  .railFillStatic {
+    animation: none;
+    width: var(--fill-from);
+  }
+}
+
+/* desktop fill advance (absolute column-pitch units) */
+@keyframes heroSegGrid {
+  from {
+    width: var(--fill-from);
+  }
+  to {
+    width: var(--fill-to);
+  }
+}
+
+/* ---- reduced motion: static fill, no advance, no slide-transition ---------
+ * The active segment is shown FULL instantly; completed stay full; future
+ * stay empty. Autoplay is already disabled in JS (A11/F5). */
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    transition: none;
+  }
+  /* progress segment never advances — fills only to the active node. The
+   *  static WIDTH is already correct per breakpoint (.railFill base = mobile
+   *  fraction; the desktop block = column-pitch); here we only kill the
+   *  advance animation defensively (JS also adds .railFillStatic). */
+  .railFill {
+    animation: none;
+  }
+  .dot {
+    transition: none;
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Default, hover-paused, focus-paused, dragging, empty (placeholder), and reduced motion: no autoplay, the fill is static at the active node, no slide transition, no dot transition. Focus-visible on a node: outline 2px #6ea8ff, offset 0, round. On a navItem: outline 2px, offset 2px, radius 4px.</p>
+<p><strong>Copy.</strong> Khuyến mãi nổi bật (Featured promotions), Chọn khuyến mãi (Choose a promotion), "Khuyến mãi {n}" (Promotion n), "{i} / {N}" (slide label), Yaobet (empty placeholder), plus the 5 slide titles above.</p>
+<p><strong>Behaviour and a11y.</strong> Slides are raw <code>&lt;a href&gt;</code>, so following one is a full page load to /khuyen-mai/{id}. Only the active slide is tabbable. Both the progress row and the navigator use <code>role="tablist"</code> with the same aria-label. There are no arrow-key handlers.</p>
+<div class="callout warn">The file comment says "Three full-bleed banner slides" and "3 banners → 3 items"; there are 5 slides, reusing 3 JPGs. The comments also describe a "BLUE" (#007aff) progress segment; the code uses <span class="tok">--brand-accent</span> gold. <code>--rail-overhang: 18px</code> is declared at ≥768 but never read. The <code>.slot</code> class on a slide only applies when <code>imageSrc</code> is empty, which the page filter never allows.</div>
+
+<h3 id="s-category-launcher">CategoryLauncher (mobile round icons)</h3>
+<p><strong>Purpose.</strong> A mobile-only row of round category icons: 9 game categories in a 5-column grid.</p>
+<p><strong>Source.</strong> <code>src/components/home/CategoryLauncher.tsx</code>, <code>CategoryLauncher.module.css</code>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">IF verticals.length===0 → null
+nav.launcher aria-label="Danh mục"
+  ul.grid
+    li x9
+      Link.item href={v.href}
+        span.iconWrap aria-hidden  Icon {verticalIcon(v.iconId)} 26
+        span.label {v.label}</code></pre>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>verticals</td><td>Vertical[]</td><td>Items.</td></tr></tbody></table>
+<p>Style table: <code>src/components/home/CategoryLauncher.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.launcher</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(5, 1fr)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>) var(<span class="tok">--space-2</span>)</code></td><td>12px 8px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>color</td><td><code>var(<span class="tok">--text</span>)</code></td><td><span class="sw" style="background:#d6d3c7"></span>#d6d3c7</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.item</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>) 0</code></td><td>4px 0</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>width</td><td><code>56px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>height</td><td><code>56px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>place-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>border</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.iconWrap</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), border-color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1), border-color 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.item:hover .iconWrap</code></td><td>transform</td><td><code>scale(1.1)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item:hover .iconWrap</code></td><td>border-color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.item:active .iconWrap</code></td><td>transform</td><td><code>scale(0.96)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.item:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.item:focus-visible</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>text-align</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.launcher</code></td><td>display</td><td><code>none</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.iconWrap, .item:hover .iconWrap, .item:active .iconWrap</code></td><td>transition</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.iconWrap, .item:hover .iconWrap, .item:active .iconWrap</code></td><td>transform</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/home/CategoryLauncher.module.css</code></summary><pre><code class="lang-css">/* CategoryLauncher — mobile round-icon vertical grid. Hidden ≥768. Tokens only. */
+
+.launcher {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3) var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--text);
+  /* ≥44px row; the icon disc is the visual target */
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+}
+
+.iconWrap {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  color: var(--brand-accent);
+  /* flat: a solid raised disc drawn by the gold hairline (was a radial fill) */
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+  /* box-shadow removed from the transition list — nothing paints one now */
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+/* icon affordance = scale(1.10) */
+.item:hover .iconWrap {
+  transform: scale(1.1);
+  border-color: var(--brand-accent);
+}
+
+.item:active .iconWrap {
+  transform: scale(0.96);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.label {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+  text-align: center;
+}
+
+/* desktop hands off to the Tier-2 CategoryRail (SPEC-03 B5/B10) */
+@media (min-width: 768px) {
+  .launcher {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconWrap,
+  .item:hover .iconWrap,
+  .item:active .iconWrap {
+    transition: none;
+    transform: none;
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Hover: the disc scales to 1.1 and its border becomes #d4af37. Active: disc scale(0.96). Focus-visible: outline 2px #6ea8ff, offset 2px, radius 8px. Hidden from 768px. <strong>Motion:</strong> transform and border-color 200ms. Reduced motion: none. <strong>Copy:</strong> "Danh mục" aria-label plus the 9 labels. <strong>Behaviour:</strong> Next Link to "/?v={id}" (no effect on the page).</p>
+
+<h3 id="s-stats-bar">StatsBar</h3>
+<p><strong>Purpose.</strong> A strip for "paid this month" and "participants" figures. On home it is always hidden, because the page passes <code>{status:"absent"}</code>.</p>
+<p><strong>Source.</strong> <code>src/components/home/StatsBar.tsx</code>, <code>StatsBar.module.css</code>.</p>
+<p><strong>Structure.</strong> absent/error → null. loading → <code>div.bar aria-busy</code> with Skeleton 40%×1.4em and Skeleton 30%×1.4em. live → <code>dl.bar aria-label="Số liệu nền tảng"</code> containing [<code>div.stat</code>: <code>dt.label "Đã trả thưởng tháng này"</code> + <code>dd.value</code> formatVnd] and [<code>div.stat</code>: <code>dt.label "Người tham gia"</code> + <code>dd.value</code> formatCount]. If neither field is present → null.</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>stats</td><td>Envelope&lt;{paidThisMonth?: MoneyValue; participants?: number}&gt;</td><td>See structure.</td></tr></tbody></table>
+<p>Style table: <code>src/components/home/StatsBar.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.bar</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>flex-wrap</td><td><code>wrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>) var(<span class="tok">--space-6</span>)</code></td><td>16px 32px</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>padding</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-card</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>background</td><td><code>var(<span class="tok">--surface-2</span>)</code></td><td><span class="sw" style="background:#1a1a1a"></span>#1a1a1a</td><td>all</td></tr>
+<tr><td><code>.bar</code></td><td>border</td><td><code>1px solid var(<span class="tok">--border</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.stat</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.stat</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.stat</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.stat</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.value</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.value</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h3</span>)</code></td><td>18px</td><td>all</td></tr>
+<tr><td><code>.value</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.value</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.value</code></td><td>font-family</td><td><code>var(<span class="tok">--brand-font-num</span>)</code></td><td>&quot;Be Vietnam Pro&quot; (next/font, hashed family), ui-monospace, &quot;DIN Alternate&quot;, &quot;Segoe UI&quot;, sans-serif</td><td>all</td></tr>
+<tr><td><code>.value</code></td><td>font-variant-numeric</td><td><code>tabular-nums</code></td><td>(literal)</td><td>all</td></tr>
+</tbody></table>
+
+<p><strong>Copy.</strong> Số liệu nền tảng (Platform stats), Đã trả thưởng tháng này (Paid out this month), Người tham gia (Participants). <strong>Motion/States:</strong> none beyond the envelope branches.</p>
+
+<h3 id="s-provider-game-grid">ProviderGameGrid (provider tabs + fixed-tile game grid)</h3>
+<p><strong>Purpose.</strong> Provider filter tabs over a grid of 205px-tall game tiles. The first tile is a large feature. Short grids are padded with "coming soon" tiles. A guest tap on a tile opens login.</p>
+<p><strong>Source.</strong> <code>src/components/home/ProviderGameGrid.tsx</code>, <code>ProviderGameGrid.module.css</code>; primitives <a href="#f-ui-tabs">Tabs</a>, <a href="#f-ui-tile">Tile / ComingSoonTile</a>, <a href="#f-ui-empty-state">EmptyState</a>; <code>useGridCols</code> and <code>computeGridFill</code> from <code>src/ui/Skeleton/useGridFill.ts</code>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">section.section aria-label="Trò chơi"
+  Tabs items=[{id:"all",label:"Tất cả"}, …providers.map(p =&gt; {id:p.name,label:p.name})] active onChange label="Nhà cung cấp"
+  IF filtered.length===0:
+    EmptyState message="Chưa có trò chơi cho nhà cung cấp này."
+  ELSE:
+    div.grid ref
+      div.cell[.featureBig on index 0] x filtered.length
+        Tile label={g.name} caption={g.provider} imageSrc={g.imageSrc} fill onClick=onTile(g)
+      div.cell x fillerCount
+        ComingSoonTile</code></pre>
+<p><strong>Tabs (in order).</strong> Tất cả · PG Soft · Pragmatic · JILI · CQ9 · Evolution · Sexy. Games per tab: all 16; Evolution 4 (g1, g3, g8, g14); Sexy 3 (g2, g11, g16); JILI 3 (g5, g9, g15); PG Soft 2 (g4, g10); Pragmatic 2 (g6, g12); CQ9 2 (g7, g13).</p>
+<p><strong>Game data (16 rows, ids g1–g16, provider logos unused).</strong></p>
+<table><thead><tr><th>id</th><th>name</th><th>imageSrc</th><th>provider</th></tr></thead><tbody>
+<tr><td>g1</td><td>Baccarat Kim Cương</td><td>/assets/casino/mg_baccarat_landscape.png (702×480)</td><td>Evolution</td></tr>
+<tr><td>g2</td><td>Tài Xỉu Trực Tiếp</td><td>/assets/casino/sunwin_taixiu-live-landscape.png (234×160)</td><td>Sexy</td></tr>
+<tr><td>g3</td><td>Roulette Châu Âu</td><td>/assets/casino/mg_roulette_landscape.png (702×480)</td><td>Evolution</td></tr>
+<tr><td>g4</td><td>Sicbo May Mắn</td><td>/assets/casino/mg_sicbo_landscape.png (702×480)</td><td>PG Soft</td></tr>
+<tr><td>g5</td><td>Keno Vietlott</td><td>/assets/casino/keno_vietlott.png (234×160)</td><td>JILI</td></tr>
+<tr><td>g6</td><td>Baccarat Tốc Hành</td><td>baccarat</td><td>Pragmatic</td></tr>
+<tr><td>g7</td><td>Tài Xỉu Sunwin</td><td>taixiu</td><td>CQ9</td></tr>
+<tr><td>g8</td><td>Roulette Vàng</td><td>roulette</td><td>Evolution</td></tr>
+<tr><td>g9</td><td>Sicbo Lộc Phát</td><td>sicbo</td><td>JILI</td></tr>
+<tr><td>g10</td><td>Keno Siêu Tốc</td><td>keno</td><td>PG Soft</td></tr>
+<tr><td>g11</td><td>Baccarat VIP</td><td>baccarat</td><td>Sexy</td></tr>
+<tr><td>g12</td><td>Tài Xỉu Phú Quý</td><td>taixiu</td><td>Pragmatic</td></tr>
+<tr><td>g13</td><td>Roulette Kim Cương</td><td>roulette</td><td>CQ9</td></tr>
+<tr><td>g14</td><td>Sicbo Tài Lộc</td><td>sicbo</td><td>Evolution</td></tr>
+<tr><td>g15</td><td>Keno Thần Tài</td><td>keno</td><td>JILI</td></tr>
+<tr><td>g16</td><td>Baccarat Hoàng Gia</td><td>baccarat</td><td>Sexy</td></tr>
+</tbody></table>
+<p><strong>Filler math.</strong> <code>cols</code> is read live from the computed <code>grid-template-columns</code> (ResizeObserver). The feature tile counts as 4 cells when cols ≥ 4, else 2; every other tile counts 1. <code>fillerCount = max(ceil(occupied/cols), 2) × cols − occupied</code>. Worked examples for "Tất cả" (16 games, occupied 19 or 17): 3 columns → 17 cells → 1 filler; 4 → 19 → 1; 6 → 19 → 5; 8 → 19 → 5. For Evolution (4 games) at 8 columns: 4+3 = 7 → 9 fillers. With <code>grid-auto-flow: row dense</code> the rows pack into a full rectangle.</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>providers</td><td>Provider[]</td><td>Tabs.</td></tr><tr><td>games</td><td>GameTile[]</td><td>Tiles.</td></tr></tbody></table>
+<p>Style table: <code>src/components/home/ProviderGameGrid.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.section</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(3, 1fr)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-auto-rows</td><td><code>var(<span class="tok">--tile-h</span>)</code></td><td>205px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>gap</td><td><code>var(<span class="tok">--band-gap</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-auto-flow</td><td><code>row dense</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.featureBig, .featureWide</code></td><td>grid-column</td><td><code>span 2</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(4, 1fr)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.featureBig</code></td><td>grid-row</td><td><code>span 2</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(6, 1fr)</code></td><td>(literal)</td><td>(min-width: 992px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(8, 1fr)</code></td><td>(literal)</td><td>(min-width: 1424px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/home/ProviderGameGrid.module.css</code></summary><pre><code class="lang-css">/* ============================================================================
+ * ProviderGameGrid — J9 FIXED-TILE game lobby (02-J9-MEASUREMENTS §2).
+ * J9: `.game-list{grid-template-columns:repeat(8,1fr);gap:16px}` with each `li`
+ * a FIXED height of 205px, radius 8, bg #262833, art object-fit:cover. Feature
+ * tiles span 2×2 (.iSlot) or 2-wide (.fishing). The grid pins every cell so a
+ * tile is ONE physical size — never viewport÷column-count fluid.
+ * Column ladder: 3-up @375 → 4-up @768 → 6-up @992 → 8-up @1424.
+ * ==========================================================================*/
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-gap);
+}
+
+/* J9 lobby grid — fixed-height rows (each row = one --tile-h). grid-auto-rows
+ * pins the row height so 1fr columns give ~164px width at the 1424 frame, and
+ * 2×2 feature tiles span exactly two rows of the same fixed height. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: var(--tile-h);
+  gap: var(--band-gap);
+  /* dense backfill: with a 2×2 row-spanning hero (.featureBig) under default
+   * auto-flow:row the renderer leaves a hole beside the hero, so the trailing
+   * filler count maps to a non-rectangular layout and the LAST ROW still shows
+   * ragged empty space. `dense` backfills those holes, so the (already correct)
+   * cell-count fill lands every breakpoint on complete J9 rows (defect 4). */
+  grid-auto-flow: row dense;
+}
+
+/* the cell — a tile fills its fixed-height row edge to edge (no width:100% fluid) */
+.cell {
+  min-width: 0;
+}
+
+/* J9 feature tiles: 2×2 hero (.iSlot) + 2-wide strip (.fishing). On the narrow
+ * 3-up ladder a 2×2 would overflow, so spans only engage from 4-up upward. */
+.featureBig,
+.featureWide {
+  grid-column: span 2;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .featureBig {
+    grid-row: span 2; /* J9 .iSlot 2×2 */
+  }
+}
+
+@media (min-width: 992px) {
+  .grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (min-width: 1424px) {
+  .grid {
+    grid-template-columns: repeat(8, 1fr); /* J9 .game-list — the 8-up lobby */
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Tab active, hover and focus come from Tabs (F). Tile hover and focus come from Tile (F). Empty: EmptyState message. Guest vs member: guest tap → <code>promptAuth({action:"none"})</code> (login modal). Member tap → <code>router.push("/?game={id}")</code>, which is a no-op route back to home.</p>
+<p><strong>Copy.</strong> Trò chơi (Games), Nhà cung cấp (Providers), Tất cả (All), Chưa có trò chơi cho nhà cung cấp này. (No games for this provider yet.), plus the 16 game names and provider captions. ComingSoonTile copy ("Sắp ra mắt") belongs to track F.</p>
+<div class="callout warn">The header comment says "3-col @375 → 6-col desktop" and "IMAGE SLOT (token-derived gradient)". The code uses 3/4/6/8 columns and real PNG art. The CSS comment says tiles are about 164px wide at the frame; at 1440, with RightRail and QuickActionRail reserved, the measured columns are 112.5px. <code>.featureWide</code> is defined and never applied. Two of the five art files are only 234×160 and are upscaled into large tiles (g2/g7/g12 taixiu, g5/g10/g15 keno).</div>
+
+<h3 id="s-sports-lifestyle">SportsLifestyle (sports cards + match cards)</h3>
+<p><strong>Purpose.</strong> A "Thể thao" section of 4 image cards (SABA, K-Sports, football, e-sports/virtual), each with one compact odds card underneath.</p>
+<p><strong>Source.</strong> <code>src/components/home/SportsLifestyle.tsx</code>, <code>SportsLifestyle.module.css</code>; <a href="#f-ui-card">Card</a> variant "promo" interactive href; <a href="#s-sports-match-card">SportsMatchCard</a>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">section.section aria-label="Thể thao &amp; Esports"
+  h2.title "Thể thao"
+  div.grid
+    div.column x4
+      Card variant="promo" href interactive className=.lifeCard
+        img.lifeImg src alt={title} loading=lazy
+        span.lifeOverlay aria-hidden
+        span.lifeKicker {kicker}
+        span.lifeTitle  {title}
+      loading → div.matchSlot  Skeleton 100% × 168px
+      live[i] → div.matchSlot  SportsMatchCard match=matches[i]
+      else    → nothing</code></pre>
+<table><thead><tr><th>#</th><th>img (object-fit cover, card 16:9)</th><th>kicker</th><th>title</th><th>href</th><th>Match card under it</th></tr></thead><tbody>
+<tr><td>1</td><td>/assets/sports/saba-sports.png (702×480)</td><td>Thể thao</td><td>SABA Sports</td><td>/?v=sports&amp;p=saba</td><td>sm-live-1 V-League 1</td></tr>
+<tr><td>2</td><td>/assets/sports/k-sports.png (468×320)</td><td>Thể thao</td><td>K-Sports</td><td>/?v=sports&amp;p=ksports</td><td>sm-pre-1 AFC Champions League</td></tr>
+<tr><td>3</td><td>/assets/sports/Betgming_football_grid.png (702×480)</td><td>Bóng đá</td><td>Kèo bóng đá trực tiếp</td><td>/?v=sports&amp;sub=football</td><td>sm-live-2 Ngoại Hạng Anh</td></tr>
+<tr><td>4</td><td>/assets/sports/e-vitualsports.png (702×480)</td><td>Esports</td><td>Thi đấu điện tử &amp; thể thao ảo</td><td>/?v=sports&amp;sub=esports</td><td>sm-pre-2 LMHT — VCS</td></tr>
+</tbody></table>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>matches</td><td>Envelope&lt;SportsMatch[]&gt;?</td><td>Live → paired by index. Loading → skeletons. Otherwise no match cards.</td></tr></tbody></table>
+<p>Style table: <code>src/components/home/SportsLifestyle.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.section</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h2</span>)</code></td><td>20px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>1fr</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>gap</td><td><code>var(<span class="tok">--gutter</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(2, 1fr)</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(4, 1fr)</code></td><td>(literal)</td><td>(min-width: 1024px)</td></tr>
+<tr><td><code>.column</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.column</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.column</code></td><td>gap</td><td><code>var(<span class="tok">--gutter</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.matchSlot</code></td><td>flex</td><td><code>1 1 auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.matchSlot</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.matchSlot &gt; *</code></td><td>flex</td><td><code>1 1 auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>justify-content</td><td><code>flex-end</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>aspect-ratio</td><td><code>16 / 9</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>padding</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>border</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.lifeCard</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), border-color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1), border-color 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.lifeCard:hover</code></td><td>transform</td><td><code>scale(1.02)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeCard:hover</code></td><td>border-color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.lifeCard:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.lifeCard:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeImg</code></td><td>position</td><td><code>absolute</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeImg</code></td><td>inset</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeImg</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeImg</code></td><td>height</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeImg</code></td><td>object-fit</td><td><code>cover</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeImg</code></td><td>z-index</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeOverlay</code></td><td>position</td><td><code>absolute</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeOverlay</code></td><td>inset</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeOverlay</code></td><td>z-index</td><td><code>1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeOverlay</code></td><td>background</td><td><code>linear-gradient(180deg, transparent 30%, var(<span class="tok">--scrim</span>) 100%)</code></td><td>linear-gradient(180deg, transparent 30%, rgba(0, 0, 0, 0.7) 100%)</td><td>all</td></tr>
+<tr><td><code>.lifeOverlay</code></td><td>pointer-events</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeKicker, .lifeTitle</code></td><td>position</td><td><code>relative</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeKicker, .lifeTitle</code></td><td>z-index</td><td><code>2</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeKicker</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.lifeKicker</code></td><td>text-transform</td><td><code>uppercase</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeKicker</code></td><td>letter-spacing</td><td><code>0.04em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.lifeKicker</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.lifeKicker</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.lifeTitle</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h3</span>)</code></td><td>18px</td><td>all</td></tr>
+<tr><td><code>.lifeTitle</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.lifeTitle</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.lifeCard, .lifeCard:hover</code></td><td>transform</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/home/SportsLifestyle.module.css</code></summary><pre><code class="lang-css">/* SportsLifestyle — lifestyle cards, each with a compact match card. Tokens only. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+/* 4 columns; each column stacks {lifestyle card + compact match card} */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--gutter);
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* a single column: lifestyle card on top, one compact match card beneath.
+ * The grid stretches every column to equal height; the match slot grows to
+ * fill the leftover space so all 4 match cards bottom-align (equal height). */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+}
+/* the match-card slot absorbs the column&#x27;s slack so cards equalize; the
+ * lifestyle card above keeps its fixed 16/9 aspect ratio untouched. */
+.matchSlot {
+  flex: 1 1 auto;
+  display: flex;
+}
+.matchSlot &gt; * {
+  flex: 1 1 auto;
+}
+
+/* lifestyle entry cards — filled image SLOTS (user key-art, object-fit:cover) */
+/* Every lifestyle card is the same 16:9 grid cell and hovers to the SAME
+ * scale(1.02) — no card is enlarged by what it links to. */
+.lifeCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  aspect-ratio: 16 / 9;
+  padding: var(--space-4);
+  text-decoration: none;
+  color: var(--text-hi);
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.lifeCard:hover {
+  transform: scale(1.02);
+  border-color: var(--brand-accent);
+}
+.lifeCard:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.lifeImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+/* legibility scrim so the kicker/title read over any key-art. Kept as a
+ * gradient on purpose: it is a full-bleed image overlay (the permitted
+ * &quot;background decoration&quot; class) and it is load-bearing for text contrast —
+ * a flat scrim would either hide the art or fail AA on the title. Raw rgba
+ * literals swapped for the locked --scrim token. */
+.lifeOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, transparent 30%, var(--scrim) 100%);
+  pointer-events: none;
+}
+.lifeKicker,
+.lifeTitle {
+  position: relative;
+  z-index: 2;
+}
+.lifeKicker {
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-accent);
+  font-weight: var(--weight-semi);
+}
+.lifeTitle {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-tight);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lifeCard,
+  .lifeCard:hover {
+    transform: none;
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Card hover: scale(1.02), border #d4af37 (rest: gold hairline, bg #212121). Focus-visible: outline 2px #6ea8ff, offset 2px. Grid: 1 column, 2 from 768, 4 from 1024, gap 16px. <strong>Motion:</strong> transform/border 200ms. Reduced motion: no transform. <strong>Copy:</strong> Thể thao &amp; Esports (aria), Thể thao (heading), the kickers and titles above.</p>
+
+<h3 id="s-sports-match-card">SportsMatchCard</h3>
+<p><strong>Purpose.</strong> A compact fixture card: league, teams with flags, a LIVE score or "VS", three handicap odds cells, and a gold "Cược ngay" button.</p>
+<p><strong>Source.</strong> <code>src/components/home/SportsMatchCard.tsx</code>, <code>SportsMatchCard.module.css</code>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">article.card aria-label="{home} – {away}"
+  span.league {league}
+  div.fixture  (grid 1fr auto 1fr)
+    div.team data-side="home"   {flag &amp;&amp; span.flag aria-hidden {flag}}  span.teamName {name}
+    div.center
+      live → span.liveTag (span.liveDot aria-hidden + "TRỰC TIẾP")
+             {score &amp;&amp; span.score aria-label="Tỷ số"  {s0} span.scoreSep aria-hidden "–" {s1}}
+      pre  → span.vs aria-label="Chưa diễn ra" "VS"
+    div.team data-side="away"  (row-reverse, right-aligned)
+  div.market  (markets[0] only)
+    span.marketName {name}
+    div.cells  div.cell[data-suspended] x3   span.cellLabel {label}  span.cellPrice {price === null ? span aria-label="Tạm dừng" "—" : price.toFixed(2)}
+  a.cta href="/?v=sports&amp;m={id}" "Cược ngay"</code></pre>
+<p><strong>Data (4 matches).</strong></p>
+<table><thead><tr><th>id</th><th>league</th><th>home (flag)</th><th>away (flag)</th><th>phase / score</th><th>Kèo chấp cells (label price)</th></tr></thead><tbody>
+<tr><td>sm-live-1</td><td>V-League 1</td><td>Hà Nội FC 🇻🇳</td><td>Bình Dương 🇻🇳</td><td>live 1–0</td><td>Hà Nội 1.86 · Hòa 3.60 · Bình Dương 3.80</td></tr>
+<tr><td>sm-pre-1</td><td>AFC Champions League</td><td>Công An Hà Nội 🇻🇳</td><td>Buriram United 🇹🇭</td><td>pre (VS)</td><td>CAHN 2.06 · Hòa 3.18 · Buriram 3.68</td></tr>
+<tr><td>sm-live-2</td><td>Ngoại Hạng Anh</td><td>Liverpool 🏴󠁧󠁢󠁥󠁮󠁧󠁿</td><td>Chelsea 🏴󠁧󠁢󠁥󠁮󠁧󠁿</td><td>live 2–1</td><td>Liverpool 1.68 · Hòa 3.80 · Chelsea 5.60</td></tr>
+<tr><td>sm-pre-2</td><td>LMHT — VCS</td><td>GAM Esports 🇻🇳</td><td>Team Whales 🇻🇳</td><td>pre (VS)</td><td>GAM 1.66 · Hòa — (null, suspended) · Whales 2.18</td></tr>
+</tbody></table>
+<p>The second market ("Kèo tài xỉu") and <code>crestSrc</code> exist in the data but are not rendered. <code>startsAt</code> is not rendered either.</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>match</td><td>SportsMatch</td><td>Everything above.</td></tr></tbody></table>
+<p>Style table: <code>src/components/home/SportsMatchCard.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.card</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>padding</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-card</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>background</td><td><code>var(<span class="tok">--surface-2</span>)</code></td><td><span class="sw" style="background:#1a1a1a"></span>#1a1a1a</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>border</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>height</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>min-height</td><td><code>168px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.card</code></td><td>box-sizing</td><td><code>border-box</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>text-transform</td><td><code>uppercase</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>letter-spacing</td><td><code>0.04em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>text-overflow</td><td><code>ellipsis</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.league</code></td><td>white-space</td><td><code>nowrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fixture</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fixture</code></td><td>grid-template-columns</td><td><code>1fr auto 1fr</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fixture</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fixture</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.team</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team[data-side=&quot;away&quot;]</code></td><td>flex-direction</td><td><code>row-reverse</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.team[data-side=&quot;away&quot;]</code></td><td>text-align</td><td><code>right</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.flag</code></td><td>font-size</td><td><code>16px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.flag</code></td><td>line-height</td><td><code>1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.flag</code></td><td>flex</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>text-overflow</td><td><code>ellipsis</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.teamName</code></td><td>white-space</td><td><code>nowrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>gap</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>min-width</td><td><code>48px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.center</code></td><td>height</td><td><code>38px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.vs</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.vs</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.vs</code></td><td>letter-spacing</td><td><code>0.06em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.vs</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>letter-spacing</td><td><code>0.03em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.liveTag</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>width</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>height</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.liveDot</code></td><td>background</td><td><code>var(<span class="tok">--loss</span>)</code></td><td><span class="sw" style="background:#f53f55"></span>#f53f55</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>align-items</td><td><code>baseline</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>gap</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.score</code></td><td>font-variant-numeric</td><td><code>tabular-nums</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.scoreSep</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.market</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.market</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.market</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.marketName</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.marketName</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.marketName</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.cells</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cells</code></td><td>grid-template-columns</td><td><code>repeat(3, 1fr)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cells</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>gap</td><td><code>1px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-sm</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>border</td><td><code>1px solid transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>min-height</td><td><code>34px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell[data-suspended]</code></td><td>opacity</td><td><code>0.6</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>font-size</td><td><code>10px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>text-align</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>text-overflow</td><td><code>ellipsis</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>white-space</td><td><code>nowrap</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellLabel</code></td><td>max-width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cellPrice</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.cellPrice</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.cellPrice</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.cellPrice</code></td><td>font-variant-numeric</td><td><code>tabular-nums</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>min-height</td><td><code>34px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>margin-top</td><td><code>auto</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>padding</td><td><code>0 var(<span class="tok">--space-3</span>)</code></td><td>0 12px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent-grad</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>color</td><td><code>var(<span class="tok">--brand-on-accent</span>)</code></td><td><span class="sw" style="background:#0a0a0a"></span>#0a0a0a</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>letter-spacing</td><td><code>0.02em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), background var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1), background 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.cta:hover</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent-2</span>)</code></td><td><span class="sw" style="background:#b4952f"></span>#b4952f</td><td>all</td></tr>
+<tr><td><code>.cta:hover</code></td><td>transform</td><td><code>scale(1.05)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta:active</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent-2</span>)</code></td><td><span class="sw" style="background:#b4952f"></span>#b4952f</td><td>all</td></tr>
+<tr><td><code>.cta:active</code></td><td>transform</td><td><code>scale(0.98)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.cta:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta, .cta:hover, .cta:active</code></td><td>transform</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/home/SportsMatchCard.module.css</code></summary><pre><code class="lang-css">/* SportsMatchCard — COMPACT J9 match card. Tokens only (gold-on-dark, 16px gap). */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  border: 1px solid var(--brand-accent-hairline);
+  /* EQUAL HEIGHT: every card is pinned to the same height so all 4 align in
+   * the row regardless of content (live score vs VS, league length). The
+   * fixture/center rows below reserve fixed space so nothing reflows. */
+  height: 100%;
+  min-height: 168px;
+  box-sizing: border-box;
+}
+
+/* league kicker */
+.league {
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--weight-semi);
+  color: var(--brand-accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* fixture row: Team A · centre · Team B */
+.fixture {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-1);
+}
+.team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.team[data-side=&quot;away&quot;] {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.flag {
+  font-size: 16px;
+  line-height: 1;
+  flex: none;
+}
+.teamName {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* centre status block — VS (pre) or Live + score */
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 48px;
+  /* Reserve fixed height: a live &quot;TRỰC TIẾP&quot; + score (2 rows) and a &quot;VS&quot;
+   * (1 row) occupy the SAME vertical space → uniform card height. */
+  height: 38px;
+}
+.vs {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+}
+.liveTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.03em;
+  color: var(--text-hi);
+}
+.liveDot {
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--loss);
+}
+.score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-variant-numeric: tabular-nums;
+}
+.scoreSep {
+  color: var(--text-mid);
+}
+
+/* a betting market = tiny heading + 3 tight cells */
+.market {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.marketName {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+.cells {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+}
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid transparent;
+  min-height: 34px;
+}
+.cell[data-suspended] {
+  opacity: 0.6;
+}
+.cellLabel {
+  font-size: 10px;
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.cellPrice {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* small gold CTA — full-width, compact */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  /* push the CTA to the bottom so it bottom-aligns across all 4 cards when a
+   * card grows to the shared height */
+  margin-top: auto;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  /* hover is a COLOUR shift + the uniform button scale — not a filter. A
+   * brightness() filter is depth-adjacent styling and it also cannot be
+   * re-skinned by a brand, whereas --brand-accent-2 follows [data-brand]. */
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.cta:hover {
+  background: var(--brand-accent-2);
+  transform: scale(1.05);
+}
+.cta:active {
+  background: var(--brand-accent-2);
+  transform: scale(0.98);
+}
+.cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta,
+  .cta:hover,
+  .cta:active {
+    transform: none;
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Suspended cell: opacity 0.6. CTA hover: bg #b4952f, scale(1.05). Active: bg #b4952f, scale(0.98). Focus-visible: outline 2px #6ea8ff, offset 2px. Live dot 4×4 #f53f55. Score #d4af37, separator #888888. <strong>Motion:</strong> transform/background 200ms. Reduced motion: transform none. <strong>Copy:</strong> TRỰC TIẾP (LIVE), VS, Chưa diễn ra (Not started, aria), Tỷ số (Score, aria), Tạm dừng (Suspended, aria), Kèo chấp (Handicap), Cược ngay (Bet now). <strong>Behaviour:</strong> the CTA is a raw <code>&lt;a&gt;</code> (full page load to "/?v=sports&amp;m=…").</p>
+<div class="callout warn">The comment says a '"Live" text label'; the code renders "TRỰC TIẾP". The flags are emoji; the England flag is the tag sequence 🏴󠁧󠁢󠁥󠁮󠁧󠁿, which renders as a plain black flag on platforms without support.</div>
+
+<h3 id="s-dev-auth-toggle">DevAuthToggle (dev only)</h3>
+<p><strong>Purpose.</strong> A QA control fixed at the top left of the home page that cycles the mock auth state. It renders nothing when <code>NODE_ENV === "production"</code>.</p>
+<p><strong>Source.</strong> <code>src/components/home/DevAuthToggle.tsx</code>, <code>DevAuthToggle.module.css</code>.</p>
+<p><strong>Structure.</strong> Collapsed: <code>button.fab aria-label="Mở bảng chuyển trạng thái đăng nhập (dev)" title="Dev: auth state"</code> showing "DEV". Open: <code>div.panel role="group" aria-label="Trạng thái đăng nhập (dev)"</code> &gt; <code>div.row</code> [<code>span.tag "DEV · AUTH"</code>, <code>button.close aria-label="Đóng" "×"</code>] + <code>button.cycle onClick=cycleDevState</code> [<code>span.stateLabel</code> Khách | Cấp 0 | Hội viên, <code>span.hint "chạm để đổi"</code>].</p>
+<p>Style table: <code>src/components/home/DevAuthToggle.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.fab, .panel</code></td><td>position</td><td><code>fixed</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fab, .panel</code></td><td>top</td><td><code>calc(var(<span class="tok">--header-h</span>) + var(<span class="tok">--space-2</span>))</code></td><td>calc(72px + 8px)</td><td>all</td></tr>
+<tr><td><code>.fab, .panel</code></td><td>left</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.fab, .panel</code></td><td>z-index</td><td><code>var(<span class="tok">--z-toast</span>)</code></td><td>3000</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>width</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-pill</span>)</code></td><td>9999px</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>border</td><td><code>1px dashed var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px dashed rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>background</td><td><code>var(<span class="tok">--scrim</span>)</code></td><td>rgba(0, 0, 0, 0.7)</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>letter-spacing</td><td><code>0.06em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fab</code></td><td>opacity</td><td><code>0.7</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.fab:hover</code></td><td>opacity</td><td><code>1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>padding</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>width</td><td><code>160px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-lg</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.panel</code></td><td>border</td><td><code>1px dashed var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px dashed rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.row</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.tag</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.tag</code></td><td>letter-spacing</td><td><code>0.06em</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.tag</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.tag</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>border</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h3</span>)</code></td><td>18px</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>line-height</td><td><code>1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>width</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.close</code></td><td>height</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>align-items</td><td><code>flex-start</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>padding</td><td><code>var(<span class="tok">--space-2</span>) var(<span class="tok">--space-3</span>)</code></td><td>8px 12px</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>border</td><td><code>1px solid var(<span class="tok">--border</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>background</td><td><code>var(<span class="tok">--surface</span>)</code></td><td><span class="sw" style="background:#141414"></span>#141414</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cycle</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.stateLabel</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.stateLabel</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.stateLabel</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.hint</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.hint</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+</tbody></table>
+
+<p><strong>Copy.</strong> DEV, DEV · AUTH, Khách (Guest), Cấp 0 (Level 0), Hội viên (Member), chạm để đổi (tap to change). Position: fixed, top calc(72px + 8px) = 80px, left 8px, z 3000. The comment says a "60px header band"; the header is 72px.</p>
+</section>

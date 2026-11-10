@@ -1,0 +1,389 @@
+/* Lottery area partial: the data-attribute and descendant state selectors (with
+ * the base declarations they override), the ticket and medallion art, and the
+ * keyframes. Everything else on /ve-so is written as utilities in the
+ * components. Sheet order follows the original import order: OutcomeFrame,
+ * ScratchSurface, ScratchCardGame. */
+
+/* ---- Type roles ----
+ * The display face renders only in the h1 and h2 roles (26px and up at 375).
+ * Uppercase labels take the body face with open tracking; numerals take the
+ * numeric face with tabular figures. Headings carry no tracking. */
+
+.lottery-type-h1 {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  letter-spacing: 0;
+}
+
+.lottery-type-h2 {
+  font-family: var(--type-h2-family);
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-leading);
+  font-weight: var(--type-h2-weight);
+  letter-spacing: 0;
+}
+
+.lottery-type-label {
+  font-family: var(--type-caption-family);
+  font-size: var(--type-caption-size);
+  line-height: var(--lh-tight);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lottery-type-num-md {
+  font-family: var(--type-num-md-family);
+  font-size: var(--type-num-md-size);
+  line-height: var(--type-num-md-leading);
+  font-weight: var(--type-num-md-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status pills: feedback foreground on its own tint. */
+.lottery-status-open {
+  background: var(--status-locked-bg);
+  color: var(--status-locked-text);
+}
+
+/* ---- OutcomeFrame ---- */
+
+.lottery-outcome-frame-frame {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  animation: frame-in var(--dur-slow) var(--ease-entrance) backwards;
+}
+
+/* ---------- WIN — gold, restrained. No confetti, one ring, one count-up ---- */
+.lottery-outcome-frame-frame[data-outcome="win"] {
+  border-color: var(--brand-accent);
+  background: color-mix(in srgb, var(--brand-accent) 8%, var(--surface-2));
+}
+
+.lottery-outcome-frame-total-win {
+  animation: total-settle var(--dur-slow) var(--ease-entrance) backwards;
+}
+
+.lottery-outcome-frame-frame[data-outcome="partial"] {
+  border-color: color-mix(in srgb, var(--win) 40%, transparent);
+}
+
+.lottery-outcome-frame-frame[data-outcome="lose"] {
+  border-color: color-mix(in srgb, var(--loss) 42%, transparent);
+}
+
+.lottery-outcome-frame-lose-block {
+  /* the SINGLE animation the near-miss and the dust share, so the two land
+   * in the same frame — never staggered, never sequenced. */
+  animation: frame-in var(--dur-slow) var(--ease-entrance) backwards;
+}
+
+@keyframes frame-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes total-settle {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* REDUCED MOTION — the frame appears in its final state, no movement at all.
+ * (The count-up is separately disabled in JS via usePrefersReducedMotion.) */
+@media (prefers-reduced-motion: reduce) {
+  .lottery-outcome-frame-frame,
+  .lottery-outcome-frame-lose-block,
+  .lottery-outcome-frame-total-win {
+    animation: none;
+    transform: none;
+  }
+}
+
+[data-motion="off"] .lottery-outcome-frame-frame,
+[data-motion="off"] .lottery-outcome-frame-lose-block,
+[data-motion="off"] .lottery-outcome-frame-total-win {
+  animation: none;
+  transform: none;
+}
+
+/* ---- ScratchSurface ---- */
+
+.lottery-scratch-surface-cover {
+  opacity: 1;
+  transition: opacity var(--dur-slow) var(--ease-standard);
+}
+
+/* threshold reached — the remainder lifts away instead of demanding that every
+ * corner be scrubbed. Pointer events stop the moment it starts fading. */
+.lottery-scratch-surface-cover[data-clearing] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lottery-scratch-surface-cover {
+    transition: none;
+  }
+}
+
+[data-motion="off"] .lottery-scratch-surface-cover {
+  transition: none;
+}
+
+/* ---- ScratchCardGame ---- */
+
+.lottery-scratch-card-game-close-btn {
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.lottery-scratch-card-game-close-btn:hover {
+  transform: scale(1.05);
+}
+
+.lottery-scratch-card-game-ticket {
+  background:
+    radial-gradient(
+      130% 90% at 50% -12%,
+      color-mix(in srgb, var(--brand-accent) 11%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      100% 80% at 6% 108%,
+      color-mix(in srgb, var(--brand-accent) 7%, transparent) 0%,
+      transparent 58%
+    ),
+    color-mix(in srgb, var(--brand-accent) 4%, var(--surface-2));
+}
+
+.lottery-scratch-card-game-section-state {
+  border: 1px solid color-mix(in srgb, var(--text-mid) 55%, transparent);
+  color: var(--text-mid);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.lottery-scratch-card-game-section-state[data-open] {
+  border-color: color-mix(in srgb, var(--brand-accent) 60%, transparent);
+  color: var(--brand-accent-fg);
+}
+
+.lottery-scratch-card-game-band-well {
+  background:
+    radial-gradient(
+      120% 160% at 50% -20%,
+      color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%,
+      transparent 68%
+    ),
+    var(--canvas);
+}
+
+/* pressed bevel */
+.lottery-scratch-card-game-band-coin::before,
+.lottery-scratch-card-game-field-coin::before {
+  content: "";
+  position: absolute;
+  inset: 9%;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--canvas) 30%, transparent);
+}
+
+/* milled inner ring */
+.lottery-scratch-card-game-band-coin::after,
+.lottery-scratch-card-game-field-coin::after {
+  content: "";
+  position: absolute;
+  inset: 17%;
+  border-radius: inherit;
+  border: 1px dashed color-mix(in srgb, var(--canvas) 18%, transparent);
+}
+
+/* the band coin is struck in full gold — these four ARE the prize numbers */
+.lottery-scratch-card-game-band-coin {
+  background:
+    radial-gradient(
+      42% 34% at 30% 22%,
+      color-mix(in srgb, var(--text-hi) 55%, transparent) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      78% 78% at 32% 26%,
+      color-mix(in srgb, var(--text-hi) 52%, var(--brand-accent)) 0%,
+      var(--brand-accent) 42%,
+      var(--brand-accent-2) 78%,
+      color-mix(in srgb, var(--brand-accent-2) 52%, var(--canvas)) 100%
+    );
+}
+
+/* the field coin is struck in UNLIT bronze until it pays — a full-gold coin on
+ * a cell that pays nothing would read as a win it is not */
+.lottery-scratch-card-game-field-coin {
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, var(--canvas));
+  background:
+    radial-gradient(
+      42% 34% at 30% 22%,
+      color-mix(in srgb, var(--text-hi) 20%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      80% 80% at 32% 26%,
+      color-mix(in srgb, var(--brand-accent) 46%, var(--canvas)) 0%,
+      color-mix(in srgb, var(--brand-accent) 30%, var(--canvas)) 48%,
+      color-mix(in srgb, var(--brand-accent-2) 16%, var(--canvas)) 100%
+    );
+  color: var(--text-hi);
+}
+
+.lottery-scratch-card-game-field-prize {
+  color: var(--text-mid);
+}
+
+/* ---- HIT: this cell matched a winning number ----------------------------
+ * The cell and the winning-number medallion it answers to share a pulse RUNG
+ * (--k), so the two beat in unison — that unison IS the link. */
+.lottery-scratch-card-game-field-cell[data-hit] .lottery-scratch-card-game-field-coin {
+  border-color: var(--brand-accent);
+  background:
+    radial-gradient(
+      42% 34% at 30% 22%,
+      color-mix(in srgb, var(--text-hi) 55%, transparent) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      78% 78% at 32% 26%,
+      color-mix(in srgb, var(--text-hi) 52%, var(--brand-accent)) 0%,
+      var(--brand-accent) 42%,
+      var(--brand-accent-2) 78%,
+      color-mix(in srgb, var(--brand-accent-2) 52%, var(--canvas)) 100%
+    );
+  color: var(--brand-on-accent);
+}
+
+.lottery-scratch-card-game-field-cell[data-hit] .lottery-scratch-card-game-field-prize {
+  color: var(--win);
+  font-weight: var(--weight-semi);
+}
+
+.lottery-scratch-card-game-band-coin[data-hit],
+.lottery-scratch-card-game-field-cell[data-hit] .lottery-scratch-card-game-field-coin {
+  outline: 2px solid var(--win);
+  outline-offset: 3px;
+  animation: token-pulse var(--dur-slow) var(--ease-standard) 3 backwards;
+  animation-delay: calc(var(--k, 0) * var(--dur-fast) / 4);
+}
+
+/* ---- the tear line between the two halves of the ticket ---- */
+.lottery-scratch-card-game-perf::before,
+.lottery-scratch-card-game-perf::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--brand-accent) 70%, transparent);
+}
+.lottery-scratch-card-game-perf::before {
+  left: var(--space-3);
+}
+.lottery-scratch-card-game-perf::after {
+  right: var(--space-3);
+}
+
+.lottery-scratch-card-game-odds-row dt {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+}
+.lottery-scratch-card-game-odds-row dd {
+  margin: 0;
+  text-align: right;
+  font-family: var(--brand-font-num);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  color: var(--text-hi);
+}
+
+.lottery-scratch-card-game-reveal-all {
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.lottery-scratch-card-game-dev-btn {
+  border: 1px solid var(--text-dim);
+  color: var(--text-mid);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.lottery-scratch-card-game-dev-btn:hover {
+  color: var(--text-hi);
+  border-color: var(--text-mid);
+}
+.lottery-scratch-card-game-dev-btn[data-active] {
+  color: var(--text-hi);
+  border-color: var(--info);
+}
+
+@keyframes token-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* REDUCED MOTION — mandatory. Every animation degrades to an instant state
+ * change with NO movement (transforms removed, not merely shortened). Both the
+ * media query and the JS-set data-motion="off" flag are honoured. */
+@media (prefers-reduced-motion: reduce) {
+  .lottery-scratch-card-game-close-btn,
+  .lottery-scratch-card-game-section-state,
+  .lottery-scratch-card-game-reveal-all,
+  .lottery-scratch-card-game-dev-btn {
+    transition: none;
+  }
+  .lottery-scratch-card-game-close-btn:hover {
+    transform: none;
+  }
+  .lottery-scratch-card-game-band-coin[data-hit],
+  .lottery-scratch-card-game-field-cell[data-hit] .lottery-scratch-card-game-field-coin {
+    animation: none;
+    transform: none;
+  }
+}
+
+.lottery-scratch-card-game-body[data-motion="off"] .lottery-scratch-card-game-close-btn,
+.lottery-scratch-card-game-body[data-motion="off"] .lottery-scratch-card-game-section-state,
+.lottery-scratch-card-game-body[data-motion="off"] .lottery-scratch-card-game-reveal-all,
+.lottery-scratch-card-game-body[data-motion="off"] .lottery-scratch-card-game-dev-btn {
+  transition: none;
+}
+.lottery-scratch-card-game-body[data-motion="off"] .lottery-scratch-card-game-close-btn:hover {
+  transform: none;
+}
+.lottery-scratch-card-game-body[data-motion="off"] .lottery-scratch-card-game-band-coin[data-hit],
+.lottery-scratch-card-game-body[data-motion="off"]
+  .lottery-scratch-card-game-field-cell[data-hit]
+  .lottery-scratch-card-game-field-coin {
+  animation: none;
+  transform: none;
+}
+
+/* ---- ≥480: a touch more room ---- */
+@media (min-width: 480px) {
+  .lottery-scratch-card-game-odds-row dd {
+    margin-top: var(--space-1);
+    text-align: left;
+  }
+}

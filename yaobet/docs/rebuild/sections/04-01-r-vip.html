@@ -1,0 +1,376 @@
+<section>
+<h2 id="r-vip">R1 · VIP — overview, routes and the luxury palette</h2>
+<p>Track R covers the VIP program (<code>/vip</code>, <code>/tier</code>, <code>/cau-lac-bo</code>), the points store (<code>/cua-hang</code>), the scratch-card lottery (<code>/ve-so</code>) and the card collection (<code>/bo-suu-tap</code>, <code>/bo-suu-tap/cua-toi</code>, <code>/dev/collection-ports</code>). Every route renders inside the global shell (<a href="#s-shell-h">#s-shell</a>: header, category rail, bottom tab bar, QuickActionRail, auth modal). Primitives (<code>Card</code>, <code>Button</code>, <code>Badge</code>, <code>Icon</code>, <code>Modal</code>, <code>Countdown</code>, <code>Tabs</code>, <code>Scroller</code>, <code>Skeleton</code>, <code>EmptyState</code>, <code>ErrorState</code>, <code>MoneyValue</code>) are specified by track F (<a href="#f-ui-button">#f-ui-button</a> and siblings); tokens by <a href="#f-tokens">#f-tokens</a>. This fragment gives every value the R-area components set themselves.</p>
+
+<div class="callout note"><strong>Two VIP systems coexist.</strong> <code>/vip</code> is a self-contained "luxury" rebuild (5 tiers Đồng→Kim Cương × 10 levels, data in <code>src/lib/vip/*</code>, components <code>VipProgram</code> tree, page-scoped <code>.vipPalette</code>). <code>/tier</code> is the legacy ladder page (5 tiers Tân thủ→Kim Cương, data in <code>src/lib/mock/vip.ts</code>, components <code>CurrentTierCard</code>/<code>TierLadder</code>/<code>PrivilegeTable</code>/<code>PerkGallery</code>/<code>VipRules</code>, app-canvas palette). They share no data and no tier names list. Rebuild them as two independent features.</div>
+
+<h3 id="r-vip-shared-tokens">Resolved global tokens used across track R</h3>
+<p>All values below are the literal resolutions in <code>src/styles/tokens.css</code> (Yaobet brand; <code>[data-brand="yaobet"]</code> repoints nothing). Under <code>prefers-reduced-motion: reduce</code>, <code>src/styles/motion.css</code> sets <span class="tok">--dur-fast</span>/<span class="tok">--dur-base</span>/<span class="tok">--dur-slow</span> to <code>0ms</code> and forces <code>animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important</code> on <code>*</code>, <code>*::before</code>, <code>*::after</code> — every keyframe below is therefore globally neutralised under reduced motion in addition to the per-module rules.</p>
+<table>
+<thead><tr><th>Token</th><th>Literal</th><th>Token</th><th>Literal</th></tr></thead>
+<tbody>
+<tr><td><span class="tok">--space-1</span></td><td>4px</td><td><span class="tok">--t-micro</span></td><td>12px</td></tr>
+<tr><td><span class="tok">--space-2</span></td><td>8px</td><td><span class="tok">--t-sm</span></td><td>14px</td></tr>
+<tr><td><span class="tok">--space-3</span></td><td>12px</td><td><span class="tok">--t-body</span></td><td>16px</td></tr>
+<tr><td><span class="tok">--space-4</span></td><td>16px</td><td><span class="tok">--t-h3</span></td><td>18px</td></tr>
+<tr><td><span class="tok">--space-5</span></td><td>24px</td><td><span class="tok">--t-h2</span></td><td>20px</td></tr>
+<tr><td><span class="tok">--space-6</span></td><td>32px</td><td><span class="tok">--t-h1</span></td><td>24px</td></tr>
+<tr><td><span class="tok">--space-7</span></td><td>40px</td><td><span class="tok">--t-display</span></td><td>32px</td></tr>
+<tr><td><span class="tok">--space-8</span></td><td>48px</td><td><span class="tok">--t-hero</span></td><td>40px</td></tr>
+<tr><td><span class="tok">--gutter</span></td><td>16px</td><td><span class="tok">--t-num-lg</span></td><td>32px</td></tr>
+<tr><td><span class="tok">--gap-sm</span> / <span class="tok">--gap-xs</span></td><td>8px / 4px</td><td><span class="tok">--lh-body</span> / <span class="tok">--lh-tight</span></td><td>1.5 / 1.3</td></tr>
+<tr><td><span class="tok">--card-pad</span> / <span class="tok">--card-pad-sm</span></td><td>24px / 16px</td><td><span class="tok">--weight-reg/semi/bold</span></td><td>400 / 600 / 700</td></tr>
+<tr><td><span class="tok">--radius-sm/md/lg</span></td><td>4px / 8px / 12px</td><td><span class="tok">--radius-card</span> / <span class="tok">--radius-pill</span></td><td>16px / 9999px</td></tr>
+<tr><td><span class="tok">--tap-min</span></td><td>44px</td><td><span class="tok">--bottombar-h</span></td><td>56px</td></tr>
+<tr><td><span class="tok">--frame-w</span></td><td>1424px</td><td><span class="tok">--z-content/sticky/modal/toast</span></td><td>1 / 100 / 2000 / 3000</td></tr>
+<tr><td><span class="tok">--dur-fast</span> / <span class="tok">--dur-base</span></td><td>200ms / 200ms</td><td><span class="tok">--dur-slow</span></td><td>300ms</td></tr>
+<tr><td><span class="tok">--ease-standard</span></td><td>cubic-bezier(0.645, 0.045, 0.355, 1)</td><td><span class="tok">--ease-entrance</span></td><td>cubic-bezier(0.23, 1, 0.32, 1)</td></tr>
+<tr><td><span class="tok">--canvas</span></td><td><span class="sw" style="background:#0a0a0a"></span> #0a0a0a</td><td><span class="tok">--surface</span></td><td><span class="sw" style="background:#141414"></span> #141414</td></tr>
+<tr><td><span class="tok">--surface-2</span></td><td><span class="sw" style="background:#1a1a1a"></span> #1a1a1a</td><td><span class="tok">--surface-3</span></td><td><span class="sw" style="background:#212121"></span> #212121</td></tr>
+<tr><td><span class="tok">--surface-hover</span></td><td><span class="sw" style="background:#262626"></span> #262626</td><td><span class="tok">--surface-disabled</span></td><td><span class="sw" style="background:#303030"></span> #303030</td></tr>
+<tr><td><span class="tok">--scrim</span></td><td>rgba(0, 0, 0, 0.7)</td><td><span class="tok">--tint</span></td><td>rgba(242, 240, 228, 0.05)</td></tr>
+<tr><td><span class="tok">--text-hi</span></td><td><span class="sw" style="background:#f2f0e4"></span> #f2f0e4</td><td><span class="tok">--text</span></td><td><span class="sw" style="background:#d6d3c7"></span> #d6d3c7</td></tr>
+<tr><td><span class="tok">--text-mid</span></td><td><span class="sw" style="background:#888888"></span> #888888</td><td><span class="tok">--text-dim</span></td><td><span class="sw" style="background:#6f6f6f"></span> #6f6f6f</td></tr>
+<tr><td><span class="tok">--border</span></td><td>rgba(212, 175, 55, 0.55)</td><td><span class="tok">--brand-accent-hairline</span></td><td>rgba(212, 175, 55, 0.55)</td></tr>
+<tr><td><span class="tok">--brand-accent</span></td><td><span class="sw" style="background:#d4af37"></span> #d4af37</td><td><span class="tok">--brand-accent-2</span></td><td><span class="sw" style="background:#b4952f"></span> #b4952f</td></tr>
+<tr><td><span class="tok">--brand-accent-grad</span></td><td>#d4af37 (solid — name is historical)</td><td><span class="tok">--brand-on-accent</span></td><td><span class="sw" style="background:#0a0a0a"></span> #0a0a0a</td></tr>
+<tr><td><span class="tok">--win</span></td><td><span class="sw" style="background:#45c9a5"></span> #45c9a5</td><td><span class="tok">--loss</span></td><td><span class="sw" style="background:#f53f55"></span> #f53f55</td></tr>
+<tr><td><span class="tok">--error</span></td><td><span class="sw" style="background:#e42946"></span> #e42946</td><td><span class="tok">--caution</span></td><td><span class="sw" style="background:#f5a623"></span> #f5a623</td></tr>
+<tr><td><span class="tok">--info</span></td><td><span class="sw" style="background:#018fff"></span> #018fff</td><td><span class="tok">--focus-ring</span></td><td><span class="sw" style="background:#6ea8ff"></span> #6ea8ff</td></tr>
+<tr><td><span class="tok">--brand-font-body</span></td><td>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</td><td><span class="tok">--brand-font-num</span></td><td>var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif</td></tr>
+<tr><td><span class="tok">--brand-font-head</span></td><td>var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif</td><td><span class="tok">--brand-font-display</span></td><td>var(--font-head) = Montserrat stack (same as head)</td></tr>
+</tbody></table>
+<div class="callout note"><strong>color-mix rule used throughout.</strong> <code>color-mix(in srgb, X p%, transparent)</code> resolves to colour X at alpha p (e.g. <code>color-mix(in srgb, #e3c15a 34%, transparent)</code> = <code>rgba(227, 193, 90, 0.34)</code>). Two-opaque mixes are given as computed hex where they matter.</div>
+
+<h3 id="r-vip-palette">The /vip luxury palette (page-scoped)</h3>
+<p>Declared in <code>src/styles/tokens.css</code> lines 294–362, consumed only inside the <code>.vipPalette</code> wrapper (VipProgram). Every colour:</p>
+<table>
+<thead><tr><th>Token</th><th>Value</th><th>Role (source comment)</th></tr></thead>
+<tbody>
+<tr><td><span class="tok">--vip-page-bg</span></td><td><span class="sw" style="background:#0b0a07"></span> #0b0a07</td><td>warm near-black page; also the dark ink on tier-deck cards</td></tr>
+<tr><td><span class="tok">--vip-panel-bg</span></td><td><span class="sw" style="background:#17140d"></span> #17140d</td><td>warm panel</td></tr>
+<tr><td><span class="tok">--vip-panel-alt</span></td><td><span class="sw" style="background:#141019"></span> #141019</td><td>alt panel (cool-violet cast) — level-table sticky column, next-tier chip</td></tr>
+<tr><td><span class="tok">--vip-inner-bg</span></td><td><span class="sw" style="background:#0f0c07"></span> #0f0c07</td><td>inner well — table headers</td></tr>
+<tr><td><span class="tok">--vip-text-primary</span></td><td><span class="sw" style="background:#e6ebf5"></span> #e6ebf5</td><td>primary text</td></tr>
+<tr><td><span class="tok">--vip-text-secondary</span></td><td><span class="sw" style="background:#c9c3b4"></span> #c9c3b4</td><td>secondary text</td></tr>
+<tr><td><span class="tok">--vip-text-muted</span></td><td><span class="sw" style="background:#8b96ad"></span> #8b96ad</td><td>muted</td></tr>
+<tr><td><span class="tok">--vip-text-faint</span></td><td><span class="sw" style="background:#6b7690"></span> #6b7690</td><td>faint (level-table "CẤP" word)</td></tr>
+<tr><td><span class="tok">--vip-text-disabled</span></td><td><span class="sw" style="background:#565f70"></span> #565f70</td><td>dimmed locked-ahead values</td></tr>
+<tr><td><span class="tok">--vip-gold-start</span></td><td><span class="sw" style="background:#9a7b1e"></span> #9a7b1e</td><td>gold ramp start</td></tr>
+<tr><td><span class="tok">--vip-gold-mid</span></td><td><span class="sw" style="background:#e3c15a"></span> #e3c15a</td><td>THE accent: CTAs, headings, active states</td></tr>
+<tr><td><span class="tok">--vip-gold-end</span></td><td><span class="sw" style="background:#f6e39a"></span> #f6e39a</td><td>light gold: hover, badge text</td></tr>
+<tr><td><span class="tok">--vip-gold-ink</span></td><td><span class="sw" style="background:#2e2404"></span> #2e2404</td><td>ink ON a gold fill</td></tr>
+<tr><td><span class="tok">--vip-gold-grad</span></td><td><code>linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a)</code></td><td>declared, not painted anywhere (comments only)</td></tr>
+<tr><td><span class="tok">--vip-gold-tint</span></td><td>rgba(227, 193, 90, 0.08)</td><td>faint gold film (open FAQ / selected column)</td></tr>
+<tr><td><span class="tok">--vip-positive</span></td><td><span class="sw" style="background:#34d399"></span> #34d399</td><td>unlocked ✓</td></tr>
+<tr><td><span class="tok">--vip-negative</span></td><td><span class="sw" style="background:#fb7185"></span> #fb7185</td><td>declared, never used</td></tr>
+<tr><td><span class="tok">--vip-hairline</span></td><td>rgba(255, 255, 255, 0.07)</td><td>all VIP borders/rules</td></tr>
+<tr><td><span class="tok">--vip-radius-table</span></td><td>14px</td><td>table scrollers</td></tr>
+<tr><td><span class="tok">--vip-radius-control</span></td><td>12px</td><td>guest CTAs, FAQ rows</td></tr>
+<tr><td><span class="tok">--vip-radius-gem</span></td><td>8px</td><td>rotated-square gems</td></tr>
+</tbody></table>
+<h4>Per-tier metallic gradients and accents (verbatim)</h4>
+<table>
+<thead><tr><th>Tier (index)</th><th>Gradient token → value</th><th>Accent token → value</th></tr></thead>
+<tbody>
+<tr><td>bronze / Đồng (0)</td><td><span class="tok">--vip-tier-bronze-grad</span>: <code>linear-gradient(135deg, #8c5a2b, #c88f5a, #e0a56b)</code> <span class="sw" style="background:#8c5a2b"></span><span class="sw" style="background:#c88f5a"></span><span class="sw" style="background:#e0a56b"></span></td><td><span class="tok">--vip-tier-bronze-acc</span>: <span class="sw" style="background:#e0a56b"></span> #e0a56b</td></tr>
+<tr><td>silver / Bạc (1)</td><td><span class="tok">--vip-tier-silver-grad</span>: <code>linear-gradient(135deg, #8a94a6, #cbd3df, #eef2f7)</code> <span class="sw" style="background:#8a94a6"></span><span class="sw" style="background:#cbd3df"></span><span class="sw" style="background:#eef2f7"></span></td><td><span class="tok">--vip-tier-silver-acc</span>: <span class="sw" style="background:#cbd3df"></span> #cbd3df</td></tr>
+<tr><td>gold / Vàng (2)</td><td><span class="tok">--vip-tier-gold-grad</span>: <code>linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a)</code> <span class="sw" style="background:#9a7b1e"></span><span class="sw" style="background:#e3c15a"></span><span class="sw" style="background:#f6e39a"></span></td><td><span class="tok">--vip-tier-gold-acc</span>: <span class="sw" style="background:#e3c15a"></span> #e3c15a</td></tr>
+<tr><td>platinum / Bạch Kim (3)</td><td><span class="tok">--vip-tier-platinum-grad</span>: <code>linear-gradient(135deg, #6b7280, #cfd6e0, #e8edf3)</code> <span class="sw" style="background:#6b7280"></span><span class="sw" style="background:#cfd6e0"></span><span class="sw" style="background:#e8edf3"></span></td><td><span class="tok">--vip-tier-platinum-acc</span>: <span class="sw" style="background:#cfd6e0"></span> #cfd6e0</td></tr>
+<tr><td>diamond / Kim Cương (4)</td><td><span class="tok">--vip-tier-diamond-grad</span>: <code>linear-gradient(135deg, #3f7fb5, #9fd7ee, #e6f7ff)</code> <span class="sw" style="background:#3f7fb5"></span><span class="sw" style="background:#9fd7ee"></span><span class="sw" style="background:#e6f7ff"></span></td><td><span class="tok">--vip-tier-diamond-acc</span>: <span class="sw" style="background:#9fd7ee"></span> #9fd7ee</td></tr>
+</tbody></table>
+<div class="callout warn"><strong>The metallic gradients are never painted.</strong> <code>TIERS[i].grad</code> holds <code>"var(--vip-tier-*-grad)"</code> but no component reads <code>.grad</code>; every surface (tier-deck card face, hero tier pill, comparison gems, matrix gems, next-tier chip) uses the flat accent <code>tier.acc</code>. Comments in TierDeck/VipHeroMember say gradients are banned on buttons/chips. A faithful rebuild paints flat accents only; the gradient tokens are inert data.</div>
+<details><summary>Verbatim token block (tokens.css 294–362)</summary>
+<pre><code class="lang-css">
+  /* ======================================================================
+   * LUXURY VIP PROGRAM LAYER (/vip rebuild) — page-scoped palette.
+   * ----------------------------------------------------------------------
+   * A SELF-CONTAINED warm-near-black + luxury-gold palette for the /vip page
+   * only, applied via a .vipPalette page-root wrapper. Intentionally distinct
+   * from the app --canvas/--brand-accent chrome (a visible seam vs the shell
+   * is accepted &amp; flagged). tokens.css is the ONLY file permitted literals;
+   * components read these via var() and tint via color-mix(). Names use the
+   * --vip-* prefix (NEVER --gold-*, which is RAW-RAMP-reserved). --font-cinzel
+   * is provided at runtime by next/font/google on &lt;html&gt; (layout.tsx). */
+
+  /* surfaces / text */
+  --vip-page-bg:        #0b0a07; /* warm near-black page */
+  --vip-panel-bg:       #17140d; /* warm panel */
+  --vip-panel-alt:      #141019; /* alt panel (cool-violet cast) */
+  --vip-inner-bg:       #0f0c07; /* inner well */
+  --vip-text-primary:   #e6ebf5;
+  --vip-text-secondary: #c9c3b4;
+  --vip-text-muted:     #8b96ad;
+  --vip-text-faint:     #6b7690;
+  --vip-text-disabled:  #565f70; /* dimmed locked-ahead values */
+
+  /* luxury gold ramp + ink */
+  --vip-gold-start: #9a7b1e;
+  --vip-gold-mid:   #e3c15a;
+  --vip-gold-end:   #f6e39a;
+  --vip-gold-ink:   #2e2404; /* ink ON a gold fill */
+  --vip-gold-grad:  linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a);
+  --vip-gold-tint:  rgba(227, 193, 90, 0.08); /* faint gold film (open FAQ / selected col) */
+
+  /* semantic (distinct from app --win/--loss) */
+  --vip-positive: #34d399; /* unlocked ✓ */
+  --vip-negative: #fb7185;
+  --vip-hairline: rgba(255, 255, 255, 0.07);
+
+  /* per-tier gradients + accents (bronze → diamond) */
+  --vip-tier-bronze-grad:   linear-gradient(135deg, #8c5a2b, #c88f5a, #e0a56b);
+  --vip-tier-bronze-acc:    #e0a56b;
+  --vip-tier-silver-grad:   linear-gradient(135deg, #8a94a6, #cbd3df, #eef2f7);
+  --vip-tier-silver-acc:    #cbd3df;
+  --vip-tier-gold-grad:     linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a);
+  --vip-tier-gold-acc:      #e3c15a;
+  --vip-tier-platinum-grad: linear-gradient(135deg, #6b7280, #cfd6e0, #e8edf3);
+  --vip-tier-platinum-acc:  #cfd6e0;
+  --vip-tier-diamond-grad:  linear-gradient(135deg, #3f7fb5, #9fd7ee, #e6f7ff);
+  --vip-tier-diamond-acc:   #9fd7ee;
+
+  /* VIP-local radii (panels reuse --radius-card 16 / pills --radius-pill) */
+  --vip-radius-table:   14px;
+  --vip-radius-control: 12px;
+  --vip-radius-gem:     8px;
+
+  /* display face — Montserrat, the same geometric sans as --brand-font-head.
+   *
+   * WAS Cinzel, and Cinzel had to go for two independent reasons:
+   *   1. CORRECTNESS. Cinzel serves `latin` + `latin-ext` only — no `vietnamese`
+   *      subset — so U+1EA0–1EF1 falls out of the face. Measured on the running
+   *      app: `Đồng` lost `ồ`, `Bạc` and `Bạch Kim` lost `ạ`, mid-word, on /vip.
+   *      This is the identical defect that got Outfit rejected in ruling A4;
+   *      rejecting one and shipping the other would have been incoherent.
+   *   2. SYSTEM. Flat Design specifies a GEOMETRIC SANS for display. Cinzel is
+   *      an inscriptional serif — it was the previous luxury direction's voice
+   *      and is off-system regardless of the language failure.
+   *
+   * Kept as its own token rather than collapsed into --brand-font-head: display
+   * and heading are distinct roles and a future brand may want them to differ.
+   * The serif fallbacks are gone with the serif. */
+  --brand-font-display: var(--font-head);</code></pre></details>
+
+<h3 id="r-vip-lib">src/lib/vip — data, formulas, computed numbers</h3>
+<h4>TIERS (src/lib/vip/tiers.ts)</h4>
+<table>
+<thead><tr><th>index</th><th>id</th><th>nameKey → VI / EN</th><th>gift</th><th>rebate base live / sports / slots / table (%)</th><th>cash base (%)</th><th>unlock</th><th>perks</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>bronze</td><td>tBronze → Đồng / Bronze</td><td>50</td><td>0.5 / 0.4 / 0.7 / 0.4</td><td>5</td><td>"50,000"</td><td>1</td></tr>
+<tr><td>1</td><td>silver</td><td>tSilver → Bạc / Silver</td><td>99</td><td>0.6 / 0.5 / 0.8 / 0.5</td><td>8</td><td>"150,000"</td><td>2</td></tr>
+<tr><td>2</td><td>gold</td><td>tGold → Vàng / Gold</td><td>199</td><td>0.75 / 0.6 / 1.0 / 0.6</td><td>15</td><td>"500,000"</td><td>2</td></tr>
+<tr><td>3</td><td>platinum</td><td>tPlatinum → Bạch Kim / Platinum</td><td>399</td><td>0.8 / 0.8 / 1.0 / 0.7</td><td>20</td><td>"1,000,000"</td><td>3</td></tr>
+<tr><td>4</td><td>diamond</td><td>tDiamond → Kim Cương / Diamond</td><td>799</td><td>0.9 / 0.9 / 1.1 / 0.8</td><td>25</td><td>"3,000,000"</td><td>4</td></tr>
+</tbody></table>
+<p><code>PRIVILEGES = ["bnPoints", "bnShop", "bnEvent", "bnHost"]</code> (cumulative unlock order; a row index <em>r</em> is unlocked at a tier when <code>r &lt; tier.perks</code>).</p>
+<p><code>CURRENT_USER</code> (demo, independent of auth fixture): <code>{ name: "Jordan Rivera", currentTierIndex: 2, currentLevel: 7, points: 86880, wagerProgressPctToNextTier: 72, pointsToNextTier: 33120, nextTierIndex: 3 }</code>; <code>CUR = 2</code>, <code>CUR_LEVEL = 7</code>.</p>
+<div class="callout warn"><code>tier.gift</code> (50/99/199/399/799) is never rendered; the level table derives gifts from <code>giftAt()</code> instead (Gold L1 = $50, not $199). <code>unlock</code> strings use EN comma grouping ("500,000") while the rest of the app uses VN dot grouping.</div>
+<h4>Formulas (src/lib/vip/formulas.ts) — verbatim</h4>
+<pre><code class="lang-tsx">/** Per-tier gift multiplier (bronze..diamond). */
+export const GIFT_MULT = [0.6, 0.8, 1.0, 1.4, 2.0] as const;
+
+/**
+ * Promotion-gift amount ($) for a tier/level, rounded to the nearest $5.
+ * @param tierIndex 0..4
+ * @param level     1..10
+ */
+export function giftAt(tierIndex: number, level: number): number {
+  return Math.round(((50 + (level - 1) * 25) * GIFT_MULT[tierIndex]) / 5) * 5;
+}
+
+/**
+ * Scale a tier BASE value (a level-10 / 100% figure) down to a given level:
+ * 82% at L1 → 100% at L10. Used for every rebate + weekly-cashback cell.
+ * @param base  the tier's level-10 (100%) base value
+ * @param level 1..10
+ */
+export function rate(base: number, level: number): number {
+  return base * (0.82 + (0.18 * (level - 1)) / 9);
+}
+
+/** Alias for `rate` under the guideline's alternate name. */
+export const rebateAtLevel = rate;
+
+/** "$1,234" — gift display (thousands-grouped, no decimals). */
+export function fmtGift(n: number): string {
+  return "$" + n.toLocaleString("en-US");
+}
+
+/** "14%" — weekly-cashback display (whole percent). */
+export function fmtCash(r: number): string {
+  return Math.round(r) + "%";
+}
+
+/** "0.62%" — per-category rebate display (2 decimals). */
+export function fmtRate(r: number): string {
+  return r.toFixed(2) + "%";
+}</code></pre>
+<p><code>GIFT_MULT = [0.6, 0.8, 1.0, 1.4, 2.0]</code>. giftAt(t, l) = round(((50 + (l−1)·25) · GIFT_MULT[t]) / 5) · 5. rate(base, l) = base · (0.82 + 0.18·(l−1)/9). fmtGift → "$" + en-US grouping; fmtRate → 2 decimals + "%"; fmtCash → Math.round + "%".</p>
+<h4>Every level-table value (computed from the formulas; L1 → L10)</h4>
+<table>
+<thead><tr><th>Tier</th><th>Row</th><th>CẤP 1 … CẤP 10</th></tr></thead>
+<tbody>
+<tr><td rowspan="6">Đồng</td><td>Quà thăng cấp</td><td>$30 · $45 · $60 · $75 · $90 · $105 · $120 · $135 · $150 · $165</td></tr>
+<tr><td>Hoàn cược Live</td><td>0.41% · 0.42% · 0.43% · 0.44% · 0.45% · 0.46% · 0.47% · 0.48% · 0.49% · 0.50%</td></tr>
+<tr><td>Hoàn cược Thể thao</td><td>0.33% · 0.34% · 0.34% · 0.35% · 0.36% · 0.37% · 0.38% · 0.38% · 0.39% · 0.40%</td></tr>
+<tr><td>Hoàn cược Nổ hũ</td><td>0.57% · 0.59% · 0.60% · 0.62% · 0.63% · 0.64% · 0.66% · 0.67% · 0.69% · 0.70%</td></tr>
+<tr><td>Hoàn cược Game bàn</td><td>0.33% · 0.34% · 0.34% · 0.35% · 0.36% · 0.37% · 0.38% · 0.38% · 0.39% · 0.40%</td></tr>
+<tr><td>Hoàn tiền tuần</td><td>4% · 4% · 4% · 4% · 5% · 5% · 5% · 5% · 5% · 5%</td></tr>
+<tr><td rowspan="6">Bạc</td><td>Quà thăng cấp</td><td>$40 · $60 · $80 · $100 · $120 · $140 · $160 · $180 · $200 · $220</td></tr>
+<tr><td>Live</td><td>0.49% · 0.50% · 0.52% · 0.53% · 0.54% · 0.55% · 0.56% · 0.58% · 0.59% · 0.60%</td></tr>
+<tr><td>Thể thao</td><td>0.41% · 0.42% · 0.43% · 0.44% · 0.45% · 0.46% · 0.47% · 0.48% · 0.49% · 0.50%</td></tr>
+<tr><td>Nổ hũ</td><td>0.66% · 0.67% · 0.69% · 0.70% · 0.72% · 0.74% · 0.75% · 0.77% · 0.78% · 0.80%</td></tr>
+<tr><td>Game bàn</td><td>0.41% · 0.42% · 0.43% · 0.44% · 0.45% · 0.46% · 0.47% · 0.48% · 0.49% · 0.50%</td></tr>
+<tr><td>Hoàn tiền tuần</td><td>7% · 7% · 7% · 7% · 7% · 7% · 8% · 8% · 8% · 8%</td></tr>
+<tr><td rowspan="6">Vàng (default)</td><td>Quà thăng cấp</td><td>$50 · $75 · $100 · $125 · $150 · $175 · $200 · $225 · $250 · $275</td></tr>
+<tr><td>Live</td><td>0.61% · 0.63% · 0.65% · 0.66% · 0.67% · 0.69% · 0.70% · 0.72% · 0.73% · 0.75%</td></tr>
+<tr><td>Thể thao</td><td>0.49% · 0.50% · 0.52% · 0.53% · 0.54% · 0.55% · 0.56% · 0.58% · 0.59% · 0.60%</td></tr>
+<tr><td>Nổ hũ</td><td>0.82% · 0.84% · 0.86% · 0.88% · 0.90% · 0.92% · 0.94% · 0.96% · 0.98% · 1.00%</td></tr>
+<tr><td>Game bàn</td><td>0.49% · 0.50% · 0.52% · 0.53% · 0.54% · 0.55% · 0.56% · 0.58% · 0.59% · 0.60%</td></tr>
+<tr><td>Hoàn tiền tuần</td><td>12% · 13% · 13% · 13% · 13% · 14% · 14% · 14% · 15% · 15%</td></tr>
+<tr><td rowspan="6">Bạch Kim</td><td>Quà thăng cấp</td><td>$70 · $105 · $140 · $175 · $210 · $245 · $280 · $315 · $350 · $385</td></tr>
+<tr><td>Live</td><td>0.66% · 0.67% · 0.69% · 0.70% · 0.72% · 0.74% · 0.75% · 0.77% · 0.78% · 0.80%</td></tr>
+<tr><td>Thể thao</td><td>0.66% · 0.67% · 0.69% · 0.70% · 0.72% · 0.74% · 0.75% · 0.77% · 0.78% · 0.80%</td></tr>
+<tr><td>Nổ hũ</td><td>0.82% · 0.84% · 0.86% · 0.88% · 0.90% · 0.92% · 0.94% · 0.96% · 0.98% · 1.00%</td></tr>
+<tr><td>Game bàn</td><td>0.57% · 0.59% · 0.60% · 0.62% · 0.63% · 0.64% · 0.66% · 0.67% · 0.69% · 0.70%</td></tr>
+<tr><td>Hoàn tiền tuần</td><td>16% · 17% · 17% · 18% · 18% · 18% · 19% · 19% · 20% · 20%</td></tr>
+<tr><td rowspan="6">Kim Cương</td><td>Quà thăng cấp</td><td>$100 · $150 · $200 · $250 · $300 · $350 · $400 · $450 · $500 · $550</td></tr>
+<tr><td>Live</td><td>0.74% · 0.76% · 0.77% · 0.79% · 0.81% · 0.83% · 0.85% · 0.86% · 0.88% · 0.90%</td></tr>
+<tr><td>Thể thao</td><td>0.74% · 0.76% · 0.77% · 0.79% · 0.81% · 0.83% · 0.85% · 0.86% · 0.88% · 0.90%</td></tr>
+<tr><td>Nổ hũ</td><td>0.90% · 0.92% · 0.95% · 0.97% · 0.99% · 1.01% · 1.03% · 1.06% · 1.08% · 1.10%</td></tr>
+<tr><td>Game bàn</td><td>0.66% · 0.67% · 0.69% · 0.70% · 0.72% · 0.74% · 0.75% · 0.77% · 0.78% · 0.80%</td></tr>
+<tr><td>Hoàn tiền tuần</td><td>21% · 21% · 22% · 22% · 22% · 23% · 24% · 24% · 25% · 25%</td></tr>
+</tbody></table>
+<div class="callout warn">Rates use a decimal POINT ("0.61%") and gifts a "$" with en-US grouping, on a Vietnamese page where every other figure uses VN grouping (1.234 / 0,6%). The FAQ/rules talk about weekly cashback in % while the table shows "Hoàn tiền tuần 15%" — a 15% weekly cashback base (Gold L10) next to a 0.6% "Hoàn trả" on /tier; the two VIP pages publish incompatible economics.</div>
+<h4>Other UI-computed numbers</h4>
+<ul>
+<li><strong>LevelRing</strong> (size 108, stroke 7): r = (108 − 7)/2 = 50.5; circumference c = 2π·50.5 = 317.30; arc dash = clamp(percent,0,100)/100 · c → demo 72% = 228.46. Word font-size = size·0.13 = 14.04px; numeral = size·0.3 = 32.4px.</li>
+<li><strong>Hero progress</strong>: pct = clamp(wagerProgressPctToNextTier, 0, 100) = 72 → fill width 72%, knob left 72%.</li>
+<li><strong>TierDeck</strong>: see component — o = i − (selected − drag/120), translateX o·78px, translateY |o|·8px, rotate o·5deg, scale max(.55, 1 − |o|·.09), zIndex round(40 − |o|·5), opacity max(.3, 1 − |o|·.2), locked-ahead clamp .42.</li>
+<li><strong>PrivilegeComparison target</strong>: cmpT = (selected === current &amp;&amp; current &lt; 4) ? current + 1 : selected.</li>
+<li><strong>Points</strong>: <code>points.toLocaleString("en-US")</code> → "86,880"; caption "33,120 điểm để lên Bạch Kim".</li>
+</ul>
+<h4>Copy bag (src/lib/vip/copy.ts) — every string, VI / EN</h4>
+<table>
+<thead><tr><th>Key</th><th>VI (default)</th><th>EN (lang toggle)</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>allTiers</td><td>Hành trình VIP</td><td>Your VIP journey</td><td>tier-deck section heading; dots tablist aria-label</td></tr>
+<tr><td>tierSectionTitle</td><td>So sánh đặc quyền</td><td>Compare privileges</td><td>member comparison heading</td></tr>
+<tr><td>lvlSectionTitle</td><td>Các cấp độ hội viên</td><td>Membership levels</td><td>level-table heading</td></tr>
+<tr><td>tierMatrixTitle</td><td>Đặc quyền theo hạng</td><td>Privileges by tier</td><td>guest matrix heading + sr-only caption</td></tr>
+<tr><td>faqTitle</td><td>Câu hỏi thường gặp</td><td>FAQ</td><td>FAQ heading</td></tr>
+<tr><td>needWager</td><td>Cược tuần</td><td>Weekly wager</td><td>deck card "Cược tuần 500,000"; comparison footer; matrix lock title</td></tr>
+<tr><td>newTag</td><td>MỚI</td><td>NEW</td><td>comparison new-privilege badge</td></tr>
+<tr><td>levelWord</td><td>CẤP</td><td>LEVEL</td><td>ring, deck "CẤP 1–10", level-table headers</td></tr>
+<tr><td>statPoints</td><td>Điểm</td><td>Points</td><td>hero points label</td></tr>
+<tr><td>youAreHere</td><td>Bạn ở đây</td><td>You are here</td><td>deck current-tier tag</td></tr>
+<tr><td>progressLabel</td><td>Tiến độ cược lên hạng sau</td><td>Wager progress to next tier</td><td>hero progress label + aria-label</td></tr>
+<tr><td>pointsToNextSuffix</td><td>điểm để lên</td><td>points to reach</td><td>hero caption</td></tr>
+<tr><td>rbGift / rbLive / rbSports / rbSlots / rbTable / rbCashback</td><td>Quà thăng cấp / Hoàn cược Live / Hoàn cược Thể thao / Hoàn cược Nổ hũ / Hoàn cược Game bàn / Hoàn tiền tuần</td><td>Promotion gift / Live rebate / Sports rebate / Slots rebate / Table rebate / Weekly cashback</td><td>level-table row labels</td></tr>
+<tr><td>bnPoints / bnShop / bnEvent / bnHost</td><td>Đổi điểm ưu đãi / Chọn quà cửa hàng / Ưu tiên sự kiện / Quản lý VIP riêng</td><td>Bonus point exchange / Store gift selection / Event priority / Personal VIP host</td><td>privilege rows</td></tr>
+<tr><td>tBronze … tDiamond</td><td>Đồng / Bạc / Vàng / Bạch Kim / Kim Cương</td><td>Bronze / Silver / Gold / Platinum / Diamond</td><td>tier names</td></tr>
+<tr><td>guestBadge</td><td>Chương trình VIP</td><td>VIP program</td><td>guest hero badge</td></tr>
+<tr><td>guestH1</td><td>Đặc quyền dành riêng cho hội viên VIP</td><td>Privileges reserved for VIP members</td><td>guest hero h1</td></tr>
+<tr><td>guestSub</td><td>Chơi càng nhiều, hạng càng cao. Mở khóa hoàn tiền, quà thăng cấp và quản lý VIP riêng qua 5 hạng và 50 cấp độ.</td><td>The more you play, the higher you climb. Unlock cashback, promotion gifts and a personal VIP host across 5 tiers and 50 levels.</td><td>guest hero sub</td></tr>
+<tr><td>ctaRegister / ctaLogin</td><td>Đăng ký ngay / Đăng nhập</td><td>Register now / Log in</td><td>guest CTAs</td></tr>
+</tbody></table>
+<p>FAQ items (FAQ_ITEMS, 7 entries): see <a href="#r-vip-faq">VipFaq</a>.</p>
+
+<h3 id="r-vip-route-vip">Route /vip</h3>
+<table><tbody>
+<tr><th>URL</th><td><code>/vip</code></td></tr>
+<tr><th>Page file</th><td><code>src/app/vip/page.tsx</code> — server component returning <code>&lt;VipProgram /&gt;</code> only. No <code>metadata</code> export (tab title falls back to the root layout title).</td></tr>
+<tr><th>Auth gating</th><td>None for access. <code>useRequireAuth().allowed</code> (true when logged in, either fixture session) switches hero (member vs guest), privilege block (comparison vs matrix), deck "Bạn ở đây"/locked-ahead and level-table spotlight. The member view always shows the demo <code>CURRENT_USER</code> (Jordan Rivera, Vàng L7), not the logged-in user.</td></tr>
+<tr><th>Section order</th><td>1 lang toggle (VI/EN, right-aligned) → 2 hero (VipHeroMember | VipHeroGuest) → 3 "Hành trình VIP" + TierDeck → 4 member: "So sánh đặc quyền" + PrivilegeComparison / guest: "Đặc quyền theo hạng" + PrivilegeMatrix → 5 "Các cấp độ hội viên" + LevelTable → 6 "Câu hỏi thường gặp" + VipFaq.</td></tr>
+<tr><th>375px</th><td>Shell frame padding 16px each side; <code>.vipPalette</code> adds <span class="tok">--gutter</span> 16px → content 311px. Hero member: identity row then points block full-width left-aligned; next-tier chip moves above the bar (order −1, right-aligned). Guest CTAs stretch (flex 1 1 auto). Deck stage 196px tall (≤560px). Comparison cards stack (flex-wrap; basis 260px), arrow rotated 90° (↓). Tables scroll horizontally (matrix min-width 760px, level table 900px) with sticky first column. FAQ question padding 12/16px, font 14px.</td></tr>
+<tr><th>768px</th><td>Content 736 − 32 = 704px. Same ≤900 rules as 375 except deck stage 220px; comparison: two 260px-basis cards + arrow fit (260+16+32+16+260 = 584 ≤ 704) → side by side but arrow still rotated 90° because the ≤900 media query applies (inference: arrow points down between side-by-side cards).</td></tr>
+<tr><th>1024px</th><td>Frame: 16px left / 76px right (QuickActionRail reservation) → content 932px; vip padding 16 → inner 900px. &gt;900 rules: hero points right-aligned on the same row; arrow "→" horizontal; matrix fits (min 760); level table exactly 900px min-width → fills, no scroll at 900+.</td></tr>
+<tr><th>1440px</th><td>Frame 1424px (<span class="tok">--frame-w</span>, centred) − 16 − 76 = content 1332px, inner 1300px. FAQ list capped at 760px centred.</td></tr>
+<tr><th>Components</th><td><a href="#r-vip-program">VipProgram</a>, <a href="#r-vip-section-heading">VipSectionHeading</a>, <a href="#r-vip-hero-member">VipHeroMember</a>, <a href="#r-vip-level-ring">LevelRing</a>, <a href="#r-vip-hero-guest">VipHeroGuest</a>, <a href="#r-vip-tier-deck">TierDeck</a>, <a href="#r-vip-privilege-comparison">PrivilegeComparison</a>, <a href="#r-vip-privilege-matrix">PrivilegeMatrix</a>, <a href="#r-vip-level-table">LevelTable</a>, <a href="#r-vip-faq">VipFaq</a></td></tr>
+<tr><th>Loading / empty / error</th><td>None — all data is synchronous constants. No skeleton.</td></tr>
+</tbody></table>
+<div class="callout warn">The <code>.vipPalette</code> background (#0b0a07) fills only the content column; the shell canvas around it is #0a0a0a — a visible seam (acknowledged in the page header comment).</div>
+
+<h3 id="r-vip-route-tier">Route /tier</h3>
+<table><tbody>
+<tr><th>URL</th><td><code>/tier</code></td></tr>
+<tr><th>Page file</th><td><code>src/app/tier/page.tsx</code> — async server component; <code>Promise.all([getVipTiers(), getPerks(), getVipProgress()])</code> from <code>src/lib/mock/vip.ts</code>. No metadata export.</td></tr>
+<tr><th>Auth gating</th><td>Client children read <code>useAuth()</code>: guest → join card; member → current-tier card; ladder/table/gallery highlight by <code>user.vipLevel</code> (fixture <code>TIERED_USER.vipLevel = 3</code> "Bạch Kim"; <code>LEVEL_0_USER.vipLevel = 0</code> "Tân thủ").</td></tr>
+<tr><th>Section order</th><td><code>div.page</code> (VipPage.module.css): 1 back link "‹ Hạng VIP" (Icon chevronLeft 16) → 2 intro header: h1 with Icon trophy 26 + "Bậc thang VIP", intro paragraph → 3 <a href="#r-vip-current-tier-card">CurrentTierCard</a> → 4 <a href="#r-vip-section">VipSection</a> "Bậc thang VIP" (icon vip) + <a href="#r-vip-tier-ladder">TierLadder</a> → 5 VipSection "Bảng quyền lợi" (icon grid) + <a href="#r-vip-privilege-table">PrivilegeTable</a> → 6 VipSection "Quyền lợi theo hạng" (icon gift) + <a href="#r-vip-perk-gallery">PerkGallery</a> → 7 VipSection "Quy tắc lên hạng &amp; hoàn trả" (icon info) + <a href="#r-vip-rules">VipRules</a>.</td></tr>
+<tr><th>375px</th><td>Content 343px. Ladder: horizontal snap Scroller of 168px cards with 16px peek. PrivilegeTable scrolls with frozen first column (label col 148px, tier cols 132px). PerkGallery 1 column. Rules 1 column. Current-tier guest card: column, centred.</td></tr>
+<tr><th>768px</th><td>Ladder cards share width equally (flex 1 1 0), no scroll. PrivilegeTable stretches (label col 180px, tier cols flex 1). PerkGallery 2 columns (≥640). Rules 2-column grid. Guest card becomes a row (button auto width).</td></tr>
+<tr><th>1024 / 1440px</th><td>Same as 768 at wider widths (content 932 / 1332px). PerkGallery stays 2 columns (the ≥1024 rule repeats 1fr 1fr).</td></tr>
+<tr><th>Page copy</th><td>"Hạng VIP" (back link), "Bậc thang VIP" (h1), "Càng chơi càng được hoàn trả. Mọi hạng đều nhận hoàn trả theo % vòng cược — minh bạch, không điều kiện ẩn." (intro)</td></tr>
+<tr><th>Loading / empty / error</th><td>Progress envelope states handled in CurrentTierCard (absent / loading / error / live / max tier). PerkGallery empty → EmptyState icon gift message "Quyền lợi theo hạng". Fixture returns live data; <code>DEMO_EMPTY</code> (false) would make progress absent.</td></tr>
+</tbody></table>
+<details><summary>Verbatim VipPage.module.css (shared /tier layout)</summary>
+<pre><code class="lang-css">/* VipPage / TierPage — shared page-column layout. Tokens only. The shell
+ * (header + nav + bottom bar) is mounted by the root layout; this is just the
+ * swapped content column. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-4) 0 var(--space-8);
+  min-width: 0;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pageTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-h1);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+.titleIcon {
+  color: var(--brand-accent);
+}
+.introCopy {
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+  max-width: 64ch;
+}
+
+.detailLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-sm);
+  color: var(--brand-accent);
+  text-decoration: none;
+  min-height: var(--tap-min);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  text-decoration: none;
+  min-height: var(--tap-min);
+}
+.backLink:hover {
+  color: var(--text-hi);
+}</code></pre></details>
+<div class="callout warn">QuickActionRail (shell) links to <code>/tier</code> with <code>aria-label="Giải đấu"</code> ("Tournament") — the route is the VIP ladder, not a tournament. <code>.detailLink</code> and <code>vipCopy.detailLink</code> ("Xem bậc thang chi tiết") exist but nothing renders them, so <code>/vip</code> never links to <code>/tier</code>.</div>
+
+<h3 id="r-vip-route-club">Route /cau-lac-bo</h3>
+<table><tbody>
+<tr><th>URL / file</th><td><code>/cau-lac-bo</code> — <code>src/app/cau-lac-bo/page.tsx</code>; <code>metadata.title = "Câu lạc bộ đại lý — Yaobet"</code>.</td></tr>
+<tr><th>Auth</th><td>None.</td></tr>
+<tr><th>Content</th><td><code>div.page</code> → <code>h1.heading</code> "Câu lạc bộ đại lý" (Agent club) → <code>p.body</code> "Chương trình câu lạc bộ đại lý sẽ sớm ra mắt." (The agent club program is coming soon.)</td></tr>
+<tr><th>Styles</th><td><code>src/app/stub.module.css</code>: .page flex column, gap <span class="tok">--space-4</span> 16px, min-width 0; .heading font-size <span class="tok">--t-h1</span> 24px, colour <span class="tok">--text-hi</span> #f2f0e4, weight 700; .body <span class="tok">--t-body</span> 16px, <span class="tok">--text-mid</span> #888888, max-width 60ch, line-height 1.6. Same at every breakpoint.</td></tr>
+<tr><th>Linked from</th><td>MemberMenu ("agentClub", icon trophy) and MemberSidebar ("honor", icon trophy) — both shell/member tracks.</td></tr>
+</tbody></table>
+</section>
+

@@ -1,0 +1,21 @@
+{
+  "$description": "radius tokens: primitive -> semantic -> component. Swap the semantic tier to add a theme.",
+  "primitive": {
+    "radius": {
+      "control": {
+        "$value": "4px",
+        "$type": "dimension"
+      },
+      "full": {
+        "$value": "999px",
+        "$type": "dimension"
+      },
+      "surface": {
+        "$value": "8px",
+        "$type": "dimension"
+      }
+    }
+  },
+  "semantic": {},
+  "component": {}
+}

@@ -1,0 +1,14 @@
+<section>
+<h2 id="i-rebuild-order">Rebuild order</h2>
+<ol>
+<li><strong>Stack and project.</strong> Next.js <code>16.2.9</code> (App Router, Turbopack dev), React <code>19.2.4</code>, TypeScript 5, ESLint 9 with <code>eslint-config-next</code>. No UI library, no Tailwind, no Bootstrap: plain CSS Modules plus one global stylesheet. Path alias <code>@/*</code> → <code>./src/*</code>. <code>next.config.ts</code> is empty. See <a href="#f-stack">Stack</a>.</li>
+<li><strong>Tokens, themes and the token lint.</strong> Recreate every custom property exactly, then the brand and theme blocks, then <code>scripts/token-lint.mjs</code> so violations fail early. See <a href="#f-tokens">Tokens</a> and <a href="#f-themes">Themes and brands</a>.</li>
+<li><strong>Typography, motion, reset.</strong> Fonts load through <code>next/font/google</code> with the <code>vietnamese</code> subset. See <a href="#f-typography">Typography</a>, <a href="#f-motion">Motion</a>, <a href="#f-reset">Reset and globals</a>.</li>
+<li><strong>Root layout.</strong> <code>&lt;html lang="vi" data-brand="yaobet" data-theme="obsidian"&gt;</code>, the mock auth provider, the app shell, footer and quick-action rail. See <a href="#f-root-layout">Root layout</a>.</li>
+<li><strong>Primitives</strong> in <code>src/ui</code> (17 components). Build these before any screen; every route composes them. See <a href="#f-ui">UI primitives</a>.</li>
+<li><strong>Lib and mock data.</strong> Formatters, the VIP maths, and every mock dataset the screens read. Screens render mock data only; there is no API. See <a href="#f-lib">Lib and mock data</a>.</li>
+<li><strong>Shell, then routes.</strong> Header, category rail, bottom tab bar, footer and overlays come next, then the routes in the order of the sections that follow: home and discovery, member area, then VIP and rewards.</li>
+<li><strong>Verify</strong> with the <a href="#v-checklist">acceptance checklist</a>.</li>
+</ol>
+</section>
+

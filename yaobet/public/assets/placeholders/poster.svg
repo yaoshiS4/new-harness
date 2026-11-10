@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400" role="img" aria-label="Yaobet placeholder">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f222e"/>
+      <stop offset="1" stop-color="#25282f"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="400" rx="16" fill="url(#g)"/>
+  <rect x="0.5" y="0.5" width="299" height="399" rx="16" fill="none" stroke="#f4b740" stroke-opacity="0.32"/>
+  <text x="150" y="205" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" fill="#f4b740" opacity="0.9">Poster</text>
+</svg>

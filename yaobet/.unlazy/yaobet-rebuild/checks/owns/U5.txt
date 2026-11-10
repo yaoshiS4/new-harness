@@ -1,0 +1,6 @@
+src/app/(member)/tin-nhan/**
+src/app/(member)/gioi-thieu/**
+src/app/(member)/dai-ly/**
+src/components/messages/**
+src/components/referral/**
+src/styles/areas/member.css

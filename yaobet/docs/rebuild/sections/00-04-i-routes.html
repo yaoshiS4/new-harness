@@ -1,0 +1,34 @@
+<section>
+<h2 id="i-routes">Route inventory</h2>
+<p>Every <code>page.tsx</code> under <code>src/app</code>. Routes inside the <code>(member)</code> route group share the member layout and sidebar. Four routes are server redirects; build them as redirects, not pages.</p>
+<div class="tw"><table><thead><tr><th>URL</th><th>Page file (under <code>src/app</code>)</th><th>Kind</th></tr></thead><tbody>
+<tr><td><code>/</code></td><td><code>page.tsx</code> (+ <code>loading.tsx</code>)</td><td>Home</td></tr>
+<tr><td><code>/[vertical]</code></td><td><code>[vertical]/page.tsx</code> (+ <code>loading.tsx</code>, <code>not-found.tsx</code>)</td><td>Game lobby for one of 9 verticals: <code>casino</code>, <code>slots</code>, <code>sports</code>, <code>fishing</code>, <code>card</code>, <code>lottery</code>, <code>cockfight</code>, <code>table</code>, <code>arcade</code></td></tr>
+<tr><td><code>/khuyen-mai</code></td><td><code>khuyen-mai/page.tsx</code></td><td>Promotions list</td></tr>
+<tr><td><code>/khuyen-mai/[id]</code></td><td><code>khuyen-mai/[id]/page.tsx</code></td><td>Promotion detail (<code>pr1</code> to <code>pr8</code>, from <code>lib/mock/promos.ts</code>)</td></tr>
+<tr><td><code>/tai-khoan</code></td><td><code>(member)/tai-khoan/page.tsx</code> (+ loading)</td><td>Account</td></tr>
+<tr><td><code>/vi-tien</code></td><td><code>(member)/vi-tien/page.tsx</code> (+ loading)</td><td>Wallet</td></tr>
+<tr><td><code>/tin-nhan</code></td><td><code>(member)/tin-nhan/page.tsx</code> (+ loading)</td><td>Messages</td></tr>
+<tr><td><code>/gioi-thieu</code></td><td><code>(member)/gioi-thieu/page.tsx</code> (+ loading)</td><td>Referral</td></tr>
+<tr><td><code>/dai-ly</code></td><td><code>(member)/dai-ly/page.tsx</code></td><td>Agent / partner</td></tr>
+<tr><td><code>/cuoc-hop-le</code></td><td><code>cuoc-hop-le/page.tsx</code> (+ loading)</td><td>Valid-bet contribution, with a restricted-games tab</td></tr>
+<tr><td><code>/vip</code></td><td><code>vip/page.tsx</code></td><td>VIP (luxury palette)</td></tr>
+<tr><td><code>/tier</code></td><td><code>tier/page.tsx</code></td><td>Tier detail</td></tr>
+<tr><td><code>/cau-lac-bo</code></td><td><code>cau-lac-bo/page.tsx</code></td><td>Club</td></tr>
+<tr><td><code>/cua-hang</code></td><td><code>cua-hang/page.tsx</code></td><td>Point store</td></tr>
+<tr><td><code>/ve-so</code></td><td><code>ve-so/page.tsx</code></td><td>Scratch card</td></tr>
+<tr><td><code>/bo-suu-tap</code></td><td><code>bo-suu-tap/page.tsx</code></td><td>Collection</td></tr>
+<tr><td><code>/bo-suu-tap/cua-toi</code></td><td><code>bo-suu-tap/cua-toi/page.tsx</code></td><td>My collection</td></tr>
+<tr><td><code>/ho-tro</code></td><td><code>ho-tro/page.tsx</code></td><td>Support (utility)</td></tr>
+<tr><td><code>/tro-giup</code></td><td><code>tro-giup/page.tsx</code></td><td>Help (utility)</td></tr>
+<tr><td><code>/tai-app</code></td><td><code>tai-app/page.tsx</code></td><td>App download (utility)</td></tr>
+<tr><td><code>/phong-cach</code></td><td><code>phong-cach/page.tsx</code></td><td>Style page (utility)</td></tr>
+<tr><td><code>/dev/collection-ports</code></td><td><code>dev/collection-ports/page.tsx</code></td><td>Developer preview</td></tr>
+<tr><td><code>/bao-mat</code></td><td><code>bao-mat/page.tsx</code></td><td>Redirect → <code>/tai-khoan</code></td></tr>
+<tr><td><code>/lich-su</code></td><td><code>lich-su/page.tsx</code></td><td>Redirect → <code>/tai-khoan</code></td></tr>
+<tr><td><code>/hoan-tra</code></td><td><code>hoan-tra/page.tsx</code></td><td>Redirect → <code>/khuyen-mai</code></td></tr>
+<tr><td><code>/game-han-che</code></td><td><code>game-han-che/page.tsx</code></td><td>Redirect → <code>/cuoc-hop-le?tab=han-che</code></td></tr>
+</tbody></table></div>
+<p>Each route's full specification is in the track sections below: home and discovery (<code>s-</code> anchors), member area (<code>m-</code>), VIP and rewards (<code>r-</code>). Use the contents filter to jump to a route by its URL.</p>
+</section>
+

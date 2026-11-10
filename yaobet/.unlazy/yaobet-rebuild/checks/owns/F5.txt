@@ -1,0 +1,2 @@
+src/app/layout.tsx
+src/app/favicon.ico

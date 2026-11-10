@@ -1,0 +1,110 @@
+<section>
+<h2 id="r-vip-perk-gallery">PerkGallery (/tier)</h2>
+<h4>1. Purpose</h4><p>Grid of perk tiles (icon slot, name, "unlocks at tier N" badge, description), with a lock veil on perks above the member's tier.</p>
+<h4>2. Source</h4><p><code>src/components/vip/PerkGallery.tsx</code>, <code>PerkGallery.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">perks.length===0 → EmptyState(icon gift, message "Quyền lợi theo hạng")
+ul.grid
+  li.item per perk
+    Card(variant="tile").perkCard
+      div.art aria-hidden  Icon gift 28 ; locked &amp;&amp; span.mask  Icon lock 20
+      div.body
+        div.perkHead  span.perkName name · Badge(tone = locked?"neutral":"gold", subtle) "Mở từ hạng {n}"
+        p.perkDesc  description
+        locked &amp;&amp; p.lockedNote  "Lên hạng để mở quyền lợi này."</code></pre>
+<h4>5. Styles</h4><p>.grid 1 column gap 12px (≥640: 2 columns; ≥1024: 2 columns). .perkCard flex gap 12px padding 12px. .art 72×72 radius 8px, #212121, border rgba(212,175,55,.55), colour #d4af37. .mask absolute inset 0 radius 8px, background rgba(0,0,0,.7), colour #888888. .body column gap 4px. .perkHead flex wrap gap 8px. .perkName 16px 600 #f2f0e4. .perkDesc 14px lh 1.5 #888888. .lockedNote 12px #6f6f6f.</p>
+<details><summary>Verbatim PerkGallery.module.css</summary><pre><code class="lang-css">/* PerkGallery — responsive perk tile grid. Tokens only. */
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+.item {
+  display: flex;
+}
+
+.perkCard {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  width: 100%;
+  align-items: stretch;
+}
+
+/* illustration SLOT */
+.art {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  color: var(--brand-accent);
+  /* flat: solid raised surface + gold hairline (was a raw-rgba radial fill) */
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+}
+/* lock veil — honest locked status */
+.mask {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  color: var(--text-mid);
+  background: var(--scrim);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.perkHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.perkName {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.perkDesc {
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+.lockedNote {
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}</code></pre></details>
+<h4>9. Data</h4>
+<table><thead><tr><th>Perk</th><th>Description</th><th>unlocksAtLevel</th></tr></thead><tbody>
+<tr><td>Hoàn trả nâng cao</td><td>Tỷ lệ hoàn trả cao hơn theo hạng.</td><td>1</td></tr>
+<tr><td>Rút tiền ưu tiên</td><td>Xử lý rút tiền nhanh hơn.</td><td>2</td></tr>
+<tr><td>Quản lý tài khoản riêng</td><td>Hỗ trợ chuyên biệt 24/7.</td><td>3</td></tr>
+<tr><td>Quà sinh nhật</td><td>Ưu đãi dịp sinh nhật.</td><td>1</td></tr>
+</tbody></table>
+<p>States: guest → none locked (gold badges); member L3 → none locked; member L0 → all four locked (neutral badge, veil, note). illustrationSrc "/assets/placeholders/perk.svg" is not rendered (Icon gift instead). No motion.</p>
+<div class="callout warn">The ≥1024 media query repeats <code>1fr 1fr</code> (no change).</div>
+</section>
+

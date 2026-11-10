@@ -1,0 +1,250 @@
+<section>
+<h2 id="r-store-terms">StoreTerms</h2>
+<h4>1. Purpose</h4><p>"Terms &amp; conditions" panel: five expandable Q&amp;A rows and a programme note.</p>
+<h4>2. Source</h4><p><code>src/components/store/StoreTerms.tsx</code>, <code>StoreTerms.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">section.terms aria-label="Điều khoản &amp; điều kiện"
+  header.header
+    span.sigil aria-hidden "§"
+    div.headText  h2.title "Điều khoản &amp; điều kiện" · p.subtitle "Quy định về việc tích lũy và sử dụng điểm thưởng"
+    span.updated "Cập nhật lần cuối · —"
+  ul.list
+    li.item data-open per item
+      button.trigger aria-expanded aria-controls="terms-panel-{i}"
+        span.num aria-hidden "01".."05" · span.q question · Icon chevronDown 18 .chevron
+      isOpen &amp;&amp; p.answer id="terms-panel-{i}"
+  p.note  Icon info 16 .noteIcon + span note text</code></pre>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th></tr></thead><tbody>
+<tr><td>.terms</td><td>margin-top 32px; padding 24px; radius 16px; #1a1a1a; border 1px rgba(212,175,55,.55)</td></tr>
+<tr><td>.header</td><td>flex centre gap 12px; margin-bottom 16px</td></tr>
+<tr><td>.sigil</td><td>44×44 radius 8px; #d4af37 bg; #0a0a0a; 20px 700; line-height 1</td></tr>
+<tr><td>.headText</td><td>column gap 2px; margin-right auto</td></tr>
+<tr><td>.title / .subtitle</td><td>18px 700 #f2f0e4 lh 1.3 / 14px #888888 lh 1.3</td></tr>
+<tr><td>.updated</td><td>padding 4px 12px; pill; border rgba(212,175,55,.55); background color-mix(#212121 60%, transparent); #888888; 12px; nowrap</td></tr>
+<tr><td>.list</td><td>column gap 8px</td></tr>
+<tr><td>.item</td><td>radius 8px; #212121; border 1px transparent → open/hover rgba(212,175,55,.55)</td></tr>
+<tr><td>.trigger</td><td>flex centre gap 12px; width 100%; padding 16px; no bg/border; left; #f2f0e4</td></tr>
+<tr><td>.num</td><td>34×34 radius 8px; background rgba(212,175,55,.14); #d4af37; 14px 700 tabular</td></tr>
+<tr><td>.q</td><td>flex 1; 16px 600 #f2f0e4 lh 1.3</td></tr>
+<tr><td>.chevron</td><td>#888888; open: rotate(180deg) #d4af37</td></tr>
+<tr><td>.answer</td><td>padding 0 16px 16px calc(16px + 34px + 12px) = 62px left; 14px lh 1.5 #888888</td></tr>
+<tr><td>.note</td><td>flex start gap 8px; margin 16px 0 0; padding 12px 16px; radius 8px; background color-mix(#212121 55%, transparent); border rgba(212,175,55,.55); 14px lh 1.5 #888888; icon #888888 margin-top 2px</td></tr>
+</tbody></table>
+<details><summary>Verbatim StoreTerms.module.css</summary><pre><code class="lang-css">/* StoreTerms — T&amp;C accordion panel. Tokens only; gold-on-dark store surface. */
+
+.terms {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* ---- Header: sigil + title/subtitle + last-updated ----------------------
+ * .sigil reads --brand-accent-grad, which resolves to a SOLID #d4af37 under the
+ * flat re-skin (tokens.css); the token name is historical, not a live gradient. */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.sigil {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+}
+
+.updated {
+  flex: none;
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-3) 60%, transparent);
+  /* --text-mid: --text-dim on this ground is 4.29:1, under the AA floor. */
+  color: var(--text-mid);
+  font-size: var(--t-micro);
+  white-space: nowrap;
+}
+
+/* ---- Accordion list ---------------------------------------------------- */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  border: 1px solid transparent;
+  /* tokenised: was a raw `0.15s ease` */
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+
+.item[data-open="true"] {
+  border-color: var(--brand-accent-hairline);
+}
+
+/* hover = a colour shift, not a lift. No scale: these are full-width accordion
+ * rows, and every row answers identically whether open or closed. */
+.item:hover {
+  border-color: var(--brand-accent-hairline);
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-hi);
+}
+
+.trigger:hover .q {
+  color: var(--text-hi);
+}
+
+/* Gold number badge (01 … 05). */
+.num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
+  color: var(--brand-accent);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.q {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+}
+
+.chevron {
+  flex: none;
+  color: var(--text-mid);
+  /* tokenised: was a raw `0.2s ease` */
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.trigger:hover .chevron {
+  transform: scale(1.1); /* the uniform icon step */
+}
+.item[data-open="true"] .trigger:hover .chevron {
+  transform: rotate(180deg) scale(1.1);
+}
+
+.item[data-open="true"] .chevron {
+  transform: rotate(180deg);
+  color: var(--brand-accent);
+}
+
+.answer {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 34px + var(--space-3));
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---- Program note ------------------------------------------------------ */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-3) 55%, transparent);
+  border: 1px solid var(--border);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  /* --text-mid: --text-dim on this ground is ~4.2:1, under the AA floor, and
+   * the programme note is functional copy. */
+  color: var(--text-mid);
+}
+
+.noteIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .item {
+    transition: none;
+  }
+  /* absent, not instant — the open/closed rotation stays (it is state, not
+   * decoration); only the hover magnification goes. */
+  .trigger:hover .chevron {
+    transform: none;
+  }
+  .item[data-open="true"] .trigger:hover .chevron {
+    transform: rotate(180deg);
+  }
+}</code></pre></details>
+<h4>6–7. States / Motion</h4><p>Single-open (open index or null). Hover: item border gold; chevron scale(1.1) (open: rotate(180deg) scale(1.1)). Item border 200ms, chevron transform 200ms ease-standard; answer appears instantly (conditionally mounted). Reduced motion: no transitions, no hover scale. No focus-visible rule on .trigger.</p>
+<h4>8. Copy</h4>
+<table><thead><tr><th>#</th><th>Question</th><th>Answer</th></tr></thead><tbody>
+<tr><td>01</td><td>Làm sao để có điểm thưởng?</td><td>Bạn nhận điểm thưởng từ các hoạt động trên Yaobet như thăng cấp, thưởng tuần và thưởng tháng. Điểm sẽ được cộng tự động vào tài khoản để bạn đổi quà.</td></tr>
+<tr><td>02</td><td>Đổi quà như thế nào?</td><td>Chọn phần quà bạn muốn và nhấn Xác nhận đổi, quà sẽ được ghi nhận ngay. Lưu ý: điểm đã đổi sẽ không được hoàn lại, bạn hãy kiểm tra kỹ trước khi xác nhận nhé.</td></tr>
+<tr><td>03</td><td>Thời gian chờ là gì?</td><td>Mỗi vật phẩm đều có một khoảng thời gian chờ nhất định tùy theo giá trị. Sau khi bạn đổi, thời gian chờ sẽ bắt đầu tính. Chỉ cần đợi hết khoảng thời gian này, số điểm cần để đổi sẽ trở về mức thấp nhất.</td></tr>
+<tr><td>04</td><td>Đổi sớm là gì?</td><td>Khi vật phẩm đang trong thời gian chờ, bạn vẫn có thể bỏ qua bằng cách đổi sớm. Tuy nhiên, đổi sớm sẽ cần mức quy đổi cao hơn bình thường, và càng đổi sớm liên tiếp, mức quy đổi sẽ càng tăng. Số điểm cụ thể luôn hiển thị trên nút đổi để bạn cân nhắc trước khi quyết định.</td></tr>
+<tr><td>05</td><td>Tại sao lại hết lượt đổi?</td><td>Mỗi vật phẩm có số lần quy đổi nhất định cho mỗi tài khoản. Khi đã đổi hết số lần tối đa, bạn chỉ cần đợi thời gian chờ trở về 0 là có thể đổi tiếp.</td></tr>
+</tbody></table>
+<p>Header: "§", "Điều khoản &amp; điều kiện", "Quy định về việc tích lũy và sử dụng điểm thưởng", "Cập nhật lần cuối · —" (literal em dash, no date). Note: "Chương trình có thể thay đổi hoặc kết thúc mà không cần báo trước; quyết định cuối cùng thuộc về ban quản trị. Nếu cần hỗ trợ, vui lòng liên hệ bộ phận chăm sóc khách hàng."</p>
+<h4>9–10</h4><p>Static content. Answer panel is only in the DOM while open (aria-controls points at a missing id when closed).</p>
+</section>
+

@@ -1,0 +1,316 @@
+<section>
+<h2 id="r-vip-tier-deck">TierDeck (coverflow tier selector)</h2>
+<h4>1. Purpose</h4><p>Five fanned tier cards the player can drag or tap to pick a tier; the chosen tier drives the comparison/matrix and level table.</p>
+<h4>2. Source</h4><p><code>src/components/vip/TierDeck.tsx</code>, <code>TierDeck.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">div.deck
+  div.stage  (pointerdown/move/up/cancel handlers)
+    for each tier i:
+      button.card[.cardSelected]  aria-pressed=isSelected  aria-label=tier name
+          style: backgroundColor=tier.acc; transform; zIndex; opacity
+        span.glyph aria-hidden  "♛"        (watermark)
+        isCurrent &amp;&amp; span.here  copy.youAreHere
+        span.face
+          span.cardName    tier name
+          span.cardLevels  "{levelWord} 1–10"
+          span.cardWager   "{needWager} {tier.unlock}"
+  div.dots role=tablist aria-label=copy.allTiers
+    for each tier: button.dot[.dotActive] role=tab aria-selected aria-label=tier name</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>tiers</td><td>VipTierDef[]</td><td>cards</td></tr>
+<tr><td>selected</td><td>number</td><td>centre card</td></tr>
+<tr><td>onSelect</td><td>(i) =&gt; void</td><td>tap / snap / dot</td></tr>
+<tr><td>currentTierIndex</td><td>number | null</td><td>null = guest (no "Bạn ở đây", no locked-ahead dimming)</td></tr>
+<tr><td>lang</td><td>Lang</td><td>copy</td></tr></tbody></table>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.deck</td><td>flex column; gap 16px</td><td></td></tr>
+<tr><td>.stage</td><td>relative; height 220px; width 100%; touch-action pan-y; overflow hidden; user-select none</td><td>≤560px: height 196px</td></tr>
+<tr><td>.card</td><td>absolute; left 50%; top 50%; 232×148px; padding 16px; radius 16px; border 1px solid color-mix(#0b0a07 55%, transparent) = rgba(11,10,7,.55); colour #0b0a07; text-align left; overflow hidden; font inherit; transform-origin center; will-change transform, opacity; background-color inline tier.acc</td><td></td></tr>
+<tr><td>.cardSelected</td><td>border-color #e3c15a</td><td></td></tr>
+<tr><td>.glyph</td><td>absolute; right −6px; bottom −18px; font-size 116px; line-height 1; pointer-events none; colour rgba(11,10,7,.16)</td><td></td></tr>
+<tr><td>.here</td><td>absolute; top 12px; right 12px; padding 2px 8px; radius pill; background rgba(11,10,7,.82); colour #f6e39a; 12px; 600; letter-spacing 0.02em</td><td></td></tr>
+<tr><td>.face</td><td>absolute; left/right/bottom 16px; flex column; gap 2px</td><td></td></tr>
+<tr><td>.cardName</td><td>Montserrat 22px 700; line-height 1.1; letter-spacing 0.02em</td><td></td></tr>
+<tr><td>.cardLevels</td><td>12px 600; letter-spacing .08em; uppercase; colour rgba(11,10,7,.68)</td><td></td></tr>
+<tr><td>.cardWager</td><td>14px 600; colour rgba(11,10,7,.82)</td><td></td></tr>
+<tr><td>.dots</td><td>flex; gap 8px; centred</td><td></td></tr>
+<tr><td>.dot</td><td>8×8px; padding 0; border 0; radius pill; background rgba(227,193,90,.26)</td><td></td></tr>
+<tr><td>.dotActive</td><td>width 22px; background #e3c15a</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim TierDeck.module.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Tier coverflow deck. The .stage is the static, non-translating drag surface;
+ * every .card positions itself absolutely at stage-centre and applies its own
+ * coverflow transform (set inline from JS).
+ *
+ * FLAT: faces are SOLID tier accents (not metallic gradients), the selected
+ * card is marked by a BORDER-COLOUR change (never a ring/glow shadow), and the
+ * diagonal sheen is gone. Every card is the SAME 232×148 box and NO card
+ * carries a :hover transform — the coverflow scale is a carousel depth cue
+ * keyed to |index − selected| (symmetric, user-driven, identical for Bronze at
+ * centre and Diamond at centre), NOT a rank-by-value size cue (ruling B1).
+ * ==========================================================================*/
+
+.deck {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Static drag surface — never translates; clips the fan. */
+.stage {
+  position: relative;
+  height: 220px;
+  width: 100%;
+  touch-action: pan-y;
+  overflow: hidden;
+  user-select: none;
+}
+
+.card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 232px;
+  height: 148px;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--vip-page-bg) 55%, transparent);
+  background-size: cover;
+  background-position: center;
+  color: var(--vip-page-bg);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  font: inherit;
+  transform-origin: center center;
+  /* transform / opacity / zIndex are set inline per card. */
+  transition: border-color var(--dur-fast) var(--ease-standard);
+  will-change: transform, opacity;
+}
+
+/* selected = a border-colour change, the flat idiom. The old treatment was a
+ * 2px ring + a 44px bloom + --glow-gold; note that list was also INVALID CSS
+ * (--glow-gold resolves to `none`, which is illegal inside a shadow list), so
+ * the browser dropped the whole declaration and the ring never painted. */
+.cardSelected {
+  border-color: var(--vip-gold-mid);
+}
+
+/* Faint watermark VIP glyph. */
+.glyph {
+  position: absolute;
+  right: -6px;
+  bottom: -18px;
+  font-size: 116px;
+  line-height: 1;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--vip-page-bg) 16%, transparent);
+}
+
+.here {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--vip-page-bg) 82%, transparent);
+  color: var(--vip-gold-end);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.02em;
+}
+
+.face {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardName {
+  font-family: var(--brand-font-display);
+  font-size: 22px;
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.cardLevels {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--vip-page-bg) 68%, transparent);
+}
+
+.cardWager {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: color-mix(in srgb, var(--vip-page-bg) 82%, transparent);
+}
+
+/* Pagination dots. */
+.dots {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  align-items: center;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--vip-gold-mid) 26%, transparent);
+  cursor: pointer;
+  transition:
+    width var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+.dot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* solid, not the 3-stop gradient — this is a &lt;button&gt; */
+.dotActive {
+  width: 22px;
+  background: var(--vip-gold-mid);
+}
+
+/* Tighten the stage on narrow screens; the front card (232px) stays on-canvas
+ * and the fanned side cards clip cleanly against overflow:hidden. */
+@media (max-width: 560px) {
+  .stage {
+    height: 196px;
+  }
+}</code></pre></details>
+<h4>Per-card transform (verbatim logic)</h4>
+<pre><code class="lang-tsx">/** px of horizontal drag that maps to one whole card step. */
+const DRAG_PER_CARD = 120;
+/** movement beyond this (px) is a drag, not a tap. */
+const TAP_SLOP = 4;
+
+export function TierDeck({
+  tiers,
+  selected,
+  onSelect,
+  currentTierIndex,
+  lang,
+}: {
+  tiers: VipTierDef[];
+  selected: number;
+  onSelect: (index: number) =&gt; void;
+  currentTierIndex: number | null;
+  lang: Lang;
+}) {
+  const copy = getVipCopy(lang);
+  const maxIndex = tiers.length - 1;
+
+  // Live drag offset in px (0 when idle). Container never translates; this
+  // only shifts effectiveSelected so each card recomputes its own transform.
+  const [drag, setDrag] = useState(0);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const moved = useRef(false);
+
+  const effectiveSelected = selected - drag / DRAG_PER_CARD;
+
+  const clampIndex = (n: number) =&gt; Math.min(maxIndex, Math.max(0, n));
+
+  function onPointerDown(e: React.PointerEvent&lt;HTMLDivElement&gt;) {
+    dragging.current = true;
+    moved.current = false;
+    startX.current = e.clientX;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent&lt;HTMLDivElement&gt;) {
+    if (!dragging.current) return;
+    const d = e.clientX - startX.current;
+    if (Math.abs(d) &gt; TAP_SLOP) moved.current = true;
+    setDrag(d);
+  }
+
+  function endDrag(e: React.PointerEvent&lt;HTMLDivElement&gt;) {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    const snapped = clampIndex(Math.round(selected - drag / DRAG_PER_CARD));
+    setDrag(0);
+    if (moved.current &amp;&amp; snapped !== selected) onSelect(snapped);
+  }
+
+  return (
+    &lt;div className={styles.deck}&gt;
+      &lt;div
+        className={styles.stage}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      &gt;
+        {tiers.map((tier, i) =&gt; {
+          const o = i - effectiveSelected;
+          const abs = Math.abs(o);
+          const isSelected = abs &lt; 0.5;
+          const isCurrent =
+            currentTierIndex !== null &amp;&amp; i === currentTierIndex;
+          const lockedAhead =
+            currentTierIndex !== null &amp;&amp; i &gt; currentTierIndex;
+          const grayed = lockedAhead &amp;&amp; !isSelected;
+
+          // Coverflow depth cue: scale is a function of DISTANCE FROM THE
+          // SELECTED CARD only — symmetric and user-driven, so Bronze at centre
+          // is exactly as large as Diamond at centre. It is not a rank-by-value
+          // size cue (ruling B1), and no card carries a :hover transform.
+          const scale = Math.max(0.55, 1 - abs * 0.09);
+          const opacity = isSelected ? 1 : Math.max(0.3, 1 - abs * 0.2);
+
+          const style: React.CSSProperties = {
+            // SOLID tier accent. tier.grad is a 3-stop metallic gradient and
+            // this element is a &lt;button&gt; — gradients are banned on buttons.
+            // The flat accent also fixes contrast: the old gradient started at
+            // #8c5a2b (bronze), on which the card's dark ink barely read.
+            backgroundColor: tier.acc,
+            transform: `translate(-50%, -50%) translateX(${o * 78}px) translateY(${
+              abs * 8
+            }px) rotate(${o * 5}deg) scale(${scale})`,
+            zIndex: Math.round(40 - abs * 5),
+            // locked-ahead recedes by OPACITY alone; the old grayscale+brightness
+            // filter is banned depth-adjacent styling and is now unnecessary
+            // because the faces are flat solids.
+            opacity: grayed ? Math.min(opacity, 0.42) : opacity,
+          };</code></pre>
+<table><thead><tr><th>At rest, selected = 2 (Vàng)</th><th>Đồng</th><th>Bạc</th><th>Vàng</th><th>Bạch Kim</th><th>Kim Cương</th></tr></thead><tbody>
+<tr><td>o</td><td>−2</td><td>−1</td><td>0</td><td>1</td><td>2</td></tr>
+<tr><td>translateX / translateY</td><td>−156px / 16px</td><td>−78px / 8px</td><td>0 / 0</td><td>78px / 8px</td><td>156px / 16px</td></tr>
+<tr><td>rotate</td><td>−10deg</td><td>−5deg</td><td>0</td><td>5deg</td><td>10deg</td></tr>
+<tr><td>scale</td><td>0.82</td><td>0.91</td><td>1</td><td>0.91</td><td>0.82</td></tr>
+<tr><td>z-index</td><td>30</td><td>35</td><td>40</td><td>35</td><td>30</td></tr>
+<tr><td>opacity guest</td><td>0.6</td><td>0.8</td><td>1</td><td>0.8</td><td>0.6</td></tr>
+<tr><td>opacity member (current = 2)</td><td>0.6</td><td>0.8</td><td>1</td><td>0.42</td><td>0.42</td></tr>
+<tr><td>face colour</td><td>#e0a56b</td><td>#cbd3df</td><td>#e3c15a</td><td>#cfd6e0</td><td>#9fd7ee</td></tr>
+</tbody></table>
+<p>Full transform string: <code>translate(-50%, -50%) translateX({o·78}px) translateY({|o|·8}px) rotate({o·5}deg) scale({scale})</code>.</p>
+<h4>6. States</h4><p>Selected (|o| &lt; 0.5): border #e3c15a, aria-pressed true, full opacity. No hover transform. Member current tier shows "Bạn ở đây" tag (on Vàng). Locked-ahead (member, i &gt; current, not selected): opacity min(op, 0.42). Dot active: index round(effectiveSelected) (live during drag). Dot focus-visible 2px #6ea8ff offset 2px. Card buttons have no focus style of their own (browser default outline).</p>
+<h4>7. Motion</h4><p>Card: only border-color transitions (200ms ease-standard); the transform/opacity have NO transition, so a tap-select jumps instantly and dragging tracks the pointer 1:1. Dot: width/background 200ms ease-standard.</p>
+<h4>8. Copy</h4><p>"♛", tier name, "CẤP 1–10" / "LEVEL 1–10", "Cược tuần 50,000 … 3,000,000" / "Weekly wager …", "Bạn ở đây" / "You are here".</p>
+<h4>9. Data</h4><p>TIERS (acc, unlock, nameKey).</p>
+<h4>10. Behaviour &amp; a11y</h4>
+<ul><li>Pointer down on the stage: capture pointer, record startX. Move: drag = clientX − startX; |drag| &gt; 4px (TAP_SLOP) marks it a drag. Every card recomputes with effectiveSelected = selected − drag/120 (DRAG_PER_CARD = 120px per card step); the container never translates.</li>
+<li>Pointer up/cancel: snapped = clamp(round(selected − drag/120), 0, 4); drag reset to 0; if it was a drag and snapped ≠ selected → onSelect(snapped). Cards jump to the new rest positions without animation.</li>
+<li>Click on a card: ignored if the gesture was a drag; else onSelect(i). Click on a dot: onSelect(i).</li>
+<li>VipProgram.onSelect also resets the hidden level cursor. Keyboard: cards and dots are tabbable buttons; no arrow-key handling.</li></ul>
+<div class="callout warn">The dots use <code>role="tab"</code> inside <code>role="tablist"</code> but control no tabpanel (no aria-controls), and the cards duplicate the same selection with <code>aria-pressed</code>.</div>
+</section>
+

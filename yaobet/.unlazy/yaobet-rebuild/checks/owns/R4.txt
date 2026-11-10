@@ -1,0 +1,11 @@
+src/components/vip/CurrentTierCard.tsx
+src/components/vip/TierLadder.tsx
+src/components/vip/PrivilegeTable.tsx
+src/components/vip/PerkGallery.tsx
+src/components/vip/VipRules.tsx
+src/components/vip/VipSection.tsx
+src/components/vip/copy.ts
+src/components/vip/index.ts
+src/app/tier/**
+src/app/cau-lac-bo/**
+src/styles/areas/vip.css

@@ -1,0 +1,898 @@
+[
+ {
+  "file": "00-01-i-how-to-use.html",
+  "id": "i-how-to-use",
+  "title": "How to use this guide",
+  "kb": 2,
+  "lines": 15,
+  "h3": 1,
+  "h3_titles": [
+   "Conventions"
+  ]
+ },
+ {
+  "file": "00-02-i-rebuild-order.html",
+  "id": "i-rebuild-order",
+  "title": "Rebuild order",
+  "kb": 2,
+  "lines": 14,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "00-03-i-runtime.html",
+  "id": "i-runtime",
+  "title": "Runtime and mock auth",
+  "kb": 2,
+  "lines": 19,
+  "h3": 1,
+  "h3_titles": [
+   "Package scripts"
+  ]
+ },
+ {
+  "file": "00-04-i-routes.html",
+  "id": "i-routes",
+  "title": "Route inventory",
+  "kb": 4,
+  "lines": 34,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "00-05-i-discrepancies.html",
+  "id": "i-discrepancies",
+  "title": "Known discrepancies to reproduce",
+  "kb": 5,
+  "lines": 22,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "01-01-f-stack.html",
+  "id": "f-stack",
+  "title": "Stack &amp; project setup",
+  "kb": 41,
+  "lines": 609,
+  "h3": 10,
+  "h3_titles": [
+   "package.json",
+   "next.config.ts",
+   "tsconfig.json — paths &amp; aliases",
+   "eslint.config.mjs",
+   "scripts/token-lint.mjs — the token-contract gate (rebuild MUST reproduce)",
+   "verify-app-ds.mjs — app-wide flat-design browser sweep",
+   "Other root files",
+   "Folder layout of src/",
+   "App Router conventions used",
+   "Server vs Client component split"
+  ]
+ },
+ {
+  "file": "01-02-f-tokens.html",
+  "id": "f-tokens",
+  "title": "Token contract — src/styles/tokens.css",
+  "kb": 59,
+  "lines": 407,
+  "h3": 19,
+  "h3_titles": [
+   "Colour — canvas &amp; surfaces (GROUP A, locked)",
+   "Colour — semantic (GROUP A; --win/--loss/--error/--focus-ring PINNED)",
+   "Colour — text ladder (GROUP A)",
+   "Colour — border &amp; tint (GROUP A)",
+   "Typography scale, line-height, weight (GROUP A)",
+   "Spacing (GROUP A)",
+   "Radius (GROUP A)",
+   "Elevation / shadow — all neutralised to none",
+   "Z-index ladder (GROUP A)",
+   "Layout / chrome sizes",
+   "Grid / tile / band spacing system",
+   "Motion — durations &amp; easings (GROUP A)",
+   "Tap targets (GROUP A)",
+   "Member-hub premium layer (surfaces, gradients, progress)",
+   "GROUP B — raw ramp (default-brand source literals; components must NOT read)",
+   "GROUP B — font stacks (raw ramp)",
+   "GROUP B — --brand-* indirection (the only vars a [data-brand] re-points)",
+   "Luxury VIP layer (/vip page-scoped palette, --vip-*)",
+   "tokens.css verbatim"
+  ]
+ },
+ {
+  "file": "01-03-f-themes.html",
+  "id": "f-themes",
+  "title": "themes.css &amp; brands.css — the two orthogonal axes",
+  "kb": 11,
+  "lines": 95,
+  "h3": 3,
+  "h3_titles": [
+   "[data-theme=\"obsidian\"] — themes.css",
+   "[data-brand] blocks — brands.css",
+   "The /vip luxury palette"
+  ]
+ },
+ {
+  "file": "01-04-f-typography.html",
+  "id": "f-typography",
+  "title": "Typography — fonts, scale, numeric rules",
+  "kb": 11,
+  "lines": 100,
+  "h3": 5,
+  "h3_titles": [
+   "next/font loaders (src/app/layout.tsx)",
+   "Type scale tokens",
+   "Document-level type cascade (exact order)",
+   "Global utility hooks (non-module classes / attributes)",
+   "Numeric / tabular rules"
+  ]
+ },
+ {
+  "file": "01-05-f-motion.html",
+  "id": "f-motion",
+  "title": "Motion — motion.css + duration/easing tokens",
+  "kb": 6,
+  "lines": 49,
+  "h3": 1,
+  "h3_titles": [
+   "Every keyframe defined in src/ui (the foundation set)"
+  ]
+ },
+ {
+  "file": "01-06-f-reset.html",
+  "id": "f-reset",
+  "title": "reset.css, globals.css, stub.module.css, app/loading.tsx",
+  "kb": 12,
+  "lines": 217,
+  "h3": 3,
+  "h3_titles": [
+   "Global import order (globals.css)",
+   "app/stub.module.css — shared stub-page styles",
+   "app/loading.tsx — root Suspense fallback"
+  ]
+ },
+ {
+  "file": "01-07-f-root-layout.html",
+  "id": "f-root-layout",
+  "title": "Root layout &amp; provider tree",
+  "kb": 9,
+  "lines": 146,
+  "h3": 4,
+  "h3_titles": [
+   "Metadata &amp; viewport",
+   "&lt;html&gt; / &lt;body&gt;",
+   "Provider tree (src/app/providers.tsx, \"use client\")",
+   "What wraps every page"
+  ]
+ },
+ {
+  "file": "01-08-f-ui.html",
+  "id": "f-ui",
+  "title": "UI primitives — src/ui/*",
+  "kb": 272,
+  "lines": 3477,
+  "h3": 21,
+  "h3_titles": [
+   "src/ui/index.ts exports",
+   "Badge",
+   "Button",
+   "Card",
+   "Countdown",
+   "Dropdown",
+   "EmptyState",
+   "ErrorState",
+   "Icon",
+   "Modal",
+   "MoneyValue (+ DeltaAmount)",
+   "Odometer",
+   "Pill",
+   "Scroller",
+   "Sheet",
+   "Skeleton",
+   "TileSkeleton",
+   "useGridFill / useGridCols / computeGridFill",
+   "Tabs",
+   "Tile",
+   "ComingSoonTile"
+  ]
+ },
+ {
+  "file": "01-09-f-lib.html",
+  "id": "f-lib",
+  "title": "src/lib — formatters, copy catalog, RG helpers, types, mock auth, mock data",
+  "kb": 200,
+  "lines": 3258,
+  "h3": 6,
+  "h3_titles": [
+   "lib/format.ts — every formatter",
+   "lib/i18n.ts — the copy catalog (every key / value)",
+   "lib/rg.ts",
+   "lib/types.ts — domain &amp; envelope types",
+   "lib/auth/* — the mock auth model",
+   "lib/mock/* — fixture inventory"
+  ]
+ },
+ {
+  "file": "01-10-f-assets.html",
+  "id": "f-assets",
+  "title": "Assets — public/ inventory",
+  "kb": 24,
+  "lines": 174,
+  "h3": 1,
+  "h3_titles": [
+   "Placeholder &amp; brand SVG sources (verbatim)"
+  ]
+ },
+ {
+  "file": "01-11-f-unused.html",
+  "id": "f-unused",
+  "title": "Unused / dead code — foundations area",
+  "kb": 6,
+  "lines": 5,
+  "h3": 1,
+  "h3_titles": [
+   "Hard-coded literals in src/ui (token-contract exceptions)"
+  ]
+ },
+ {
+  "file": "02-01-s-shell-h.html",
+  "id": "s-shell-h",
+  "title": "S1 · Global app shell",
+  "kb": 279,
+  "lines": 3855,
+  "h3": 17,
+  "h3_titles": [
+   "Root layout and provider tree",
+   "Shell layout grid at 375 / 768 / 1024 / 1440",
+   "AppShell",
+   "ShellChrome",
+   "Header (two-tier)",
+   "NavDropdown (Tier-2 category cell, the \"CategoryRail\")",
+   "MemberMenu (avatar dropdown)",
+   "NotificationBell and panel",
+   "CategorySheet (mobile)",
+   "Overlay and useFocusTrap (shell-local modal base)",
+   "BottomTabBar (mobile)",
+   "Footer (app-wide)",
+   "QuickActionRail (floating right rail)",
+   "RightRail (home desktop rail)",
+   "Countdown (shell-local)",
+   "Money (shell-local)",
+   "Logo usage"
+  ]
+ },
+ {
+  "file": "02-02-s-auth-h.html",
+  "id": "s-auth-h",
+  "title": "S2 · Auth (modal, fields, mock session)",
+  "kb": 58,
+  "lines": 781,
+  "h3": 3,
+  "h3_titles": [
+   "Mock session and modal state machine",
+   "AuthModal",
+   "AuthField"
+  ]
+ },
+ {
+  "file": "02-03-s-home-h.html",
+  "id": "s-home-h",
+  "title": "S3 · Home route \"/\"",
+  "kb": 128,
+  "lines": 1763,
+  "h3": 8,
+  "h3_titles": [
+   "Route template: /",
+   "HeroBand (hero carousel + progress line + navigator)",
+   "CategoryLauncher (mobile round icons)",
+   "StatsBar",
+   "ProviderGameGrid (provider tabs + fixed-tile game grid)",
+   "SportsLifestyle (sports cards + match cards)",
+   "SportsMatchCard",
+   "DevAuthToggle (dev only)"
+  ]
+ },
+ {
+  "file": "02-04-s-vertical-h.html",
+  "id": "s-vertical-h",
+  "title": "S4 · Vertical landing \"/[vertical]\"",
+  "kb": 46,
+  "lines": 603,
+  "h3": 5,
+  "h3_titles": [
+   "Route template: /[vertical]",
+   "CategoryPage",
+   "CategoryBanner",
+   "CategoryGrid",
+   "LiveOddsBoard (sports only)"
+  ]
+ },
+ {
+  "file": "02-05-s-promo-h.html",
+  "id": "s-promo-h",
+  "title": "S5 · Promotions \"/khuyen-mai\" and \"/khuyen-mai/[id]\"",
+  "kb": 38,
+  "lines": 525,
+  "h3": 5,
+  "h3_titles": [
+   "Route template: /khuyen-mai",
+   "PromoHero",
+   "PromoGrid",
+   "Route template: /khuyen-mai/[id]",
+   "PromoDetail"
+  ]
+ },
+ {
+  "file": "02-06-s-nav-map-h.html",
+  "id": "s-nav-map-h",
+  "title": "S6 · Sitemap and nav surfaces",
+  "kb": 6,
+  "lines": 35,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "02-07-s-unused-h.html",
+  "id": "s-unused-h",
+  "title": "S7 · Unused / dead code in shell, home, discovery",
+  "kb": 21,
+  "lines": 726,
+  "h3": 6,
+  "h3_titles": [
+   "AuthCluster (dead)",
+   "PromoChips (dead)",
+   "LiveGamesBand + JackpotTicker + LiveMatchCard (dead)",
+   "VipAisle (dead)",
+   "PartnerBand (dead)",
+   "HomeFooter (dead)"
+  ]
+ },
+ {
+  "file": "03-01-m-overview.html",
+  "id": "m-overview",
+  "title": "Member area &amp; account utilities — track M overview",
+  "kb": 11,
+  "lines": 70,
+  "h3": 2,
+  "h3_titles": [
+   "Token quick-reference (values this track resolves)",
+   "Auth model used by every member surface"
+  ]
+ },
+ {
+  "file": "03-02-m-member-layout.html",
+  "id": "m-member-layout",
+  "title": "m-member-layout — the (member) route-group frame",
+  "kb": 52,
+  "lines": 1019,
+  "h3": 4,
+  "h3_titles": [
+   "Route-group layout: src/app/(member)/layout.tsx",
+   "MemberSidebar — the member left rail",
+   "ProgressBar (inner component of MemberSidebar)",
+   "LogoutButton / LogoutModal"
+  ]
+ },
+ {
+  "file": "03-03-m-account.html",
+  "id": "m-account",
+  "title": "m-account — /tai-khoan, /bao-mat and the account components",
+  "kb": 36,
+  "lines": 819,
+  "h3": 6,
+  "h3_titles": [
+   "Route /tai-khoan",
+   "Route /bao-mat",
+   "AccountSections — hash-driven panel switcher",
+   "ProfileBasic — \"Hồ sơ cá nhân\"",
+   "SecurityCenter — \"Trung tâm an toàn\" (hash #bao-mat)",
+   "BankAccounts and CryptoAddresses (hashes #ngan-hang, #vi-tien-ao)"
+  ]
+ },
+ {
+  "file": "03-04-m-wallet.html",
+  "id": "m-wallet",
+  "title": "m-wallet — /vi-tien and the wallet components",
+  "kb": 45,
+  "lines": 1159,
+  "h3": 7,
+  "h3_titles": [
+   "Route /vi-tien",
+   "WalletTabs — wallet orchestrator and card-style tab strip",
+   "WalletBalanceHeader",
+   "DepositPanel — Nạp tiền",
+   "WithdrawPanel — Rút tiền",
+   "FundTransferPanel — Chuyển quỹ",
+   "WalletHistory — Lịch sử (transaction history rows)"
+  ]
+ },
+ {
+  "file": "03-05-m-messages.html",
+  "id": "m-messages",
+  "title": "m-messages — /tin-nhan and MessageCenter",
+  "kb": 16,
+  "lines": 369,
+  "h3": 2,
+  "h3_titles": [
+   "Route /tin-nhan",
+   "MessageCenter"
+  ]
+ },
+ {
+  "file": "03-06-m-referral.html",
+  "id": "m-referral",
+  "title": "m-referral — /gioi-thieu, /dai-ly and the referral components",
+  "kb": 33,
+  "lines": 861,
+  "h3": 7,
+  "h3_titles": [
+   "Route /gioi-thieu",
+   "Route /dai-ly",
+   "ReferralKpiHeader — \"Tổng quan thưởng\"",
+   "InviteTools — \"Công cụ mời bạn bè\"",
+   "CommissionPanel — \"Hoa hồng giới thiệu\"",
+   "StepExplainer — \"Cách hoạt động\"",
+   "AgentTiers — \"Cấp đại lý\" (/dai-ly only)"
+  ]
+ },
+ {
+  "file": "03-07-m-contribution.html",
+  "id": "m-contribution",
+  "title": "m-contribution — /cuoc-hop-le (game-contribution / valid-bet rate table)",
+  "kb": 65,
+  "lines": 1460,
+  "h3": 14,
+  "h3_titles": [
+   "Route /cuoc-hop-le",
+   "ContributionTabs",
+   "PageIntro",
+   "ContributionRoot — the rate-table island",
+   "RateFilters (+ SelectFilter)",
+   "SearchField (+ foldQuery)",
+   "ResultStatus",
+   "NotFoundResolver",
+   "FilterNotice",
+   "RateTable",
+   "RateCell",
+   "Pager",
+   "TableFoot",
+   "RateTableSkeleton"
+  ]
+ },
+ {
+  "file": "03-08-m-restricted.html",
+  "id": "m-restricted",
+  "title": "m-restricted — /game-han-che (bonus-restricted games) and the \"Game hạn chế\" tab",
+  "kb": 20,
+  "lines": 487,
+  "h3": 5,
+  "h3_titles": [
+   "Route /game-han-che",
+   "RestrictedIntro",
+   "RestrictedRoot",
+   "RestrictedFilters",
+   "RestrictedTable and RestrictedFoot"
+  ]
+ },
+ {
+  "file": "03-09-m-utility.html",
+  "id": "m-utility",
+  "title": "m-utility — /hoan-tra, /lich-su, /ho-tro, /tro-giup, /tai-app, /phong-cach",
+  "kb": 6,
+  "lines": 68,
+  "h3": 2,
+  "h3_titles": [
+   "Redirect routes",
+   "The stub page pattern (src/app/stub.module.css)"
+  ]
+ },
+ {
+  "file": "03-10-m-unused.html",
+  "id": "m-unused",
+  "title": "m-unused — Unused / dead code in the member area",
+  "kb": 5,
+  "lines": 24,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "03-11-m-discrepancies.html",
+  "id": "m-discrepancies",
+  "title": "m-discrepancies — roll-up of contradictions in track M",
+  "kb": 2,
+  "lines": 13,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-01-r-vip.html",
+  "id": "r-vip",
+  "title": "R1 · VIP — overview, routes and the luxury palette",
+  "kb": 38,
+  "lines": 376,
+  "h3": 6,
+  "h3_titles": [
+   "Resolved global tokens used across track R",
+   "The /vip luxury palette (page-scoped)",
+   "src/lib/vip — data, formulas, computed numbers",
+   "Route /vip",
+   "Route /tier",
+   "Route /cau-lac-bo"
+  ]
+ },
+ {
+  "file": "04-02-r-vip-program.html",
+  "id": "r-vip-program",
+  "title": "VipProgram (+ language toggle)",
+  "kb": 6,
+  "lines": 128,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-03-r-vip-section-heading.html",
+  "id": "r-vip-section-heading",
+  "title": "VipSectionHeading",
+  "kb": 1,
+  "lines": 13,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-04-r-vip-hero-guest.html",
+  "id": "r-vip-hero-guest",
+  "title": "VipHeroGuest",
+  "kb": 8,
+  "lines": 195,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-05-r-vip-hero-member.html",
+  "id": "r-vip-hero-member",
+  "title": "VipHeroMember",
+  "kb": 10,
+  "lines": 262,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-06-r-vip-level-ring.html",
+  "id": "r-vip-level-ring",
+  "title": "LevelRing",
+  "kb": 4,
+  "lines": 134,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-07-r-vip-tier-deck.html",
+  "id": "r-vip-tier-deck",
+  "title": "TierDeck (coverflow tier selector)",
+  "kb": 14,
+  "lines": 316,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-08-r-vip-privilege-comparison.html",
+  "id": "r-vip-privilege-comparison",
+  "title": "PrivilegeComparison (member)",
+  "kb": 7,
+  "lines": 200,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-09-r-vip-privilege-matrix.html",
+  "id": "r-vip-privilege-matrix",
+  "title": "PrivilegeMatrix (guest)",
+  "kb": 8,
+  "lines": 245,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-10-r-vip-level-table.html",
+  "id": "r-vip-level-table",
+  "title": "LevelTable",
+  "kb": 9,
+  "lines": 208,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-11-r-vip-faq.html",
+  "id": "r-vip-faq",
+  "title": "VipFaq",
+  "kb": 12,
+  "lines": 271,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-12-r-vip-current-tier-card.html",
+  "id": "r-vip-current-tier-card",
+  "title": "CurrentTierCard (/tier)",
+  "kb": 8,
+  "lines": 217,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-13-r-vip-tier-ladder.html",
+  "id": "r-vip-tier-ladder",
+  "title": "TierLadder (/tier)",
+  "kb": 6,
+  "lines": 156,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-14-r-vip-privilege-table.html",
+  "id": "r-vip-privilege-table",
+  "title": "PrivilegeTable (/tier)",
+  "kb": 5,
+  "lines": 135,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-15-r-vip-perk-gallery.html",
+  "id": "r-vip-perk-gallery",
+  "title": "PerkGallery (/tier)",
+  "kb": 4,
+  "lines": 110,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-16-r-vip-rules.html",
+  "id": "r-vip-rules",
+  "title": "VipRules (/tier)",
+  "kb": 3,
+  "lines": 87,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-17-r-vip-section.html",
+  "id": "r-vip-section",
+  "title": "VipSection (/tier)",
+  "kb": 2,
+  "lines": 40,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-18-r-store.html",
+  "id": "r-store",
+  "title": "R2 · Points store — route /cua-hang",
+  "kb": 10,
+  "lines": 136,
+  "h3": 2,
+  "h3_titles": [
+   "src/lib/store/escalation.ts — the restart-cooldown math",
+   "Mock catalogue (src/lib/mock/store.ts)"
+  ]
+ },
+ {
+  "file": "04-19-r-store-points-header.html",
+  "id": "r-store-points-header",
+  "title": "PointsHeader",
+  "kb": 3,
+  "lines": 81,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-20-r-store-product-grid.html",
+  "id": "r-store-product-grid",
+  "title": "ProductGrid (+ filter tabs)",
+  "kb": 3,
+  "lines": 33,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-21-r-store-product-card.html",
+  "id": "r-store-product-card",
+  "title": "ProductCard",
+  "kb": 17,
+  "lines": 430,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-22-r-store-redeem-dialog.html",
+  "id": "r-store-redeem-dialog",
+  "title": "RedeemDialog",
+  "kb": 17,
+  "lines": 424,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-23-r-store-terms.html",
+  "id": "r-store-terms",
+  "title": "StoreTerms",
+  "kb": 9,
+  "lines": 250,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-24-r-lottery.html",
+  "id": "r-lottery",
+  "title": "R3 · Vé số (scratch card) — route /ve-so",
+  "kb": 2,
+  "lines": 16,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-25-r-lottery-root.html",
+  "id": "r-lottery-root",
+  "title": "LotteryRoot (hub)",
+  "kb": 16,
+  "lines": 434,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-26-r-lottery-engine.html",
+  "id": "r-lottery-engine",
+  "title": "Scratch-card outcome engine (src/lib/mock/lottery.ts)",
+  "kb": 5,
+  "lines": 97,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-27-r-lottery-scratch-card.html",
+  "id": "r-lottery-scratch-card",
+  "title": "ScratchCardGame / ScratchCardStage (the ticket overlay)",
+  "kb": 30,
+  "lines": 756,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-28-r-lottery-scratch-surface.html",
+  "id": "r-lottery-scratch-surface",
+  "title": "ScratchSurface (canvas coating) + coverArt",
+  "kb": 25,
+  "lines": 669,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-29-r-lottery-outcome.html",
+  "id": "r-lottery-outcome",
+  "title": "OutcomeFrame (+ useCountUp)",
+  "kb": 9,
+  "lines": 249,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-30-r-collection.html",
+  "id": "r-collection",
+  "title": "R4 · Bộ sưu tập (card collection) — routes",
+  "kb": 8,
+  "lines": 158,
+  "h3": 3,
+  "h3_titles": [
+   "Route /bo-suu-tap",
+   "Route /bo-suu-tap/cua-toi",
+   "Route /dev/collection-ports"
+  ]
+ },
+ {
+  "file": "04-31-r-collection-lib.html",
+  "id": "r-collection-lib",
+  "title": "src/lib/collection — data, rates and state machines",
+  "kb": 33,
+  "lines": 729,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-32-r-collection-app.html",
+  "id": "r-collection-app",
+  "title": "CollectionApp (the /bo-suu-tap surface)",
+  "kb": 25,
+  "lines": 625,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-33-r-collection-pack-stage.html",
+  "id": "r-collection-pack-stage",
+  "title": "PackStage (pack opening)",
+  "kb": 19,
+  "lines": 437,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-34-r-collection-card-art.html",
+  "id": "r-collection-card-art",
+  "title": "CardArt (trading-card face) + rarity styling",
+  "kb": 11,
+  "lines": 224,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-35-r-collection-ceremony.html",
+  "id": "r-collection-ceremony",
+  "title": "RewardCeremony (exchange confirm + reveal ceremony)",
+  "kb": 16,
+  "lines": 448,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-36-r-collection-terms.html",
+  "id": "r-collection-terms",
+  "title": "CollectionTerms",
+  "kb": 9,
+  "lines": 176,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-37-r-collection-history.html",
+  "id": "r-collection-history",
+  "title": "CollectionHistory",
+  "kb": 5,
+  "lines": 126,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-38-r-collection-my-cards.html",
+  "id": "r-collection-my-cards",
+  "title": "MyCards (inventory)",
+  "kb": 12,
+  "lines": 393,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-39-r-collection-card-detail.html",
+  "id": "r-collection-card-detail",
+  "title": "CardDetail",
+  "kb": 5,
+  "lines": 179,
+  "h3": 0,
+  "h3_titles": []
+ },
+ {
+  "file": "04-40-r-unused.html",
+  "id": "r-unused",
+  "title": "R5 · Unused / dead code and open discrepancies (track R)",
+  "kb": 7,
+  "lines": 58,
+  "h3": 2,
+  "h3_titles": [
+   "Dead or unreachable code",
+   "Discrepancies index (all callouts in this fragment)"
+  ]
+ },
+ {
+  "file": "05-01-v-checklist.html",
+  "id": "v-checklist",
+  "title": "Acceptance checklist",
+  "kb": 8,
+  "lines": 114,
+  "h3": 6,
+  "h3_titles": [
+   "1. Static checks",
+   "2. Routes",
+   "3. Visual comparison",
+   "4. Copy",
+   "5. States, motion and accessibility",
+   "Screenshot capture recipe"
+  ]
+ }
+]

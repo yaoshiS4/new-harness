@@ -1,0 +1,781 @@
+<section id="s-auth">
+<h2 id="s-auth-h">S2 · Auth (modal, fields, mock session)</h2>
+
+<h3 id="s-auth-state">Mock session and modal state machine</h3>
+<p><strong>Source.</strong> <code>src/lib/auth/session.tsx</code> (MockAuthProvider, useAuth), <code>src/lib/auth/modal.tsx</code> (AuthModalProvider, useAuthModal), <code>src/lib/auth/fixtures.ts</code>, <code>src/lib/auth/guard.ts</code> (useRequireAuth).</p>
+<table><thead><tr><th>authState</th><th>user</th><th>Shell effect</th></tr></thead><tbody>
+<tr><td>"guest"</td><td>null</td><td>Header shows the Đăng ký / Đăng nhập buttons. BottomTabBar NẠP/Ví/Tài khoản open the modal. Game tiles open the modal.</td></tr>
+<tr><td>"level-0"</td><td>{id:"u_new", displayName:"Thành viên mới", memberId:"YB-668812", vipLevel:0, vipTierName:"Tân thủ", verified:false, unreadMessages:1}</td><td>Member chrome.</td></tr>
+<tr><td>"tiered" (INITIAL)</td><td>{id:"u_vip", displayName:"Nguyễn Văn An", memberId:"YB-880066", vipLevel:3, vipTierName:"Bạch Kim", verified:true, unreadMessages:2}</td><td>Member chrome.</td></tr>
+</tbody></table>
+<p><strong>Transitions.</strong> <code>signIn(as = "tiered")</code> sets the state. <code>signOut()</code> sets guest. <code>cycleDevState()</code> cycles guest → level-0 → tiered → guest (dev toggle only). The state is React state only, so a page reload resets it to "tiered". Modal state: <code>{open:false, mode:"login", resumeIntent:{action:"none"}}</code>. <code>openAuthModal({mode = "login", resumeIntent = {action:"none"}})</code> replaces all three fields. <code>closeAuthModal()</code> sets open:false and keeps mode and intent. <code>consumeResumeIntent()</code> returns the intent and resets it to none. Modes: "login" | "register" | "forgot". <code>useRequireAuth()</code> returns <code>{authState, allowed: state !== "guest", promptAuth(intent?) → openAuthModal({mode:"login", resumeIntent: intent})}</code>.</p>
+<table><thead><tr><th>Entry point</th><th>Call</th></tr></thead><tbody>
+<tr><td>Header guest "Đăng ký"</td><td>openAuthModal({mode:"register"})</td></tr>
+<tr><td>Header guest "Đăng nhập"</td><td>openAuthModal({mode:"login"})</td></tr>
+<tr><td>BottomTabBar guest NẠP</td><td>openAuthModal({mode:"register", resumeIntent:{action:"deposit", isFirstDeposit:true}})</td></tr>
+<tr><td>BottomTabBar guest Ví / Tài khoản</td><td>openAuthModal({mode:"login", resumeIntent:{action:"none"}})</td></tr>
+<tr><td>Game tile (home grid, category grid) as guest</td><td>promptAuth({action:"none"}), so mode login</td></tr>
+<tr><td>PromoDetail "Đăng nhập để tham gia" as guest</td><td>promptAuth(), so mode login, no intent</td></tr>
+</tbody></table>
+
+<h3 id="s-auth-modal">AuthModal</h3>
+<p><strong>Purpose.</strong> The single login / register / forgot-password surface. Below 640px it is a bottom sheet holding only the form. From 640px it is a 720px centred dialog with a 280px brand panel on the left.</p>
+<p><strong>Source.</strong> <code>src/components/auth/AuthModal.tsx</code>, <code>AuthModal.module.css</code>; it uses <a href="#s-overlay">Overlay</a> (presentation="auto", desktopMaxWidth=720), <a href="#s-auth-field">AuthField</a>, and <a href="#f-ui-button">Button</a> (variant gold, size lg, fullWidth, loading).</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">IF !open → null
+Overlay open onClose=handleClose presentation="auto" returnFocus={!skipReturnFocus} labelledBy={titleId} desktopMaxWidth=720
+  AuthModalBody key={mode}
+    div.layout
+      aside.brandZone aria-hidden="true"                     [display:none &lt;640]
+        div.brandTop
+          img.brandLogo src="/assets/logo.svg" alt=""
+          p.brandTag "Nạp nhanh · Rút nhanh · Hoàn trả mỗi ngày"
+        ul.trustList
+          li.trustItem x4   span.trustIcon (Icon {fast|cashback|shield|support} 18) + span.trustText
+        div.brandArt aria-hidden   Icon chip 160 .brandArtMark
+      div.formZone
+        div.head
+          h2.title#titleId  {forgot ? "Đặt lại mật khẩu" : register ? "Đăng ký" : "Đăng nhập"}
+          button.closeBtn type=button aria-label="Đóng" onClick=onClose   Icon close 22
+        ── branch A: registered OR (forgot AND sent)
+          div.success role="status"
+            Icon check 28 .successIcon
+            p.successText {forgot ? forgotSuccess : "Đăng ký thành công"}
+            {forgot &amp;&amp; button.switchBtn "Quay lại đăng nhập" → openAuthModal({mode:"login", resumeIntent})}
+        ── branch B: forgot
+          form.form onSubmit
+            p.resetPrompt  {forgotPrompt}
+            AuthField label="Email / Số điện thoại" type=text prefixIcon={resetIcon} autoComplete="username" required
+            Button type=submit gold lg fullWidth loading={submitting}  "Gửi liên kết"
+          p.switch  button.switchBtn "Quay lại đăng nhập"
+        ── branch C: login / register
+          form.form onSubmit
+            [register] AuthField "Tên đăng nhập"  text  prefix user  autoComplete=username  required
+            AuthField  {register ? "Số điện thoại" : "Số điện thoại / Tên đăng nhập"}
+                       type {register ? tel : text}  inputMode {register ? tel : —}
+                       prefix {register ? phone : (looksNumeric ? phone : user)}  autoComplete {tel | username}  required
+            AuthField "Mật khẩu"  password  prefix lock  revealable  autoComplete {new-password | current-password}  required
+            [register] AuthField "Xác nhận mật khẩu"  password prefix lock revealable autoComplete=new-password required error={confirmError}
+            [register] AuthField "Mã giới thiệu (tùy chọn)"  text prefix gift autoComplete=off   (optional)
+            [login]    div.forgotRow  button.forgotLink "Quên mật khẩu?" → openAuthModal({mode:"forgot", resumeIntent})
+            Button type=submit gold lg fullWidth loading={submitting}  {register ? "Đăng ký" : "Đăng nhập"}
+          p.switch  {register ? "Đã có tài khoản?" : "Chưa có tài khoản?"} + " " +
+                    button.switchBtn {register ? "Đăng nhập" : "Đăng ký"} → openAuthModal({mode: other, resumeIntent})</code></pre>
+<p><strong>Fields per mode.</strong></p>
+<table><thead><tr><th>Mode</th><th>#</th><th>Label</th><th>type / inputMode</th><th>Prefix icon</th><th>Required</th><th>Reveal</th><th>autoComplete</th></tr></thead><tbody>
+<tr><td>login</td><td>1</td><td>Số điện thoại / Tên đăng nhập</td><td>text</td><td>user; switches to phone when the value matches <code>/^[\d+\s().-]+$/</code></td><td>yes</td><td>no</td><td>username</td></tr>
+<tr><td>login</td><td>2</td><td>Mật khẩu</td><td>password</td><td>lock</td><td>yes</td><td>yes</td><td>current-password</td></tr>
+<tr><td>register</td><td>1</td><td>Tên đăng nhập</td><td>text</td><td>user</td><td>yes</td><td>no</td><td>username</td></tr>
+<tr><td>register</td><td>2</td><td>Số điện thoại</td><td>tel / tel</td><td>phone</td><td>yes</td><td>no</td><td>tel</td></tr>
+<tr><td>register</td><td>3</td><td>Mật khẩu</td><td>password</td><td>lock</td><td>yes</td><td>yes</td><td>new-password</td></tr>
+<tr><td>register</td><td>4</td><td>Xác nhận mật khẩu</td><td>password</td><td>lock</td><td>yes</td><td>yes</td><td>new-password</td></tr>
+<tr><td>register</td><td>5</td><td>Mã giới thiệu (tùy chọn)</td><td>text</td><td>gift</td><td>no</td><td>no</td><td>off</td></tr>
+<tr><td>forgot</td><td>1</td><td>Email / Số điện thoại</td><td>text</td><td>mail; phone when numeric and without "@"; mail when it contains "@"</td><td>yes</td><td>no</td><td>username</td></tr>
+</tbody></table>
+<p><strong>Validation.</strong> Native HTML <code>required</code> handles the required fields (browser bubble, no custom message). There is one client rule: in register, if Mật khẩu ≠ Xác nhận mật khẩu, the confirm field shows "Mật khẩu xác nhận không khớp" (Passwords do not match) and submit stops. Editing the confirm field clears that error. No length, format or phone checks exist.</p>
+<p><strong>Submit state machine.</strong></p>
+<table><thead><tr><th>Case</th><th>Effect</th></tr></thead><tbody>
+<tr><td>Already submitting</td><td>Ignored (single flight).</td></tr>
+<tr><td>forgot</td><td>submitting=true. After 600ms: sent=true, submitting=false. Shows the success text "Đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra email hoặc tin nhắn." plus "Quay lại đăng nhập".</td></tr>
+<tr><td>register + resumeIntent.action==="deposit"</td><td>submitting=true, registered=true (success "Đăng ký thành công"), then the intent is consumed. After 700ms: signIn("level-0"), close the modal without returning focus, call onResumeDeposit, and ShellChrome pushes /vi-tien.</td></tr>
+<tr><td>register (no deposit intent)</td><td>signIn("level-0"), close immediately.</td></tr>
+<tr><td>login</td><td>signIn("tiered"), close immediately. Any credentials are accepted.</td></tr>
+<tr><td>Cancel (✕, Esc, scrim, swipe)</td><td>closeAuthModal; focus returns to the trigger; the intent is kept.</td></tr>
+<tr><td>Mode switch</td><td>openAuthModal with the new mode and the same intent. Because <code>key={mode}</code>, the body remounts and every field resets.</td></tr>
+</tbody></table>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+<tr><td>onResumeDeposit</td><td>(opts:{isFirstDeposit:boolean}) =&gt; void</td><td>undefined</td><td>Called after the register + deposit handoff.</td></tr>
+</tbody></table>
+<p><strong>Styles.</strong> Desktop width: the Overlay <code>.auto</code> panel uses max-width <code>var(--overlay-desktop-max)</code> = 720px (inline), margin 0 16px, radius 16px. The mobile sheet is full width with radius 16px 16px 0 0, a 36×4 grab handle, padding-bottom calc(24px + safe-area), and max-height 92vh with overflow-y auto.</p>
+<p>Style table: <code>src/components/auth/AuthModal.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.layout</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.layout</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.brandZone</code></td><td>display</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.formZone</code></td><td>padding</td><td><code>var(<span class="tok">--space-2</span>) var(<span class="tok">--space-5</span>) var(<span class="tok">--space-4</span>)</code></td><td>8px 24px 16px</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>margin-bottom</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h2</span>)</code></td><td>20px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>min-width</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>margin-right</td><td><code>calc(var(<span class="tok">--space-2</span>) * -1)</code></td><td>calc(8px * -1)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>border</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.closeBtn</code></td><td>transition</td><td><code>color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>color 200ms cubic-bezier(0.645, 0.045, 0.355, 1), transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.closeBtn svg</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.closeBtn:hover</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.closeBtn:hover</code></td><td>transform</td><td><code>scale(1.05)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn:hover svg</code></td><td>transform</td><td><code>scale(1.1)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.closeBtn:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.closeBtn:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.form</code></td><td>margin-bottom</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.success</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.success</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.success</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.success</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.success</code></td><td>padding</td><td><code>var(<span class="tok">--space-6</span>) var(<span class="tok">--space-4</span>)</code></td><td>32px 16px</td><td>all</td></tr>
+<tr><td><code>.success</code></td><td>text-align</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.successIcon</code></td><td>color</td><td><code>var(<span class="tok">--win</span>)</code></td><td><span class="sw" style="background:#45c9a5"></span>#45c9a5</td><td>all</td></tr>
+<tr><td><code>.successText</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h3</span>)</code></td><td>18px</td><td>all</td></tr>
+<tr><td><code>.successText</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.successText</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.switch</code></td><td>text-align</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switch</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.switch</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>border</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>color</td><td><code>var(<span class="tok">--brand-cta</span>)</code></td><td><span class="sw" style="background:#5e97c9"></span>#5e97c9</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>font</td><td><code>inherit</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.switchBtn</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.switchBtn:hover</code></td><td>transform</td><td><code>scale(1.05)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switchBtn:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.switchBtn:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.switchBtn:focus-visible</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-sm</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.forgotRow</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotRow</code></td><td>justify-content</td><td><code>flex-end</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotRow</code></td><td>margin-top</td><td><code>calc(var(<span class="tok">--space-2</span>) * -1)</code></td><td>calc(8px * -1)</td><td>all</td></tr>
+<tr><td><code>.forgotRow</code></td><td>margin-bottom</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>border</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>color</td><td><code>var(<span class="tok">--brand-cta</span>)</code></td><td><span class="sw" style="background:#5e97c9"></span>#5e97c9</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>font</td><td><code>inherit</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.forgotLink</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.forgotLink:hover</code></td><td>text-decoration</td><td><code>underline</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink:hover</code></td><td>transform</td><td><code>scale(1.05)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.forgotLink:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.forgotLink:focus-visible</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-sm</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.closeBtn, .closeBtn svg, .switchBtn, .forgotLink</code></td><td>transition</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.closeBtn:hover, .closeBtn:hover svg, .switchBtn:hover, .forgotLink:hover</code></td><td>transform</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.resetPrompt</code></td><td>margin-bottom</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.resetPrompt</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.resetPrompt</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-body</span>)</code></td><td>1.5</td><td>all</td></tr>
+<tr><td><code>.resetPrompt</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.layout</code></td><td>flex-direction</td><td><code>row</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.layout</code></td><td>align-items</td><td><code>stretch</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>justify-content</td><td><code>flex-start</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>gap</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>width</td><td><code>280px</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>flex</td><td><code>none</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>padding</td><td><code>var(<span class="tok">--space-6</span>) var(<span class="tok">--space-5</span>)</code></td><td>32px 24px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandZone</code></td><td>border-right</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTop</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTop</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTop</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandLogo</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandLogo</code></td><td>width</td><td><code>132px</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandLogo</code></td><td>height</td><td><code>auto</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTag</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTag</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-body</span>)</code></td><td>1.5</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTag</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandTag</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustList</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustList</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustList</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustList</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustList</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustList</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustItem</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustItem</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustItem</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>flex</td><td><code>1 1 auto</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>min-height</td><td><code>64px</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>margin-top</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArt</code></td><td>background</td><td><code>radial-gradient( 62% 60% at 50% 58%, color-mix(in srgb, var(<span class="tok">--brand-accent</span>) 13%, transparent), transparent 70% )</code></td><td>radial-gradient( 62% 60% at 50% 58%, color-mix(in srgb, #d4af37 13%, transparent), transparent 70% )</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArtMark</code></td><td>width</td><td><code>clamp(84px, 46%, 156px)</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArtMark</code></td><td>height</td><td><code>auto</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArtMark</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.brandArtMark</code></td><td>opacity</td><td><code>0.17</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>width</td><td><code>32px</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>height</td><td><code>32px</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>flex</td><td><code>none</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>background</td><td><code>color-mix(in srgb, var(<span class="tok">--brand-accent</span>) 14%, transparent)</code></td><td>color-mix(in srgb, #d4af37 14%, transparent)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustIcon</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustText</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustText</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-body</span>)</code></td><td>1.5</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.trustText</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.formZone</code></td><td>flex</td><td><code>1</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.formZone</code></td><td>padding</td><td><code>var(<span class="tok">--space-5</span>) var(<span class="tok">--space-6</span>) var(<span class="tok">--space-6</span>)</code></td><td>24px 32px 32px</td><td>(min-width: 640px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/auth/AuthModal.module.css</code></summary><pre><code class="lang-css">/* AuthModal — 2-zone centred dialog (desktop) / single-zone sheet (mobile).
+ * The desktop panel width (720px for the 2-zone layout) is set via the
+ * Overlay `desktopMaxWidth` prop, NOT here.
+ *
+ * PASSWORD-ONLY: no method tabs / no OTP (defect 3). The left brand panel is a
+ * filled logo + tagline + trust-bullet column — no empty placeholder boxes. */
+
+.layout {
+  display: flex;
+  flex-direction: column;
+}
+
+/* brand zone — hidden on mobile (sheet shows the form only) */
+.brandZone {
+  display: none;
+}
+
+.formZone {
+  padding: var(--space-2) var(--space-5) var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin-right: calc(var(--space-2) * -1);
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.closeBtn svg {
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+/* uniform hover — button 1.05 / glyph 1.10, identical for every control here */
+.closeBtn:hover {
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+.closeBtn:hover svg {
+  transform: scale(1.1);
+}
+.closeBtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.form {
+  margin-bottom: var(--space-3);
+}
+
+/* the single honest register confirmation — equal-salience, no win-juice */
+.success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.successIcon {
+  color: var(--win); /* neutral success, NOT brand-juiced */
+}
+.successText {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.switch {
+  text-align: center;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+.switchBtn {
+  border: 0;
+  background: transparent;
+  color: var(--brand-cta);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  padding: var(--space-1);
+  min-height: var(--tap-min);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.switchBtn:hover {
+  transform: scale(1.05);
+}
+.switchBtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* LOGIN: &quot;Quên mật khẩu?&quot; — right-aligned just under the password field */
+.forgotRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(var(--space-2) * -1);
+  margin-bottom: var(--space-2);
+}
+.forgotLink {
+  border: 0;
+  background: transparent;
+  color: var(--brand-cta);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  padding: var(--space-1);
+  min-height: var(--tap-min);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.forgotLink:hover {
+  text-decoration: underline;
+  transform: scale(1.05);
+}
+.forgotLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .closeBtn,
+  .closeBtn svg,
+  .switchBtn,
+  .forgotLink {
+    transition: none;
+  }
+  /* absent, not instant */
+  .closeBtn:hover,
+  .closeBtn:hover svg,
+  .switchBtn:hover,
+  .forgotLink:hover {
+    transform: none;
+  }
+}
+
+/* FORGOT: the email-or-phone instruction above the reset field */
+.resetPrompt {
+  margin-bottom: var(--space-4);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---- DESKTOP: 2-zone side-by-side ≥640 ---- */
+@media (min-width: 640px) {
+  .layout {
+    flex-direction: row;
+    align-items: stretch; /* both zones share the tallest height */
+  }
+
+  /* BRAND PANEL — a filled column: logo + tagline pinned top, trust bullets
+   *  spread to the bottom so the panel reads as one solid gold-on-dark surface
+   *  with no dead space. */
+  .brandZone {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--space-5);
+    width: 280px;
+    flex: none;
+    padding: var(--space-6) var(--space-5);
+    /* FLAT: a structural panel takes a SOLID fill, never a gradient. The one
+     * gradient left in this file is .brandArt, which is decoration, not a
+     * panel/card/button. The old rgba(243,184,103,…) was a stale literal of the
+     * pre-Flat amber accent — a raw hex on a component file (lint A2 in spirit)
+     * that no longer matched --brand-accent #d4af37. */
+    background: var(--surface-3);
+    border-right: 1px solid var(--brand-accent-hairline);
+  }
+
+  .brandTop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .brandLogo {
+    display: block;
+    width: 132px;
+    height: auto;
+  }
+  .brandTag {
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    color: var(--text-hi);
+    font-weight: var(--weight-semi);
+  }
+
+  /* trust bullets — a COMPACT, top-anchored group (fixed rhythm). The variable
+   *  leftover height is filled by .brandArt below, NOT by stretching these
+   *  bullets apart — so they never go sparse beside the tall 5-field register. */
+  .trustList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .trustItem {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* decorative brand fill — grows to consume the height the form leaves so the
+   *  panel is a finished surface at any modal height (no void, no sparse list).
+   *  A soft gold spotlight + a faint casino-chip mark; purely decorative. */
+  .brandArt {
+    flex: 1 1 auto;
+    min-height: 64px;
+    margin-top: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    /* The system permits gradients ONLY as large background decoration — this
+     * is that: an inert art slot that grows to fill the panel&#x27;s leftover height.
+     * Re-tinted off --brand-accent (was a raw amber literal) so it tracks the
+     * token instead of drifting from it. */
+    background: radial-gradient(
+      62% 60% at 50% 58%,
+      color-mix(in srgb, var(--brand-accent) 13%, transparent),
+      transparent 70%
+    );
+  }
+  .brandArtMark {
+    width: clamp(84px, 46%, 156px);
+    height: auto;
+    color: var(--brand-accent);
+    opacity: 0.17;
+  }
+  .trustIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
+    color: var(--brand-accent);
+  }
+  .trustText {
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+    color: var(--text-mid);
+  }
+
+  .formZone {
+    flex: 1;
+    padding: var(--space-5) var(--space-6) var(--space-6);
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> closeBtn hover: color #f2f0e4, scale(1.05); its svg scale(1.1). switchBtn hover: scale(1.05). forgotLink hover: underline, scale(1.05). Focus-visible: outline 2px #6ea8ff, offset 2px. Loading: Button <code>loading</code> (see <a href="#f-ui-button">#f-ui-button</a>). Success: a 28px check in #45c9a5 and text at 18px/600 #f2f0e4, centred, padding 32px 16px.</p>
+<p><strong>Motion.</strong> transform/color 200ms ease-standard. Overlay entrance as in <a href="#s-overlay">#s-overlay</a>. Reduced motion: transitions none and hover transforms none.</p>
+<p><strong>Copy.</strong></p>
+<table><thead><tr><th>Vietnamese</th><th>English gloss</th><th>Where</th></tr></thead><tbody>
+<tr><td>Đăng nhập</td><td>Log in</td><td>title, submit, switch link</td></tr>
+<tr><td>Đăng ký</td><td>Register</td><td>title, submit, switch link</td></tr>
+<tr><td>Đặt lại mật khẩu</td><td>Reset password</td><td>forgot title</td></tr>
+<tr><td>Đóng</td><td>Close</td><td>close button aria-label</td></tr>
+<tr><td>Nạp nhanh · Rút nhanh · Hoàn trả mỗi ngày</td><td>Fast deposit · Fast withdrawal · Daily cashback</td><td>brand tagline</td></tr>
+<tr><td>Rút tiền trong vài phút</td><td>Withdraw within minutes</td><td>trust 1 (icon fast)</td></tr>
+<tr><td>Hoàn trả mỗi ngày, không giới hạn</td><td>Daily cashback, unlimited</td><td>trust 2 (icon cashback)</td></tr>
+<tr><td>Bảo mật chuẩn ngân hàng</td><td>Bank-grade security</td><td>trust 3 (icon shield)</td></tr>
+<tr><td>Hỗ trợ 24/7</td><td>24/7 support</td><td>trust 4 (icon support)</td></tr>
+<tr><td>Số điện thoại / Tên đăng nhập</td><td>Phone / Username</td><td>login field 1</td></tr>
+<tr><td>Tên đăng nhập</td><td>Username</td><td>register field 1</td></tr>
+<tr><td>Số điện thoại</td><td>Phone number</td><td>register field 2</td></tr>
+<tr><td>Mật khẩu</td><td>Password</td><td>password field</td></tr>
+<tr><td>Xác nhận mật khẩu</td><td>Confirm password</td><td>register field 4</td></tr>
+<tr><td>Mã giới thiệu (tùy chọn)</td><td>Referral code (optional)</td><td>register field 5</td></tr>
+<tr><td>Mật khẩu xác nhận không khớp</td><td>Passwords do not match</td><td>confirm error</td></tr>
+<tr><td>Quên mật khẩu?</td><td>Forgot password?</td><td>login link</td></tr>
+<tr><td>Nhập email hoặc số điện thoại đã đăng ký để nhận liên kết đặt lại mật khẩu.</td><td>Enter your registered email or phone to receive a reset link.</td><td>forgot prompt</td></tr>
+<tr><td>Email / Số điện thoại</td><td>Email / Phone</td><td>forgot field</td></tr>
+<tr><td>Gửi liên kết</td><td>Send link</td><td>forgot submit</td></tr>
+<tr><td>Đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra email hoặc tin nhắn.</td><td>Reset instructions sent. Please check your email or messages.</td><td>forgot success</td></tr>
+<tr><td>Quay lại đăng nhập</td><td>Back to login</td><td>forgot link</td></tr>
+<tr><td>Đăng ký thành công</td><td>Registration successful</td><td>register + deposit success</td></tr>
+<tr><td>Đã có tài khoản? / Chưa có tài khoản?</td><td>Have an account? / No account yet?</td><td>switch line</td></tr>
+<tr><td>Hiện mật khẩu / Ẩn mật khẩu</td><td>Show / Hide password</td><td>eye button aria-label</td></tr>
+</tbody></table>
+<div class="callout warn">The file comment says "Modes: login | register" and "số điện thoại + mật khẩu". The code has three modes, and login accepts phone <em>or</em> username. In the deposit handoff, <code>submitting</code> never returns to false; that is harmless because the body unmounts. <code>skipReturnFocus</code> stays true after a handoff until the next <code>handleClose</code> (inference: the first close after a later reopen may skip focus return).</div>
+
+<h3 id="s-auth-field">AuthField</h3>
+<p><strong>Purpose.</strong> The labelled input in the auth modal: prefix icon, required star, optional reveal eye, and an error row that is always reserved.</p>
+<p><strong>Source.</strong> <code>src/components/auth/AuthField.tsx</code>, <code>AuthField.module.css</code>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">div.field
+  label.label for={id}   {label} {required &amp;&amp; span.star aria-hidden " *"}
+  div.box[.boxError]
+    {prefixIcon &amp;&amp; Icon {prefixIcon} 18 .prefix}
+    input.input#id type={revealable ? (revealed ? "text" : "password") : type} value onChange required inputMode maxLength autoComplete
+          aria-invalid={error ? true : undefined} aria-describedby={error ? errId : undefined}
+    {revealable &amp;&amp; button.eye type=button aria-label={revealed ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={revealed}
+                     Icon {revealed ? eyeOff : eye} 18}
+  p.errorRow#errId role={error ? "alert" : undefined}   {error ?? " "}</code></pre>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+<tr><td>label</td><td>string</td><td>—</td><td>Label text.</td></tr><tr><td>type</td><td>HTMLInputTypeAttribute</td><td>"text"</td><td>Input type (overridden when revealable).</td></tr><tr><td>value / onChange</td><td>string / (v)=&gt;void</td><td>—</td><td>Controlled.</td></tr><tr><td>prefixIcon</td><td>IconName?</td><td>—</td><td>Leading 18px icon in #888888.</td></tr><tr><td>required</td><td>boolean?</td><td>—</td><td>Gold star plus native required.</td></tr><tr><td>revealable</td><td>boolean?</td><td>—</td><td>Eye toggle.</td></tr><tr><td>error</td><td>string?</td><td>—</td><td>Red border plus error text.</td></tr><tr><td>inputMode</td><td>"text" | "numeric" | "tel"</td><td>—</td><td></td></tr><tr><td>maxLength</td><td>number?</td><td>—</td><td></td></tr><tr><td>autoComplete</td><td>string?</td><td>—</td><td></td></tr></tbody></table>
+<p><strong>Styles.</strong></p>
+<p>Style table: <code>src/components/auth/AuthField.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.field</code></td><td>margin-bottom</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>color</td><td><code>var(<span class="tok">--text</span>)</code></td><td><span class="sw" style="background:#d6d3c7"></span>#d6d3c7</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>margin-bottom</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.label</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.star</code></td><td>color</td><td><code>var(<span class="tok">--brand-accent</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>padding</td><td><code>1px calc(var(<span class="tok">--space-3</span>) + 1px)</code></td><td>1px calc(12px + 1px)</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>background</td><td><code>var(<span class="tok">--surface-3</span>)</code></td><td><span class="sw" style="background:#212121"></span>#212121</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>border</td><td><code>1px solid var(<span class="tok">--border</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.box</code></td><td>transition</td><td><code>border-color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>border-color 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.box:focus-within</code></td><td>border-width</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.box:focus-within</code></td><td>border-color</td><td><code>var(<span class="tok">--focus-ring</span>)</code></td><td><span class="sw" style="background:#6ea8ff"></span>#6ea8ff</td><td>all</td></tr>
+<tr><td><code>.box:focus-within</code></td><td>padding</td><td><code>0 var(<span class="tok">--space-3</span>)</code></td><td>0 12px</td><td>all</td></tr>
+<tr><td><code>.boxError</code></td><td>border-color</td><td><code>var(<span class="tok">--error</span>)</code></td><td><span class="sw" style="background:#e42946"></span>#e42946</td><td>all</td></tr>
+<tr><td><code>.boxError:focus-within</code></td><td>border-color</td><td><code>var(<span class="tok">--error</span>)</code></td><td><span class="sw" style="background:#e42946"></span>#e42946</td><td>all</td></tr>
+<tr><td><code>.prefix</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.prefix</code></td><td>flex</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>flex</td><td><code>1</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>border</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>font</td><td><code>inherit</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>outline</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.input</code></td><td>height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.input::placeholder</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>min-width</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>margin-right</td><td><code>calc(var(<span class="tok">--space-3</span>) * -1)</code></td><td>calc(12px * -1)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>border</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>background</td><td><code>transparent</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>cursor</td><td><code>pointer</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.eye</code></td><td>transition</td><td><code>color var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>color 200ms cubic-bezier(0.645, 0.045, 0.355, 1), transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.eye:hover</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.eye:hover</code></td><td>transform</td><td><code>scale(1.05)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye:hover svg</code></td><td>transform</td><td><code>scale(1.1)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.eye svg</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.eye:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.eye:focus-visible</code></td><td>outline-offset</td><td><code>-2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.box, .eye, .eye svg</code></td><td>transition</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.eye:hover, .eye:hover svg</code></td><td>transform</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.errorRow</code></td><td>min-height</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.errorRow</code></td><td>margin</td><td><code>var(<span class="tok">--space-1</span>) 0 0</code></td><td>4px 0 0</td><td>all</td></tr>
+<tr><td><code>.errorRow</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.errorRow</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.errorRow</code></td><td>color</td><td><code>var(<span class="tok">--error</span>)</code></td><td><span class="sw" style="background:#e42946"></span>#e42946</td><td>all</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/auth/AuthField.module.css</code></summary><pre><code class="lang-css">/* AuthField — TextField analog for the auth modal.
+ *
+ * FLAT / DARK-LUXURY input contract (30-PM-DESIGN-SYSTEM, as CORRECTED 2026-08-17):
+ *   resting → filled --surface-3 PLUS a 1px --border hairline;
+ *   focus   → a 2px SOLID accent border. Never a glow/shadow ring (the flat
+ *             system bans depth, and --glow-gold/--halo/--lift are `none`).
+ *
+ * The original ruling said &quot;resting = filled surface, NO border&quot;. That was a
+ * literal translation of the light-mode system (&quot;Gray 100 background. No
+ * border.&quot;), and it does not survive the palette swap: --surface-3 #212121 on
+ * the modal&#x27;s --surface #141414 is 1.14:1, so a border-less field has no
+ * boundary at all and fails WCAG 1.4.11 (3:1 for UI component boundaries). The
+ * flat system removes shadow, gradient AND border simultaneously; in a light
+ * palette white-on-gray-100 survives that, at near-black on near-black nothing
+ * does. The hairline is therefore load-bearing here exactly as it is on cards.
+ * PM reversed the rule; this is the corrected build. DO NOT &quot;fix&quot; it back.
+ *
+ * Focus stays a WEIGHT change in the SAME hue (1px 55%-alpha gold → 2px solid
+ * gold), never a second colour. Padding compensates the extra border pixel so
+ * the box geometry is byte-identical in both states — no reflow on focus.
+ *
+ * The blue --focus-ring stays reserved for :focus-visible on the icon button;
+ * it is NEVER a resting/selected colour. */
+
+.field {
+  margin-bottom: var(--space-2);
+}
+
+.label {
+  display: block;
+  font-size: var(--t-sm);
+  color: var(--text);
+  margin-bottom: var(--space-1);
+  line-height: var(--lh-tight);
+}
+
+.star {
+  color: var(--brand-accent);
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  /* +1px on each side compensates the 1px resting border, so the CONTENT box is
+   * identical at rest (1 border + 1 pad) and at focus (2 border + 0 pad). */
+  padding: 1px calc(var(--space-3) + 1px);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.box:focus-within {
+  border-width: 2px;
+  /* FOCUS IS BLUE, EVERYWHERE — PM ruling, reconciling a split between two
+     sweep areas (one used --brand-accent here, one used --focus-ring).
+     Focus is ONE affordance and gets ONE colour: a user learns &quot;blue = where I
+     am&quot; once, or not at all. Two reinforcing reasons for blue over gold:
+       · --focus-ring is the PINNED, AA-guaranteed indicator (8.21:1 vs canvas),
+         locked identical across brands. Gold is not.
+       · On this product gold is REWARD chrome. Focus is not a reward, and the
+         trust surfaces (contribution/restricted) already forbid brand accent
+         for exactly that reason.
+     The design system&#x27;s &quot;border-2 solid Primary&quot; was written for a light
+     palette where Primary WAS the focus blue and the two coincided. In dark
+     gold they diverge, and the accessibility token wins. */
+  border-color: var(--focus-ring);
+  padding: 0 var(--space-3);
+}
+
+.boxError {
+  border-color: var(--error);
+}
+.boxError:focus-within {
+  border-color: var(--error);
+}
+
+.prefix {
+  color: var(--text-mid);
+  flex: none;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-hi);
+  font: inherit;
+  font-size: var(--t-body);
+  outline: none;
+  height: var(--tap-min);
+}
+/* --text-mid (#888888), not --text-dim: --text-dim is declared decorative-only
+ * in tokens.css and measures 3.34:1 on --surface-3 — a placeholder is the field&#x27;s
+ * only hint before typing, so it holds the AA floor (5.0:1 on --surface-3). */
+.input::placeholder {
+  color: var(--text-mid);
+}
+
+.eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin-right: calc(var(--space-3) * -1);
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+/* the house uniform hover: button 1.05, its glyph 1.10 — never differentiated
+ * by prominence (30-PM-DESIGN-SYSTEM §B1). */
+.eye:hover {
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+.eye:hover svg {
+  transform: scale(1.1);
+}
+.eye svg {
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.eye:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .box,
+  .eye,
+  .eye svg {
+    transition: none;
+  }
+  /* ABSENT, not merely instant — snapping a control 5% larger with a zero-length
+   * transition is the same jolt the query exists to avoid. */
+  .eye:hover,
+  .eye:hover svg {
+    transform: none;
+  }
+}
+
+/* reserved error row — always present so no layout shift on error appearance */
+.errorRow {
+  min-height: var(--t-micro);
+  margin: var(--space-1) 0 0;
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--error);
+}
+</code></pre></details>
+<p><strong>States.</strong> Rest: bg #212121, 1px border rgba(212, 175, 55, 0.55), padding 1px 13px. Focus-within: 2px border #6ea8ff (<span class="tok">--focus-ring</span>), padding 0 12px, so there is no reflow. Error: border-color #e42946, also while focused. Eye hover: color #f2f0e4, scale(1.05); its svg scale(1.1). Eye focus-visible: outline 2px #6ea8ff, offset -2px.</p>
+<p><strong>Motion.</strong> Border-color 200ms. Eye color/transform 200ms. Reduced motion: none.</p>
+<div class="callout warn">The comment block at the top says "focus → a 2px SOLID accent border". The code (and the comment inside the rule) uses the blue <span class="tok">--focus-ring</span> #6ea8ff. <code>CategoryGrid.module.css</code> carries a comment saying the opposite ("moved to the accent"), but its code is also blue. Rebuild with blue.</div>
+</section>
+

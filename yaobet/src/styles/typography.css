@@ -1,0 +1,109 @@
+/* ============================================================================
+ * Yaobet — typography layer (styles/typography.css)
+ * ----------------------------------------------------------------------------
+ * THREE faces, all Vietnamese-complete (Wine-Gold):
+ *
+ *   Be Vietnam Pro    → body, h2-h6, uppercase labels (--brand-font-body)
+ *   Playfair Display  → display, h1 only                (--brand-font-head)
+ *   Inter             → tabular numerals                (--brand-font-num)
+ *
+ * Playfair stops at h1 so stacked Vietnamese marks never render in the thin
+ * serif at small sizes.
+ *
+ * Outfit is REJECTED and must not be reintroduced. Measured against the Google
+ * Fonts API: Outfit serves `latin` + `latin-ext` only, and latin-ext covers
+ * U+1E00–1E9F plus U+1EF2–1EFF while SKIPPING U+1EA0–1EF1 — precisely the
+ * block holding the toned Vietnamese vowels. `BỘ SƯU TẬP` (Ộ = U+1ED8) and
+ * `Đổi thưởng` (ổ = U+1ED5, ở = U+1EDF) both fall out of the face mid-word.
+ * Be Vietnam Pro, Playfair Display and Inter all serve the `vietnamese` subset
+ * (U+1EA0–1EF9), so every string in this product renders inside its face.
+ *
+ * LOADING: next/font/google in app/layout.tsx, injected as --font-be-vietnam,
+ * --font-playfair and --font-inter on <html>. tokens.css wraps them in the
+ * raw-ramp --font-body / --font-num / --font-head, and components read only
+ * the --brand-font-* aliases (lint A2). No @font-face and no @import here.
+ * ==========================================================================*/
+
+/* Base type ramp. Components read --t-* / --weight-* tokens; these are the
+ * document-level defaults so unstyled VN copy is already on the AA ladder. */
+body {
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-reg);
+  color: var(--text-hi);
+}
+
+/* ---- Display / headings -------------------------------------------------
+ * h1 takes the display face; h2-h6 take the body face. Tracking is 0:
+ * negative tracking collides stacked Vietnamese marks. Weight and line-height
+ * are set by globals.css (which loads after this sheet), so these rules
+ * deliberately declare family + tracking ONLY — no cascade fight. /vip
+ * headings opt out by class (.vipSectionHeading etc. carry
+ * --brand-font-display at class specificity, which wins over these element
+ * selectors). */
+h1 {
+  font-family: var(--brand-font-head);
+  letter-spacing: 0;
+}
+
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--brand-font-body);
+  letter-spacing: 0;
+}
+
+/* ---- Uppercase labels ---------------------------------------------------
+ * The system's "tracking-wider" treatment: body face, strong weight, OPEN
+ * tracking (uppercase VN needs the extra sidebearing — stacked tone + vowel
+ * marks collide at negative tracking). A global opt-in hook, matching the
+ * [data-numeric] convention below: CSS Modules hash their own class names,
+ * so a module cannot reach this rule by accident. Apply with
+ * className="u-label" or data-label="upper". */
+.u-label,
+[data-label="upper"] {
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: var(--lh-tight);
+}
+
+/* ---- Heading type roles -------------------------------------------------
+ * Shared role classes for areas without their own stylesheet. Each reads only
+ * its --type-<role>-* tokens; the h1 and h2 roles take the display face, the
+ * h4 role the body face. Tracking is 0 on every role. */
+.type-h1 {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  letter-spacing: 0;
+}
+
+.type-h2 {
+  font-family: var(--type-h2-family);
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-leading);
+  font-weight: var(--type-h2-weight);
+  letter-spacing: 0;
+}
+
+.type-h4 {
+  font-family: var(--type-h4-family);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-leading);
+  font-weight: var(--type-h4-weight);
+  letter-spacing: 0;
+}
+
+/* Tabular numerals so money/odds don't reflow on tick. */
+.money,
+[data-numeric] {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}

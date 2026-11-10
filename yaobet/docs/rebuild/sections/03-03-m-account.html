@@ -1,0 +1,819 @@
+<section>
+<h2 id="m-account">m-account — /tai-khoan, /bao-mat and the account components</h2>
+
+<h3 id="m-route-tai-khoan">Route /tai-khoan</h3>
+<dl>
+<dt>URL</dt><dd><code>/tai-khoan</code> (+ in-page hashes <code>#ho-so</code>, <code>#bao-mat</code>, <code>#ngan-hang</code>, <code>#vi-tien-ao</code>)</dd>
+<dt>Page file</dt><dd><code>src/app/(member)/tai-khoan/page.tsx</code> (async Server Component), <code>tai-khoan.module.css</code>, <code>loading.tsx</code></dd>
+<dt>Metadata</dt><dd><code>title: "Tài khoản — Yaobet"</code></dd>
+<dt>Auth gating</dt><dd>No server gate. Rail shows guest card for guests. In the content column only <code>ProfileBasic</code> checks auth (returns <code>null</code> without a user); <code>SecurityCenter</code>, <code>BankAccounts</code>, <code>CryptoAddresses</code> have NO auth check and render fixture data to a guest who lands on their hash.</dd>
+<dt>Data</dt><dd>Parallel <code>getSecurityIndex()</code>, <code>getVerification()</code>, <code>getBankCards()</code>, <code>getCryptoAddresses()</code> → props of <a href="#m-account-sections">AccountSections</a>.</dd>
+</dl>
+<pre><code class="lang-txt">(member) layout → div.column
+└─ section.page  aria-label="Tài khoản"
+   └─ AccountSections   → exactly ONE of: ProfileBasic | SecurityCenter | BankAccounts | CryptoAddresses</code></pre>
+<table>
+<thead><tr><th>Selector</th><th>Values</th></tr></thead>
+<tbody><tr><td>.page</td><td>flex column; gap <span class="tok">--band-gap</span> 16px; min-width 0</td></tr></tbody>
+</table>
+<p><strong>Section order / composition</strong>: one panel only. At 375/768 the panel sits under the full MemberSidebar stack; at ≥992 it fills the column right of the 304px rail. No column changes inside the panels except <code>flex-wrap</code> rows (see each component).</p>
+<p><strong>Loading</strong> (<code>loading.tsx</code>): <code>section.page aria-busy="true" aria-label="Đang tải tài khoản"</code> → <code>h1.heading "Tài khoản"</code> → <code>Skeleton block 100% × 112</code> → <code>Skeleton block 100% × 96</code> → <code>Skeleton block 100% × 300</code>.</p>
+<div class="callout warn"><code>loading.tsx</code> uses <code>styles.heading</code>, which does NOT exist in <code>tai-khoan.module.css</code> (8 lines, only <code>.page</code>) → the h1 renders unstyled (inherits global h1 from reset/typography, track F). The skeleton footprint (profile header / quick actions / menu list) describes the deleted mobile-hub layout, not the current single panel. The live page has no h1 at all.</div>
+
+<h3 id="m-route-bao-mat">Route /bao-mat</h3>
+<p><code>src/app/bao-mat/page.tsx</code> — Server Component that calls <code>redirect("/tai-khoan")</code> (next/navigation). No UI.</p>
+<div class="callout warn">Comment says "Permanent redirect"; <code>redirect()</code> is a temporary (307) redirect (<code>permanentRedirect</code> would be 308). It lands on <code>/tai-khoan</code> with no hash, i.e. on Hồ sơ, not the security panel (<code>/tai-khoan#bao-mat</code>). Footer links "Bảo mật" and "Tự loại trừ" (<code>HomeFooter</code>) and the header MemberMenu "Bảo mật" point at <code>/bao-mat</code>.</div>
+
+<h3 id="m-account-sections">AccountSections — hash-driven panel switcher</h3>
+<p><strong>Purpose</strong> — shows the one account panel that matches the URL hash. <strong>Source</strong> — <code>src/components/account/AccountSections.tsx</code> (client; no CSS).</p>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>index</td><td><code>SecurityIndex</code></td><td>required</td><td>→ SecurityCenter</td></tr>
+<tr><td>verification</td><td><code>VerificationItem[]</code></td><td>required</td><td>→ ProfileBasic (contact) and SecurityCenter</td></tr>
+<tr><td>bankCards</td><td><code>BankCard[]</code></td><td>required</td><td>→ BankAccounts</td></tr>
+<tr><td>cryptoAddresses</td><td><code>CryptoAddress[]</code></td><td>required</td><td>→ CryptoAddresses</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Hash</th><th>Renders</th></tr></thead>
+<tbody>
+<tr><td>(none) / <code>#ho-so</code> / any unknown</td><td><a href="#m-profile-basic">ProfileBasic</a></td></tr>
+<tr><td><code>#bao-mat</code></td><td><a href="#m-security-center">SecurityCenter</a></td></tr>
+<tr><td><code>#ngan-hang</code></td><td><a href="#m-linked-accounts">BankAccounts</a></td></tr>
+<tr><td><code>#vi-tien-ao</code></td><td><a href="#m-linked-accounts">CryptoAddresses</a></td></tr>
+</tbody>
+</table>
+<p>Behaviour: initial state <code>"ho-so"</code> (SSR-safe), then <code>useEffect</code> reads <code>window.location.hash</code> and subscribes to <code>hashchange</code>. Consequence: on a hard load of <code>/tai-khoan#bao-mat</code> the first paint shows ProfileBasic, then swaps to SecurityCenter after hydration (flash). No transition/animation on swap. Panels are fully unmounted on switch (form state is lost).</p>
+
+<h3 id="m-profile-basic">ProfileBasic — "Hồ sơ cá nhân"</h3>
+<p><strong>1. Purpose</strong> — basic identity panel: avatar initial, display name, member ID, and three contact rows (real name, phone, email) each with a status badge and an edit/setup button. <strong>2. Source</strong> — <code>src/components/account/ProfileBasic.tsx</code>, <code>ProfileBasic.module.css</code>.</p>
+<pre><code class="lang-txt">[!user] → null
+section.wrap aria-label="Hồ sơ cá nhân"
+└─ Card variant=default className=.panel
+   ├─ header.header
+   │  ├─ h2.title    "Hồ sơ cá nhân"
+   │  └─ p.subtitle  "Thông tin cơ bản của tài khoản"
+   ├─ div.identity
+   │  ├─ span.avatar aria-hidden → span.avatarInitial {initial}
+   │  ├─ div.idText
+   │  │  ├─ span.name   {displayName}
+   │  │  └─ span.idLine "Mã thành viên: " span.idValue{memberId}
+   │  └─ Button variant=ghost size=sm "Đổi ảnh đại diện"  → notice=true
+   ├─ ul.list
+   │  └─ li.row × rows (filter id ∈ realName|phone|email, fixture order)
+   │     ├─ div.rowMain → span.rowLabel {label} + span.rowValue {value ?? span.rowEmpty "—"}
+   │     └─ div.rowEnd  → Badge tone={STATUS_TONE} variant=subtle {STATUS_TEXT}
+   │                      + Button ghost sm {status==="unset" ? "Thiết lập ngay" : "Chỉnh sửa"} → notice=true
+   └─ [notice] p.notice role=status "Đây là bản giao diện mẫu — chưa kết nối hệ thống."</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody><tr><td>contact</td><td><code>VerificationItem[]</code></td><td>required</td><td>Only ids realName / phone / email are shown.</td></tr></tbody>
+</table>
+<table>
+<thead><tr><th>status</th><th>Badge tone (F)</th><th>Badge text</th><th>Button</th></tr></thead>
+<tbody>
+<tr><td>verified</td><td>win</td><td>Đã xác minh</td><td>Chỉnh sửa</td></tr>
+<tr><td>pending</td><td>info</td><td>Đang chờ</td><td>Chỉnh sửa</td></tr>
+<tr><td>unset</td><td>neutral</td><td>Chưa thiết lập</td><td>Thiết lập ngay</td></tr>
+<tr><td>error</td><td>danger</td><td>Đã xảy ra lỗi</td><td>Chỉnh sửa</td></tr>
+</tbody>
+</table>
+<p><strong>Styles</strong></p>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.wrap</td><td>min-width 0</td><td>base</td></tr>
+<tr><td>.panel (on Card)</td><td>flex column; gap <span class="tok">--space-5</span> 24px; padding <span class="tok">--card-pad</span> 24px (overrides Card default 16px — inference: module CSS loads after primitive CSS)</td><td>base</td></tr>
+<tr><td>.header</td><td>flex column; gap 4px</td><td>base</td></tr>
+<tr><td>.title</td><td>24px; 600; #f2f0e4</td><td>base</td></tr>
+<tr><td>.subtitle</td><td>14px; #888888</td><td>base</td></tr>
+<tr><td>.identity</td><td>flex; align center; gap 12px; flex-wrap wrap; padding 16px; bg <span class="tok">--surface-2</span> #1a1a1a; radius 12px</td><td>base</td></tr>
+<tr><td>.avatar</td><td>grid center; 56×56px (literal); radius pill; bg #d4af37; flex 0 0 auto</td><td>base</td></tr>
+<tr><td>.avatarInitial</td><td>20px; 700; num font; color #0a0a0a</td><td>base</td></tr>
+<tr><td>.idText</td><td>flex column; gap 4px; min-width 0; flex 1 1 auto</td><td>base</td></tr>
+<tr><td>.name</td><td>16px; 600; #f2f0e4</td><td>base</td></tr>
+<tr><td>.idLine / .idValue</td><td>12px #888888 / num font #f2f0e4</td><td>base</td></tr>
+<tr><td>.list</td><td>flex column; margin 0; padding 0; list-style none</td><td>base</td></tr>
+<tr><td>.row</td><td>flex; align center; justify space-between; gap 12px; flex-wrap wrap; padding 12px 0; border-bottom 1px solid rgba(212,175,55,0.55); last-child no border</td><td>base</td></tr>
+<tr><td>.rowMain</td><td>flex column; gap 4px; min-width 0</td><td>base</td></tr>
+<tr><td>.rowLabel / .rowValue</td><td>14px #f2f0e4 / 14px #888888 num font, overflow hidden, ellipsis</td><td>base</td></tr>
+<tr><td>.rowEmpty</td><td>#6f6f6f</td><td>base</td></tr>
+<tr><td>.rowEnd</td><td>flex; align center; gap 12px; flex 0 0 auto</td><td>base</td></tr>
+<tr><td>.notice</td><td>12px; #888888; padding 8px 12px; radius 8px; bg <span class="tok">--tint</span>; border 1px solid rgba(212,175,55,0.55)</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/account/ProfileBasic.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * ProfileBasic — "Hồ sơ" basic-info panel. Tokens only. Mobile-first @375
+ * (avatar row + contact rows stack); desktop fills the content column.
+ * ==========================================================================*/
+
+.wrap {
+  min-width: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--card-pad);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.title {
+  font-size: var(--t-h1);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.subtitle {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* ---- avatar + identity --------------------------------------------------- */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--card-pad-sm);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  flex: 0 0 auto;
+}
+/* AA FIX: this read `color: var(--surface-1)` — a token that does not exist
+ * (the ladder is --surface / --surface-2 / --surface-3). The var() was invalid
+ * at computed-value time, so `color` fell back to the INHERITED --text-hi
+ * champagne, painting near-white on the #d4af37 gold avatar: 2.11:1, an AA
+ * fail. --brand-on-accent is the dark ink the system defines for gold: 9.42:1. */
+.avatarInitial {
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  font-family: var(--brand-font-num);
+  color: var(--brand-on-accent);
+}
+.idText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.name {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.idLine {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.idValue {
+  font-family: var(--brand-font-num);
+  color: var(--text-hi);
+}
+
+/* ---- contact rows -------------------------------------------------------- */
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.rowLabel {
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+}
+.rowValue {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-family: var(--brand-font-num);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowEmpty {
+  color: var(--text-dim);
+}
+.rowEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
+.notice {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--tint);
+  border: 1px solid var(--border);
+}
+</code></pre>
+</details>
+<p><strong>States</strong>: guest → renders nothing (empty content column). Clicking any button sets <code>notice=true</code> permanently (no dismiss). No hover styles of its own (Button/Badge from F). <strong>Motion</strong>: none. <strong>Data</strong> (<code>getVerification()</code> fixture): realName "Nguyễn Văn An" verified; phone "•••• •••• 866" verified; email "a••••n@gmail.com" pending; fundPassword null unset; dynamicCode null unset. Under DEMO_EMPTY all values null + unset.</p>
+<p><strong>Copy</strong>: Hồ sơ cá nhân (Personal profile) · Thông tin cơ bản của tài khoản (Basic account information) · Mã thành viên (Member ID) · Đổi ảnh đại diện (Change avatar) · Họ tên thật (Real full name) · Số điện thoại (Phone number) · Địa chỉ Email (Email address) · Đã xác minh / Đang chờ / Chưa thiết lập / Đã xảy ra lỗi (Verified / Pending / Not set / An error occurred) · Thiết lập ngay (Set up now) · Chỉnh sửa (Edit) · Đây là bản giao diện mẫu — chưa kết nối hệ thống. (This is a sample UI — not connected to the system.)</p>
+<div class="callout warn">The level-0 user's real-name row still shows "Nguyễn Văn An" (fixture is not user-specific) while their display name is "Thành viên mới".</div>
+
+<h3 id="m-security-center">SecurityCenter — "Trung tâm an toàn" (hash #bao-mat)</h3>
+<p><strong>1. Purpose</strong> — security score bar plus three collapsible controls: change login password, set/change fund (withdrawal) password, enable 2FA. All forms are UI-only and end on an honest "not connected" notice. <strong>2. Source</strong> — <code>src/components/account/SecurityCenter.tsx</code> (inner components <code>SecurityControl</code>, <code>ChangePasswordForm</code>, <code>EnableNotice</code>, <code>Field</code>), <code>SecurityCenter.module.css</code>.</p>
+<pre><code class="lang-txt">section.wrap aria-label="Trung tâm an toàn"
+└─ Card variant=default className=.panel
+   ├─ header.header
+   │  ├─ div.titleRow
+   │  │  ├─ Icon shield 24 .titleIcon
+   │  │  └─ div.titleText → h2.title "Trung tâm an toàn" + p.subtitle "Bảo vệ tài khoản bằng mật khẩu mạnh và xác thực động"
+   │  └─ div.score
+   │     ├─ div.scoreTop
+   │     │  ├─ span.scoreLabel "Điểm an toàn"
+   │     │  └─ span.scoreMeta → span.scoreNum {score} + span.scoreMax "/ 100" + Badge tone={band.tone} subtle {band.label}
+   │     └─ div.bar role=progressbar aria-valuemin=0 aria-valuemax=100 aria-valuenow={score} aria-label="Điểm an toàn"
+   │        └─ span.barFill style="width:{score}%"
+   └─ ul.controls
+      ├─ SecurityControl id=login  icon=lock   title="Đổi mật khẩu đăng nhập" sub="Dùng để đăng nhập vào tài khoản" action="Thay đổi" (no status)
+      │    └─ ChangePasswordForm fields=[Mật khẩu cũ, Mật khẩu mới, Xác nhận mật khẩu mới]
+      ├─ SecurityControl id=fund   icon=wallet title="Mật khẩu rút tiền" sub="Yêu cầu khi rút tiền và đổi thông tin nhạy cảm"
+      │    status = fundSet ? verified : unset ; action = fundSet ? "Thay đổi" : "Thiết lập ngay"
+      │    └─ ChangePasswordForm fields=[Mật khẩu mới, Xác nhận mật khẩu rút tiền]
+      └─ SecurityControl id=dynamic icon=shield title="Mã xác thực động (2FA)" sub="Xác thực hai lớp bằng ứng dụng tạo mã"
+           status = dynSet ? verified : unset ; action = dynSet ? "Thay đổi" : "Bật"
+           └─ EnableNotice
+
+SecurityControl:
+li.control
+├─ button.controlHead type=button aria-expanded={isOpen} aria-controls="sec-panel-{id}" onClick=toggle
+│  ├─ span.controlIcon aria-hidden → Icon {icon} 20
+│  ├─ span.controlText → span.controlTitle {title} + span.controlSub {sub}
+│  ├─ [status] Badge tone={verified?"win":"neutral"} subtle {verified?"Đã xác minh":"Chưa thiết lập"}
+│  └─ span.controlAction {actionLabel} + Icon chevronDown 14 [.chevOpen when open]
+└─ [isOpen] div#sec-panel-{id}.controlBody role=region → children
+
+ChangePasswordForm:
+form.form onSubmit=preventDefault + notice=true
+├─ label.field × N → span.fieldLabel {label} + input.input type={show?"text":"password"} autoComplete=off placeholder={label}
+├─ button.reveal type=button aria-pressed={show} → Icon {show?eyeOff:eye} 16 + span {show?"Ẩn mật khẩu":"Hiện mật khẩu"}
+├─ [notice] p.notice role=status "Đây là bản giao diện mẫu — chưa kết nối hệ thống."
+└─ Button variant=gold size=md type=submit fullWidth "Lưu thay đổi"
+
+EnableNotice:
+div.form
+├─ p.notice role=status {notice ? "Đây là bản giao diện mẫu — chưa kết nối hệ thống." : "Xác thực hai lớp bằng ứng dụng tạo mã"}
+└─ Button variant=gold size=md fullWidth "Bật" → notice=true</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>index</td><td><code>SecurityIndex { factors; score }</code></td><td>required</td><td><code>score</code> drives the number, bar width and band.</td></tr>
+<tr><td>verification</td><td><code>VerificationItem[]</code></td><td>required</td><td>fundSet = item fundPassword status "verified"; dynSet = item dynamicCode status "verified".</td></tr>
+</tbody>
+</table>
+<p><strong>Score band</strong>: score ≥ 80 → "Cao" tone win; ≥ 40 → "Trung bình" tone info; else "Thấp" tone danger. Fixture: factors name verified, phone verified, email pending, 2fa unset, fundpw unset → score = 2 × 20 = <strong>40</strong> → "Trung bình" (info), bar 40% wide. Fund and 2FA both unset → badges "Chưa thiết lập", actions "Thiết lập ngay" and "Bật".</p>
+<p><strong>Styles</strong></p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.panel</td><td>flex column; gap 24px; padding 24px</td></tr>
+<tr><td>.header</td><td>flex column; gap 16px</td></tr>
+<tr><td>.titleRow</td><td>flex; align flex-start; gap 8px</td></tr>
+<tr><td>.titleIcon</td><td>color #d4af37; flex 0 0 auto; margin-top 2px</td></tr>
+<tr><td>.titleText</td><td>flex column; gap 4px; min-width 0</td></tr>
+<tr><td>.title / .subtitle</td><td>24px 600 #f2f0e4 / 14px #888888</td></tr>
+<tr><td>.score</td><td>flex column; gap 8px; padding 16px; bg #1a1a1a; radius 12px</td></tr>
+<tr><td>.scoreTop</td><td>flex; align center; justify space-between; gap 12px</td></tr>
+<tr><td>.scoreLabel</td><td>14px #888888</td></tr>
+<tr><td>.scoreMeta</td><td>inline-flex; align baseline; gap 8px</td></tr>
+<tr><td>.scoreNum</td><td>20px; 700; num font; #d4af37</td></tr>
+<tr><td>.scoreMax</td><td>12px; #6f6f6f</td></tr>
+<tr><td>.bar</td><td>height 8px; radius pill; bg <span class="tok">--tint</span> rgba(242,240,228,0.05); overflow hidden</td></tr>
+<tr><td>.barFill</td><td>block; height 100%; radius pill; bg #d4af37; transition width 300ms <span class="tok">--ease-entrance</span></td></tr>
+<tr><td>.controls</td><td>flex column; gap 12px; no list styling</td></tr>
+<tr><td>.control</td><td>border 1px solid rgba(212,175,55,0.55); radius 12px; bg #1a1a1a; overflow hidden</td></tr>
+<tr><td>.controlHead</td><td>flex; align center; gap 12px; width 100%; min-height 44px; padding 12px 16px; transparent; border 0; text-align left; cursor pointer; color #f2f0e4</td></tr>
+<tr><td>.controlHead:hover</td><td>bg <span class="tok">--tint</span>; child .controlIcon scale(1.1)</td></tr>
+<tr><td>.controlHead:focus-visible</td><td>outline 2px solid #6ea8ff; offset −2px</td></tr>
+<tr><td>.controlIcon</td><td>grid center; 36×36px; radius 8px; bg <span class="tok">--tint</span>; color #d4af37; flex 0 0 auto; transition transform 200ms ease-standard</td></tr>
+<tr><td>.controlText</td><td>flex column; gap 4px; min-width 0; flex 1 1 auto</td></tr>
+<tr><td>.controlTitle / .controlSub</td><td>14px 600 #f2f0e4 / 12px #888888</td></tr>
+<tr><td>.controlAction</td><td>inline-flex; align center; gap 4px; flex 0 0 auto; 12px; 600; #d4af37</td></tr>
+<tr><td>.chevOpen</td><td>rotate(180deg); transition transform 200ms</td></tr>
+<tr><td>.controlBody</td><td>padding 16px; border-top 1px solid rgba(212,175,55,0.55)</td></tr>
+<tr><td>.form</td><td>flex column; gap 16px</td></tr>
+<tr><td>.field / .fieldLabel</td><td>flex column gap 4px / 12px #888888</td></tr>
+<tr><td>.input</td><td>width 100%; min-height 44px; padding 0 12px; border 1px solid rgba(212,175,55,0.55); radius 8px; bg #1a1a1a; color #f2f0e4; 14px; <span class="tok">--brand-font-body</span>; transition border-color 200ms; placeholder #6f6f6f</td></tr>
+<tr><td>.input:focus-visible</td><td>outline 2px solid #6ea8ff; offset 2px; border-color #6ea8ff</td></tr>
+<tr><td>.reveal</td><td>inline-flex; gap 4px; align-self flex-start; padding 4px 0; transparent; border 0; #888888; 12px; pointer; hover #d4af37</td></tr>
+<tr><td>.notice</td><td>12px; #888888; padding 8px 12px; radius 8px; bg <span class="tok">--tint</span>; border 1px solid rgba(212,175,55,0.55)</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/account/SecurityCenter.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * SecurityCenter — "Trung tâm an toàn" right-column panel. Tokens only.
+ * Mobile-first @375 (rows stack); desktop fills the content column.
+ * ==========================================================================*/
+
+.wrap {
+  min-width: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--card-pad); /* J9 spacious card 24px */
+}
+
+/* ---- header + score bar -------------------------------------------------- */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.titleIcon {
+  color: var(--brand-accent);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.titleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.title {
+  font-size: var(--t-h1); /* J9 section title 24/600 */
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.subtitle {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--card-pad-sm);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+}
+.scoreTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.scoreLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+.scoreMeta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.scoreNum {
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  font-family: var(--brand-font-num);
+  color: var(--brand-accent);
+}
+.scoreMax {
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+}
+.bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--tint);
+  overflow: hidden;
+}
+.barFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  transition: width var(--dur-slow) var(--ease-entrance);
+}
+
+/* ---- security controls (collapsible) ------------------------------------ */
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.control {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.controlHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--card-pad-sm);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-hi);
+}
+.controlHead:hover {
+  background: var(--tint);
+}
+.controlHead:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+/* icon affordance = scale(1.10). The trigger itself is a full-bleed row inside
+ * .control{overflow:hidden}, so a 1.05 row scale would clip; the icon carries it. */
+.controlHead:hover .controlIcon {
+  transform: scale(1.1);
+}
+.controlIcon {
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .controlIcon,
+  .controlHead:hover .controlIcon {
+    transform: none;
+  }
+}
+.controlIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--tint);
+  color: var(--brand-accent);
+  flex: 0 0 auto;
+}
+.controlText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.controlTitle {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.controlSub {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.controlAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  color: var(--brand-accent);
+}
+.chevOpen {
+  transform: rotate(180deg);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.controlBody {
+  padding: var(--card-pad-sm);
+  border-top: 1px solid var(--border);
+}
+
+/* ---- rows ---------------------------------------------------------------- */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.groupLabel {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.rowLabel {
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+}
+.rowValue {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-family: var(--brand-font-num);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowEmpty {
+  color: var(--text-dim);
+}
+.rowEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
+/* ---- change-password form ------------------------------------------------ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.fieldLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.input {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-hi);
+  font-size: var(--t-sm);
+  font-family: var(--brand-font-body);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.input::placeholder {
+  color: var(--text-dim);
+}
+/* focus is the locked neutral BLUE, not the brand gold — a gold focus ring on
+ * a gold-accented panel is indistinguishable from a selected/active state. */
+.input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+}
+.reveal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  padding: var(--space-1) 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-mid);
+  font-size: var(--t-micro);
+  cursor: pointer;
+}
+.reveal:hover {
+  color: var(--brand-accent);
+}
+.notice {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--tint);
+  border: 1px solid var(--border);
+}
+</code></pre>
+</details>
+<p><strong>States</strong>: accordion — at most one control open (<code>open: ControlId | null</code>; clicking the open one closes it). Closed → no body in DOM. Chevron rotates only while open (the rotation transition exists only on <code>.chevOpen</code>, so it animates on open and snaps back on close). Reveal toggle switches every field in that form between password/text. Submit or "Bật" shows the notice (stays). Guest: renders normally (no gate).</p>
+<p><strong>Motion</strong>: barFill width 300ms ease-entrance (fires only when score changes; static fixture → no visible animation); icon scale 200ms; reduced motion → icon transform forced <code>none</code>.</p>
+<p><strong>Copy</strong>: Trung tâm an toàn (Safety center) · Bảo vệ tài khoản bằng mật khẩu mạnh và xác thực động (Protect your account with a strong password and dynamic verification) · Điểm an toàn (Safety score) · / 100 · Thấp / Trung bình / Cao (Low / Medium / High) · Đổi mật khẩu đăng nhập (Change login password) · Dùng để đăng nhập vào tài khoản (Used to log in) · Mật khẩu rút tiền (Withdrawal password) · Yêu cầu khi rút tiền và đổi thông tin nhạy cảm (Required for withdrawals and sensitive changes) · Mã xác thực động (2FA) (Dynamic code) · Xác thực hai lớp bằng ứng dụng tạo mã (Two-factor via an authenticator app) · Thay đổi (Change) · Thiết lập ngay (Set up now) · Bật (Enable) · Mật khẩu cũ / Mật khẩu mới / Xác nhận mật khẩu mới / Xác nhận mật khẩu rút tiền (Old / New / Confirm new / Confirm withdrawal password) · Hiện mật khẩu / Ẩn mật khẩu (Show / Hide password) · Lưu thay đổi (Save changes) · Đã xác minh / Chưa thiết lập.</p>
+<div class="callout warn"><code>SecurityCenter.module.css</code> defines <code>.rows .groupLabel .list .row .rowMain .rowLabel .rowValue .rowEmpty .rowEnd</code> that no JSX uses (left over from the moved verification rows). <code>.controlIcon</code> is declared twice (transition block, then box block). <code>SecurityIndex.factors</code> labels are never shown. Inputs have no <code>name</code>, no validation, and the two fund forms share labels so React keys collide only per form (fine). A hard load on <code>#bao-mat</code> first paints ProfileBasic (hydration swap).</div>
+
+<h3 id="m-linked-accounts">BankAccounts and CryptoAddresses (hashes #ngan-hang, #vi-tien-ao)</h3>
+<p><strong>1. Purpose</strong> — lists of linked bank cards / crypto withdrawal addresses with a "default" badge and an add button that only shows a not-connected notice. <strong>2. Source</strong> — <code>src/components/account/LinkedAccounts.tsx</code>, <code>LinkedAccounts.module.css</code>.</p>
+<pre><code class="lang-txt">BankAccounts({cards})                         CryptoAddresses({addresses})
+section#ngan-hang.wrap aria-label="Liên kết thẻ ngân hàng"   section#vi-tien-ao.wrap aria-label="Địa chỉ ví"
+└─ Card default .panel
+   ├─ header.header
+   │  ├─ div.titleRow → Icon card 20 .titleIcon   (crypto: Icon chip 20)
+   │  │                + div.titleText → h2.title + p.subtitle
+   │  └─ Button ghost sm icon="check" → adding=true   "Thêm thẻ ngân hàng" | "Thêm địa chỉ ví"
+   ├─ [list empty] p.empty "Chưa liên kết thẻ ngân hàng" | "Chưa thêm địa chỉ ví"
+   ├─ [else] ul.list → li.item ×N
+   │     ├─ span.itemIcon aria-hidden → Icon card 22 (crypto: chip 22)
+   │     └─ div.itemMain
+   │        ├─ div.itemTop → span.itemName {bankName} | "{asset} · {network}"
+   │        │                + [isDefault] Badge tone=gold subtle "Mặc định"
+   │        ├─ span.itemNum {maskedNumber} | {maskedAddress}
+   │        └─ span.itemSub "Chủ thẻ: {holderName}" | "Mạng: {network}"
+   └─ [adding] p.notice role=status "Đây là bản giao diện mẫu — chưa kết nối hệ thống."</code></pre>
+<table>
+<thead><tr><th>Component</th><th>Prop</th><th>Type</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>BankAccounts</td><td>cards</td><td><code>BankCard[] {id, bankName, holderName, maskedNumber, isDefault}</code></td><td>rows or empty text</td></tr>
+<tr><td>CryptoAddresses</td><td>addresses</td><td><code>CryptoAddress[] {id, asset, network: "TRC20"|"ERC20"|"BEP20", maskedAddress, isDefault}</code></td><td>rows or empty text</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.panel</td><td>flex column; gap 16px; padding 24px</td><td>base</td></tr>
+<tr><td>.header</td><td>flex; align center; justify space-between; gap 12px; flex-wrap wrap</td><td>base</td></tr>
+<tr><td>.titleRow / .titleIcon / .titleText</td><td>flex, flex-start, gap 8px / #d4af37, margin-top 2px / flex column gap 4px</td><td>base</td></tr>
+<tr><td>.title / .subtitle</td><td>20px 600 #f2f0e4 / 12px #888888</td><td>base</td></tr>
+<tr><td>.empty</td><td>14px; #888888; padding 24px 0; centered</td><td>base</td></tr>
+<tr><td>.list</td><td>flex column; gap 12px; no list styling</td><td>base</td></tr>
+<tr><td>.item</td><td>flex; align flex-start; gap 12px; padding 16px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 12px</td><td>base</td></tr>
+<tr><td>.itemIcon</td><td>flex 0 0 auto; 40×40px; grid center; radius 8px; bg <span class="tok">--tint</span>; #d4af37</td><td>base</td></tr>
+<tr><td>.itemMain / .itemTop</td><td>flex column gap 4px min-width 0 / flex, center, gap 8px, wrap</td><td>base</td></tr>
+<tr><td>.itemName</td><td>16px 600 #f2f0e4</td><td>base</td></tr>
+<tr><td>.itemNum</td><td>14px; num font; #d6d3c7; letter-spacing 0.04em; word-break break-all</td><td>base</td></tr>
+<tr><td>.itemSub</td><td>12px #888888</td><td>base</td></tr>
+<tr><td>.notice</td><td>same as ProfileBasic .notice</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/account/LinkedAccounts.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * BankAccounts / CryptoAddresses — linked-account list panels. Tokens only.
+ * ==========================================================================*/
+
+.wrap {
+  min-width: 0;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--card-pad);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.titleIcon {
+  color: var(--brand-accent);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.titleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.title {
+  font-size: var(--t-h2); /* J9 sub-title 20/600 */
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.subtitle {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.empty {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  padding: var(--space-5) 0;
+  text-align: center;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--card-pad-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.itemIcon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--tint);
+  color: var(--brand-accent);
+}
+.itemMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.itemTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.itemName {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.itemNum {
+  font-size: var(--t-sm);
+  font-family: var(--brand-font-num);
+  color: var(--text);
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+.itemSub {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.notice {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--tint);
+  border: 1px solid var(--border);
+}
+</code></pre>
+</details>
+<p><strong>Data</strong>: bank — Vietcombank / NGUYEN VAN AN / •••• •••• 8866 / default; Techcombank / NGUYEN VAN AN / •••• •••• 6886. Crypto — USDT · TRC20 / TQ8r…9fAe / default; USDT · BEP20 / 0x6f…8d2C. DEMO_EMPTY → empty arrays → empty text.</p>
+<p><strong>Copy</strong>: Liên kết thẻ ngân hàng (Link bank card) · Liên kết thẻ ngân hàng để nạp và rút tiền (Link a bank card to deposit and withdraw) · Thêm thẻ ngân hàng (Add bank card) · Chưa liên kết thẻ ngân hàng (No bank card linked) · Chủ thẻ (Card holder) · Địa chỉ ví (Wallet address) · Quản lý địa chỉ ví tiền điện tử để rút (Manage crypto wallet addresses for withdrawal) · Thêm địa chỉ ví (Add wallet address) · Chưa thêm địa chỉ ví (No wallet address added) · Mạng (Network) · Mặc định (Default) · notice as above.</p>
+<div class="callout warn">The "add" button uses <code>icon="check"</code> (a tick) for an add action. The notice string is hard-coded in <code>NoBackendNotice</code> although the same text exists as <code>vi.account.uiOnlyNotice</code>. i18n keys <code>setDefault</code> ("Đặt mặc định") and <code>remove</code> ("Gỡ liên kết") are never rendered. No sidebar tile or link anywhere reaches <code>#ngan-hang</code> or <code>#vi-tien-ao</code>; the WithdrawPanel empty text sends users to "mục Bảo mật" instead. Crypto addresses exist in the UI although the wallet mock header says "No crypto".</div>
+</section>
+

@@ -1,0 +1,113 @@
+/* VIP area partial: the multi-layer hero backdrops, the FAQ accent bar and
+ * the heading type roles. Everything else on /vip is written as utilities in
+ * the components. */
+
+/* Heading type roles. The display face renders only in the display, h1 and h2
+ * roles (26px and up at 375); h3, h4 and body headings take the body face. */
+.vip-type-display {
+  font-family: var(--type-display-family);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-leading);
+  font-weight: var(--type-display-weight);
+}
+
+.vip-type-h1 {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+}
+
+.vip-type-h2 {
+  font-family: var(--type-h2-family);
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-leading);
+  font-weight: var(--type-h2-weight);
+}
+
+.vip-type-h3 {
+  font-family: var(--type-h3-family);
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-leading);
+  font-weight: var(--type-h3-weight);
+}
+
+.vip-type-h4 {
+  font-family: var(--type-h4-family);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-leading);
+  font-weight: var(--type-h4-weight);
+}
+
+.vip-type-body {
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+  font-weight: var(--type-body-weight);
+}
+
+/* Numeral roles: single-line tabular figures (points, percentages). */
+.vip-type-num-lg {
+  font-family: var(--type-num-lg-family);
+  font-size: var(--type-num-lg-size);
+  line-height: var(--type-num-lg-leading);
+  font-weight: var(--type-num-lg-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.vip-type-num-md {
+  font-family: var(--type-num-md-family);
+  font-size: var(--type-num-md-size);
+  line-height: var(--type-num-md-leading);
+  font-weight: var(--type-num-md-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* LevelRing numeral: the SVG sets its size (32px at the default ring), so
+ * this rule takes only the h2 face and weight. */
+.vip-ring-numeral {
+  font-family: var(--type-h2-family);
+  font-weight: var(--type-h2-weight);
+}
+
+/* VipHeroGuest: full-bleed hero backdrop, permitted as large background decoration */
+.vip-hero-guest-bg {
+  background:
+    radial-gradient(
+      120% 140% at 50% 0%,
+      color-mix(in srgb, var(--vip-gold-mid) 10%, transparent) 0%,
+      transparent 60%
+    ),
+    var(--vip-panel-bg);
+}
+
+/* VipHeroMember: gold-tinted panel with radial glow */
+.vip-hero-member-bg {
+  background:
+    radial-gradient(
+      120% 140% at 82% -20%,
+      color-mix(in srgb, var(--vip-gold-mid) 16%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 120% at 4% 0%,
+      color-mix(in srgb, var(--vip-gold-start) 14%, transparent) 0%,
+      transparent 48%
+    ),
+    var(--vip-panel-bg);
+}
+
+/* VipFaq: gold left accent bar, off by default, fades in when the row opens. */
+.vip-faq-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--vip-gold-mid);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.vip-faq-item-open::before {
+  opacity: 1;
+}

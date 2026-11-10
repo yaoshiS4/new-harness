@@ -1,0 +1,100 @@
+<section>
+<h2 id="f-typography">Typography — fonts, scale, numeric rules</h2>
+<h3 id="f-typography-loaders">next/font loaders (src/app/layout.tsx)</h3>
+<table><thead><tr><th>loader</th><th>subsets</th><th>weights</th><th>CSS variable on &lt;html&gt;</th><th>display</th><th>role</th></tr></thead><tbody><tr><td><code>Be_Vietnam_Pro</code></td><td><code>["latin", "vietnamese"]</code></td><td><code>["400", "600", "700"]</code></td><td><span class="tok">--font-be-vietnam</span></td><td><code>swap</code></td><td>body + tabular numerals</td></tr><tr><td><code>Montserrat</code></td><td><code>["latin", "vietnamese"]</code></td><td><code>["700", "800"]</code></td><td><span class="tok">--font-montserrat</span></td><td><code>swap</code></td><td>headings h1–h6, <code>.u-label</code>, display (/vip)</td></tr></tbody></table>
+<p>Both are imported from <code>next/font/google</code>, which self-hosts them at build time. The <code>.variable</code> classes go on <code>&lt;html className&gt;</code>, and Next defines <code>--font-be-vietnam</code> / <code>--font-montserrat</code> there with hashed family names. The chain is <code>--font-be-vietnam</code> → <code>--font-body</code> / <code>--font-num</code> (raw ramp) → <code>--brand-font-body</code> / <code>--brand-font-num</code> (what components read). Montserrat follows <code>--font-montserrat</code> → <code>--font-head</code> → <code>--brand-font-head</code> and <code>--brand-font-display</code>. There are no <code>@font-face</code> rules and no <code>@import</code> of fonts anywhere. <code>public/assets</code> has no <code>fonts/</code> folder (the README calls it "future").</p>
+<table><thead><tr><th>stack token</th><th>full value</th></tr></thead><tbody><tr><td><span class="tok">--font-body</span></td><td><code>var(--font-be-vietnam), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code></td></tr><tr><td><span class="tok">--font-num</span></td><td><code>var(--font-be-vietnam), ui-monospace, "DIN Alternate", "Segoe UI", sans-serif</code></td></tr><tr><td><span class="tok">--font-head</span></td><td><code>var(--font-montserrat), system-ui, "Segoe UI", Roboto, Arial, sans-serif</code></td></tr><tr><td><span class="tok">--brand-font-display</span></td><td><code>var(--font-head)</code></td></tr></tbody></table>
+<div class="callout warn">Weight coverage gaps (fact from the loader config). Montserrat loads only 700 and 800. Be Vietnam Pro loads only 400/600/700. Heading rules use <code>--weight-bold</code> (700, available). Any <code>font-weight: 600</code> on a Montserrat element would be synthesised or snapped to 700 by the browser. <code>.u-label</code> uses 800, which is loaded for Montserrat. Any element using Be Vietnam Pro at 800 would fall back to the nearest available weight, 700 (inference: browser weight matching).</div>
+<h3 id="f-typography-scale">Type scale tokens</h3>
+<table><thead><tr><th>token</th><th>value</th><th>note</th></tr></thead><tbody><tr><td><span class="tok">--t-micro</span></td><td>12px</td><td>dense caption</td></tr><tr><td><span class="tok">--t-sm</span></td><td>14px</td><td></td></tr><tr><td><span class="tok">--t-body</span></td><td>16px</td><td>body base</td></tr><tr><td><span class="tok">--t-h3</span></td><td>18px</td><td></td></tr><tr><td><span class="tok">--t-h2</span></td><td>20px</td><td></td></tr><tr><td><span class="tok">--t-h1</span></td><td>24px</td><td>section heading</td></tr><tr><td><span class="tok">--t-display</span></td><td>32px</td><td></td></tr><tr><td><span class="tok">--t-hero</span></td><td>40px</td><td>hero counters</td></tr><tr><td><span class="tok">--t-num</span></td><td>16px</td><td>inline tabular money</td></tr><tr><td><span class="tok">--t-num-lg</span></td><td>32px</td><td>hero tabular money</td></tr><tr><td><span class="tok">--t-balance</span></td><td>28px</td><td>member hero balance</td></tr><tr><td><span class="tok">--lh-body</span></td><td>1.5</td><td></td></tr><tr><td><span class="tok">--lh-tight</span></td><td>1.3</td><td>minimum for VN text ≤14px</td></tr><tr><td><span class="tok">--weight-reg</span></td><td>400</td><td></td></tr><tr><td><span class="tok">--weight-semi</span></td><td>600</td><td></td></tr><tr><td><span class="tok">--weight-bold</span></td><td>700</td><td></td></tr></tbody></table>
+<p><code>reset.css</code> sets <code>html { font-size: 14px }</code>. Every token is in absolute px, so this affects only rem/em/ch-based values. In <code>src/ui</code> those are <code>Button .icon 1.25em</code>, <code>.spinner 1.1em</code>, <code>Pill .icon 1.1em</code>, <code>Icon size default 1em</code>, <code>Skeleton height default 1em</code>, and the <code>40ch</code>/<code>60ch</code>/<code>2ch</code> measures.</p>
+<h3 id="f-typography-cascade">Document-level type cascade (exact order)</h3>
+<ol>
+<li><code>typography.css body</code>: <code>font-family: var(--brand-font-body); font-size: var(--t-body) (16px); line-height: var(--lh-body) (1.5); font-weight: var(--weight-reg) (400); color: var(--text-hi) (#f2f0e4)</code>.</li>
+<li><code>typography.css h1–h6</code>: <code>font-family: var(--brand-font-head)</code> (Montserrat); <code>letter-spacing: -0.02em</code>.</li>
+<li><code>globals.css h1–h6</code> (loads after): <code>font-weight: var(--weight-bold)</code> (700); <code>line-height: var(--lh-tight)</code> (1.3). Heading font-size is not set globally, so browser defaults apply unless a component sets one.</li>
+<li><code>globals.css body</code> repeats <code>font-family</code>, <code>font-size</code>, <code>line-height</code> and <code>color</code>, and adds <code>background: var(--canvas)</code>, <code>min-height: 100%</code>, <code>overflow-x: hidden</code>.</li>
+<li><code>globals.css small</code>: <code>font-size: var(--t-sm)</code> (14px); <code>color: var(--text-mid)</code> (#888888).</li>
+</ol>
+<div class="callout warn"><code>globals.css</code> says "Headings inherit the body face", but <code>typography.css</code> sets headings to <code>--brand-font-head</code> (Montserrat). The comment is stale; the code wins. Browser-default heading sizes apply (e.g. h1 = 2em of the parent's size) wherever a component does not set <code>font-size</code>.</div>
+<h3 id="f-typography-utilities">Global utility hooks (non-module classes / attributes)</h3>
+<table><thead><tr><th>selector</th><th>declarations</th><th>used in src</th></tr></thead><tbody><tr><td><code>.u-label, [data-label="upper"]</code></td><td><code>font-family: var(--brand-font-head); font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; line-height: var(--lh-tight)</code></td><td><strong>never used</strong> (rg finds no <code>u-label</code> class or <code>data-label=</code>)</td></tr><tr><td><code>.money, [data-numeric]</code></td><td><code>font-family: var(--brand-font-num); font-variant-numeric: tabular-nums</code></td><td><code>[data-numeric]</code> is used in 4 places: <code>contribution/RateTable.tsx</code> td, <code>contribution/TableFoot.tsx</code> stamp, <code>restricted/RestrictedTable.tsx</code> td, <code>restricted/RestrictedFoot.tsx</code> stamp. The global <code>.money</code> class is never applied: <code>MoneyValue</code> uses its own hashed module class named <code>money</code>.</td></tr></tbody></table>
+<h3 id="f-typography-numeric">Numeric / tabular rules</h3>
+<ul>
+<li>Every money, odds, count and countdown primitive sets <code>font-family: var(--brand-font-num); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1</code>. This covers MoneyValue <code>.money</code>, Odometer <code>.odometer</code> and Countdown <code>.countdown</code>. MoneyValue and Odometer also set <code>white-space: nowrap</code>; Countdown does not.</li>
+<li>Number formatting lives only in <code>src/lib/format.ts</code> (see <a href="#f-lib-format">f-lib-format</a>). VND uses <code>.</code> thousands grouping and a trailing <code>" ₫"</code>. Odds use 2 decimals with a <code>.</code> decimal point. Percent uses a <code>,</code> decimal only when decimals are requested.</li>
+</ul>
+<details><summary>Verbatim src/styles/typography.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — typography layer (SPEC-04 styles/typography.css)
+ * ----------------------------------------------------------------------------
+ * TWO faces, both Vietnamese-complete (Flat / Dark-Luxury, PM ruling A4):
+ *
+ *   Be Vietnam Pro  → body / numerals   (--brand-font-body / --brand-font-num)
+ *   Montserrat      → display, headings, uppercase labels (--brand-font-head)
+ *
+ * Outfit is REJECTED and must not be reintroduced. Measured against the Google
+ * Fonts API: Outfit serves `latin` + `latin-ext` only, and latin-ext covers
+ * U+1E00–1E9F plus U+1EF2–1EFF while SKIPPING U+1EA0–1EF1 — precisely the
+ * block holding the toned Vietnamese vowels. `BỘ SƯU TẬP` (Ộ = U+1ED8) and
+ * `Đổi thưởng` (ổ = U+1ED5, ở = U+1EDF) both fall out of the face mid-word.
+ * Montserrat and Be Vietnam Pro BOTH serve the `vietnamese` subset
+ * (U+1EA0–1EF9), so every string in this product renders in one typeface.
+ *
+ * LOADING: next/font/google in app/layout.tsx, injected as --font-be-vietnam
+ * and --font-montserrat on &lt;html&gt;. tokens.css wraps them in the raw-ramp
+ * --font-body / --font-num / --font-head, and components read only the
+ * --brand-font-* aliases (lint A2). No @font-face and no @import here.
+ * ==========================================================================*/
+
+/* Base type ramp. Components read --t-* / --weight-* tokens; these are the
+ * document-level defaults so unstyled VN copy is already on the AA ladder. */
+body {
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-reg);
+  color: var(--text-hi);
+}
+
+/* ---- Display / headings -------------------------------------------------
+ * Montserrat, tightened to -0.02em per the design system. Weight and
+ * line-height are set by globals.css (which loads after this sheet), so this
+ * rule deliberately declares family + tracking ONLY — no cascade fight.
+ * /vip headings opt out by class (.vipSectionHeading etc. carry
+ * --brand-font-display at class specificity, which wins over these element
+ * selectors), so the Cinzel luxury layer is untouched. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--brand-font-head);
+  letter-spacing: -0.02em;
+}
+
+/* ---- Uppercase labels ---------------------------------------------------
+ * The system's "tracking-wider" treatment: display face, heaviest weight,
+ * OPEN tracking (uppercase VN needs the extra sidebearing — stacked tone +
+ * vowel marks collide at negative tracking). A global opt-in hook, matching
+ * the [data-numeric] convention below: CSS Modules hash their own class names,
+ * so a module cannot reach this rule by accident. Apply with
+ * className="u-label" or data-label="upper". */
+.u-label,
+[data-label="upper"] {
+  font-family: var(--brand-font-head);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: var(--lh-tight);
+}
+
+/* Tabular numerals so money/odds don't reflow on tick (SPEC-02 §4 / A8). */
+.money,
+[data-numeric] {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+}
+</code></pre></details>
+</section>
+

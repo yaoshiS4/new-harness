@@ -1,0 +1,5 @@
+scripts/verify-routes.mjs
+.unlazy/yaobet-rebuild/genplan.py
+.unlazy/yaobet-rebuild/checks/U3.sh
+.unlazy/yaobet-rebuild/checks/U7.sh
+.unlazy/yaobet-rebuild/GATES.md

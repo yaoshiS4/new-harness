@@ -1,0 +1,58 @@
+# PM-approved A11 exceptions, one per line: <path><TAB><exact substring of the hit line>.
+# Filled only after a PM ruling (PR-32). Empty means no exception.
+src/app/dev/collection-ports/page.tsx	GC-101 proxy. Eleven ports, four envelope states. Fixtures inject
+src/app/dev/collection-ports/page.tsx	refuse on purpose — they are blocked on BR-03, BR-04 and BR-05.
+src/lib/collection/adapters/fixtures.ts	rateTableVersion: "provisional-demo (BR-03/04/05 chưa chốt)",
+src/app/fonts/montserrat/OFL.txt	3:This Font Software is licensed under the SIL Open Font License, Version 1.1.
+src/app/fonts/montserrat/OFL.txt	4:This license is copied below, and is also available with a FAQ at:
+src/app/fonts/montserrat/OFL.txt	5:https://openfontlicense.org
+src/app/fonts/montserrat/OFL.txt	9:SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+src/app/fonts/montserrat/OFL.txt	13:The goals of the Open Font License (OFL) are to stimulate worldwide
+src/app/fonts/montserrat/OFL.txt	19:The OFL allows the licensed fonts to be used, studied, modified and
+src/app/fonts/montserrat/OFL.txt	24:however, cannot be released under any other type of license. The
+src/app/fonts/montserrat/OFL.txt	25:requirement for fonts to remain under this license does not apply
+src/app/fonts/montserrat/OFL.txt	30:Holder(s) under this license and clearly marked as such. This may
+src/app/fonts/montserrat/OFL.txt	58:contains the above copyright notice and this license. These can be
+src/app/fonts/montserrat/OFL.txt	75:must be distributed entirely under this license, and must not be
+src/app/fonts/montserrat/OFL.txt	76:distributed under any other license. The requirement for fonts to
+src/app/fonts/montserrat/OFL.txt	77:remain under this license does not apply to any document created
+src/app/fonts/montserrat/OFL.txt	81:This license becomes null and void if any of the above conditions are
+src/app/fonts/inter/OFL.txt	3:This Font Software is licensed under the SIL Open Font License, Version 1.1.
+src/app/fonts/inter/OFL.txt	4:This license is copied below, and is also available with a FAQ at:
+src/app/fonts/inter/OFL.txt	9:SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+src/app/fonts/inter/OFL.txt	13:The goals of the Open Font License (OFL) are to stimulate worldwide
+src/app/fonts/inter/OFL.txt	19:The OFL allows the licensed fonts to be used, studied, modified and
+src/app/fonts/inter/OFL.txt	24:however, cannot be released under any other type of license. The
+src/app/fonts/inter/OFL.txt	25:requirement for fonts to remain under this license does not apply
+src/app/fonts/inter/OFL.txt	30:Holder(s) under this license and clearly marked as such. This may
+src/app/fonts/inter/OFL.txt	58:contains the above copyright notice and this license. These can be
+src/app/fonts/inter/OFL.txt	75:must be distributed entirely under this license, and must not be
+src/app/fonts/inter/OFL.txt	76:distributed under any other license. The requirement for fonts to
+src/app/fonts/inter/OFL.txt	77:remain under this license does not apply to any document created
+src/app/fonts/inter/OFL.txt	81:This license becomes null and void if any of the above conditions are
+src/app/fonts/playfair-display/OFL.txt	3:This Font Software is licensed under the SIL Open Font License, Version 1.1.
+src/app/fonts/playfair-display/OFL.txt	4:This license is copied below, and is also available with a FAQ at:
+src/app/fonts/playfair-display/OFL.txt	9:SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+src/app/fonts/playfair-display/OFL.txt	13:The goals of the Open Font License (OFL) are to stimulate worldwide
+src/app/fonts/playfair-display/OFL.txt	19:The OFL allows the licensed fonts to be used, studied, modified and
+src/app/fonts/playfair-display/OFL.txt	24:however, cannot be released under any other type of license. The
+src/app/fonts/playfair-display/OFL.txt	25:requirement for fonts to remain under this license does not apply
+src/app/fonts/playfair-display/OFL.txt	30:Holder(s) under this license and clearly marked as such. This may
+src/app/fonts/playfair-display/OFL.txt	58:contains the above copyright notice and this license. These can be
+src/app/fonts/playfair-display/OFL.txt	75:must be distributed entirely under this license, and must not be
+src/app/fonts/playfair-display/OFL.txt	76:distributed under any other license. The requirement for fonts to
+src/app/fonts/playfair-display/OFL.txt	77:remain under this license does not apply to any document created
+src/app/fonts/playfair-display/OFL.txt	81:This license becomes null and void if any of the above conditions are
+src/app/fonts/be-vietnam-pro/OFL.txt	3:This Font Software is licensed under the SIL Open Font License, Version 1.1.
+src/app/fonts/be-vietnam-pro/OFL.txt	4:This license is copied below, and is also available with a FAQ at:
+src/app/fonts/be-vietnam-pro/OFL.txt	9:SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+src/app/fonts/be-vietnam-pro/OFL.txt	13:The goals of the Open Font License (OFL) are to stimulate worldwide
+src/app/fonts/be-vietnam-pro/OFL.txt	19:The OFL allows the licensed fonts to be used, studied, modified and
+src/app/fonts/be-vietnam-pro/OFL.txt	24:however, cannot be released under any other type of license. The
+src/app/fonts/be-vietnam-pro/OFL.txt	25:requirement for fonts to remain under this license does not apply
+src/app/fonts/be-vietnam-pro/OFL.txt	30:Holder(s) under this license and clearly marked as such. This may
+src/app/fonts/be-vietnam-pro/OFL.txt	58:contains the above copyright notice and this license. These can be
+src/app/fonts/be-vietnam-pro/OFL.txt	75:must be distributed entirely under this license, and must not be
+src/app/fonts/be-vietnam-pro/OFL.txt	76:distributed under any other license. The requirement for fonts to
+src/app/fonts/be-vietnam-pro/OFL.txt	77:remain under this license does not apply to any document created
+src/app/fonts/be-vietnam-pro/OFL.txt	81:This license becomes null and void if any of the above conditions are

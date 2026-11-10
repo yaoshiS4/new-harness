@@ -1,0 +1,3 @@
+src/app/(member)/vi-tien/**
+src/components/wallet/**
+src/styles/areas/member.css

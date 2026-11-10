@@ -1,0 +1,430 @@
+<section>
+<h2 id="r-store-product-card">ProductCard</h2>
+<h4>1. Purpose</h4><p>One reward: image with category tag, base-points coin badge and live cooldown chip; name, face value, withdrawal condition and a single state-driven CTA.</p>
+<h4>2. Source</h4><p><code>src/components/store/ProductCard.tsx</code>; styles in <code>ProductGrid.module.css</code>.</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">Card(variant="product").card
+  div.media[.mediaSoldOut]
+    imgFailed ? div.fallbackTile aria-label=name: Icon gift 28 .fallbackGlyph + span.fallbackName name
+              : img.img src=product.imageSrc alt=name loading=lazy onError→imgFailed
+    span.categoryTag   soldOut ? "Tạm hết" : ("Voucher tiền" | "Sản phẩm")
+    span.pointsBadge   span.pMark aria-hidden "P" + formatCount(basePoints)
+    running &amp;&amp; span.cooldownChip
+        Icon history 13 .cooldownGlyph · span.cooldownLabel "Thời gian chờ" · Countdown(endsAt, zeroLabel "Có thể đổi ngay").cooldownClock
+  div.body
+    h3.title           name (2-line clamp)
+    div.valueRow       span.value formatVnd(faceValue) · (voucher) span.rollingLine "Rút sau {n} vòng cược"
+    Button.cta(variant, size=sm, fullWidth, disabled) label</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>default</th><th>effect</th></tr></thead><tbody>
+<tr><td>product</td><td>Product</td><td>—</td><td>data</td></tr><tr><td>points</td><td>number</td><td>—</td><td>affordability</td></tr><tr><td>allowed</td><td>boolean</td><td>—</td><td>member vs guest</td></tr><tr><td>paused</td><td>boolean?</td><td>—</td><td><strong>ignored</strong> (not destructured)</td></tr><tr><td>onRedeem</td><td>(p) =&gt; void</td><td>—</td><td>CTA click</td></tr></tbody></table>
+<h4>CTA resolution (first match wins)</h4>
+<table><thead><tr><th>Condition</th><th>Label</th><th>Button variant</th><th>Disabled</th></tr></thead><tbody>
+<tr><td>stockRemaining ≤ 0</td><td>Tạm hết hàng</td><td>ghost</td><td>yes</td></tr>
+<tr><td>member &amp;&amp; branch === "at_floor"</td><td>Hết lượt đổi</td><td>ghost</td><td>yes</td></tr>
+<tr><td>guest</td><td>Đăng nhập để đổi</td><td>gold</td><td>no</td></tr>
+<tr><td>member &amp;&amp; basePoints &gt; points</td><td>Thiếu {formatCount(base − points)} điểm</td><td>ghost</td><td>yes</td></tr>
+<tr><td>otherwise</td><td>Đổi ngay</td><td>gold</td><td>no</td></tr>
+</tbody></table>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th></tr></thead><tbody>
+<tr><td>.card</td><td>flex column; gap 0; padding 0; width/height 100%; min-width 0; overflow hidden</td></tr>
+<tr><td>.media</td><td>relative; aspect-ratio 3 / 2; overflow hidden; background #1a1a1a</td></tr>
+<tr><td>.img</td><td>100%×100%; object-fit cover; block</td></tr>
+<tr><td>.mediaSoldOut .img</td><td>opacity 0.4</td></tr>
+<tr><td>.pointsBadge</td><td>absolute top 8px right 8px; inline-flex centre gap 4px; padding 2px 8px 2px 4px; radius pill; background #0a0a0a; border 1px rgba(212,175,55,.55); #d4af37; 700; 14px; tabular; line-height 1</td></tr>
+<tr><td>.pMark</td><td>inline-flex centred; 1.35em × 1.35em; radius pill; background #d4af37; colour #0a0a0a; font-size 0.78em; 700</td></tr>
+<tr><td>.categoryTag</td><td>absolute top 8px left 8px; padding 2px 8px; radius pill; background #141414; border 1px rgba(212,175,55,.55); #888888; 12px 600; line-height 1.4</td></tr>
+<tr><td>.fallbackTile</td><td>flex column centred; gap 8px; 100%×100%; padding 12px; #1a1a1a; border 1px rgba(212,175,55,.55); centred text</td></tr>
+<tr><td>.fallbackGlyph</td><td>#d4af37 opacity .7</td></tr>
+<tr><td>.fallbackName</td><td>12px #888888 lh 1.3, 2-line clamp</td></tr>
+<tr><td>.body</td><td>flex column; gap 8px; flex 1 1 auto; min-width 0; padding 16px</td></tr>
+<tr><td>.title</td><td>16px 600 #f2f0e4 lh 1.3; 2-line clamp (-webkit-line-clamp 2)</td></tr>
+<tr><td>.valueRow</td><td>flex baseline space-between gap 8px</td></tr>
+<tr><td>.value</td><td>flex none; 18px 700 #d4af37; tabular; lh 1.3</td></tr>
+<tr><td>.rollingLine</td><td>flex 0 1 auto; min-width 0; 12px lh 1.3 #888888; nowrap; ellipsis; right-aligned</td></tr>
+<tr><td>.cooldownChip</td><td>absolute left 8px bottom 8px; inline-flex centre gap 4px; max-width calc(100% − 16px); padding 3px 8px; radius pill; background #0a0a0a; border 1px rgba(245,166,35,.45); 12px; lh 1.3; nowrap</td></tr>
+<tr><td>.cooldownGlyph</td><td>#f5a623</td></tr>
+<tr><td>.cooldownLabel</td><td>#888888</td></tr>
+<tr><td>.cooldownClock</td><td>#f5a623; 700; tabular</td></tr>
+<tr><td>.cta</td><td>margin-top auto (pins to card floor)</td></tr>
+</tbody></table>
+<details><summary>Verbatim ProductGrid.module.css (tabs, grid, card)</summary><pre><code class="lang-css">/* ProductCard / ProductGrid — points catalog. Tokens only; @360 no overflow.
+ * Grid ramp: 2-up (base) → 3-up (@768) → 4-up (@1024). The image bleeds to the
+ * card edge; a coin badge floats top-right; the body below carries title, value,
+ * withdrawal condition, a live cooldown chip, and a floored CTA. */
+
+/* ---- Filter tabs (client-side, filter by category) ---------------------- */
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+/* uniform hover — every tab scales 1.05, including the active one. The active
+ * tab is marked by COLOUR (--brand-accent), never by size. */
+.tab:hover {
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+
+.tabActive {
+  color: var(--brand-accent);
+  background: var(--surface-2);
+  border-color: var(--brand-accent-hairline);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--gutter);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.cell {
+  display: flex;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* media + body own their spacing; image bleeds full-width */
+  padding: 0;
+  width: 100%;
+  height: 100%; /* fill the stretched cell → equal card heights across the row */
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ---- Thumbnail ---------------------------------------------------------- */
+.media {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Sold-out treatment — dim the thumbnail. The `filter: grayscale(1)` that used
+ * to sit here is gone: the flat system's ban is on depth (shadow / drop-shadow /
+ * backdrop-blur), and the cheapest way to keep "computed filter is none" true
+ * everywhere is to not run a filter at all. Nothing is lost — sold-out is
+ * dual-encoded by the explicit "Tạm hết" tag in .categoryTag plus this dim, so
+ * the state never depended on desaturation to be read. */
+.mediaSoldOut .img {
+  opacity: 0.4;
+}
+
+/* Points coin pill — top-RIGHT corner badge: the BASE (original) points price. */
+.pointsBadge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2) 2px var(--space-1);
+  border-radius: var(--radius-pill);
+  /* OPAQUE. Was a 78% canvas wash over `backdrop-filter: blur(4px)`; the flat
+   * system bans backdrop-blur, and a translucent chip without the blur reads as
+   * a smear over the artwork. A solid canvas chip is the honest flat answer. */
+  background: var(--canvas);
+  border: 1px solid var(--brand-accent-hairline);
+  color: var(--brand-accent);
+  font-weight: var(--weight-bold);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* The gold "P" coin mark inside the badge. --brand-accent-grad resolves to a
+ * SOLID #d4af37 under the flat re-skin (tokens.css) — the name is historical.
+ * The glyph is --brand-on-accent dark ink: white on this gold is 2.11:1 (AA
+ * fail), dark ink is 9.42:1. */
+.pMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-size: 0.78em;
+  font-weight: var(--weight-bold);
+}
+
+/* Top-LEFT tag — category ("Voucher tiền"/"Sản phẩm"), OR the single "Tạm hết"
+   sold-out signal (one sold-out tag, no third string). */
+.categoryTag {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface); /* opaque — backdrop-blur removed (flat ban) */
+  border: 1px solid var(--border);
+  color: var(--text-mid);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  line-height: 1.4;
+}
+
+/* Branded fallback tile when the product image fails to load — never a dropzone.
+   Obsidian bg + gold hairline + centered muted gift glyph over the product name. */
+.fallbackTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--brand-accent-hairline);
+  text-align: center;
+}
+
+.fallbackGlyph {
+  color: var(--brand-accent);
+  opacity: 0.7;
+}
+
+.fallbackName {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- Body --------------------------------------------------------------- */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+/* Reward name — up to two lines, then ellipsis (keeps card rhythm). */
+.title {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Reward value — the amount the member receives IN FULL (gold accent figure). */
+/* Value + rolling share ONE row — value left (gold), rolling right (muted). */
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.value {
+  flex: none;
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+}
+
+/* Withdrawal condition — "Rút sau N vòng cược" (VOUCHERS only; info only). */
+.rollingLine {
+  margin: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+/* Reserved empty slot on PHYSICAL-product cards — matches the voucher rolling
+   line's vertical footprint (1 line of --t-sm) so value/CTA baselines stay
+   pixel-aligned across a mixed voucher+product row. */
+.rollingSlot {
+  display: block;
+  font-size: var(--t-sm);
+  line-height: var(--lh-tight);
+  min-height: 1em;
+}
+
+/* Live cooldown — a solid dark chip OVERLAID on the thumbnail (bottom-left) so
+   the card body stays identical across every card: equal heights, floored CTAs.
+   Amber-accented "waiting" affordance; present only while the cooldown runs.
+   Was "dark-glass": a 72% wash + backdrop-blur(6px). Flat bans backdrop-blur,
+   so the chip is now simply opaque. */
+.cooldownChip {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: calc(100% - var(--space-4));
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--canvas);
+  border: 1px solid color-mix(in srgb, var(--caution) 45%, transparent);
+  font-size: var(--t-micro);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.cooldownGlyph {
+  flex: none;
+  color: var(--caution);
+}
+
+.cooldownLabel {
+  color: var(--text-mid);
+}
+
+.cooldownClock {
+  color: var(--caution);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- TEMPORARY limit-lock (at_floor) body status ------------------------
+   Sits ABOVE .cta inside .body so equal-height + floored CTA are preserved.
+   Amber semantic (allowed-but-costs-more cap), NOT a loss/red. Full-color thumb
+   stays — this is a temporary "come back later", distinct from grayscale Hết hàng. */
+.limitStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--caution) 30%, var(--border));
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.limitGlyph {
+  flex: none;
+  color: var(--caution);
+}
+
+.limitStatusText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.limitStatusLine {
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+}
+
+.limitClock {
+  color: var(--caution);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --text-mid, not --text-dim: this is the helper sentence a capped member reads
+ * to understand the lock — functional copy. --text-dim is decorative-only and
+ * measures 3.67:1 on the card's --surface; --text-mid is 5.20:1. */
+.limitHelper {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+}
+
+/* CTA pinned to the card floor — equalizes the button baseline across the row. */
+.cta {
+  margin-top: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+  /* absent, not instant */
+  .tab:hover {
+    transform: none;
+  }
+}</code></pre></details>
+<h4>6. States</h4>
+<ul>
+<li><strong>Affordable</strong> (member, base ≤ balance, stock &gt; 0, not at floor): gold "Đổi ngay".</li>
+<li><strong>Not enough points</strong>: ghost disabled "Thiếu N điểm" (N = base − balance, VN grouping).</li>
+<li><strong>Disabled at limit</strong> (at_floor): ghost disabled "Hết lượt đổi"; cooldown chip still visible; image full colour.</li>
+<li><strong>Out of stock</strong>: tag becomes "Tạm hết", image opacity .4, ghost disabled "Tạm hết hàng" (applies to guests too).</li>
+<li><strong>Cooldown running</strong> (member only): chip bottom-left of image with live HH:MM:SS. When it reaches zero the Countdown fires onZeroState → <code>nowMs</code> re-read → <code>running</code> false → chip disappears and the branch returns to base.</li>
+<li><strong>Guest</strong>: no chip, never "Thiếu…", CTA gold "Đăng nhập để đổi" (except sold-out).</li>
+<li><strong>Image error</strong>: fallback tile (gift glyph + name).</li>
+<li>Button hover/focus/disabled visuals: <a href="#f-ui-button">#f-ui-button</a> (gold/ghost, size sm, fullWidth).</li>
+</ul>
+<h4>7. Motion</h4><p>None on the card itself (Card variant hover per F). Countdown ticks every 1 s (reduced motion: single timeout to the deadline, no per-second tick).</p>
+<h4>8. Copy</h4>
+<table><thead><tr><th>VI</th><th>EN gloss</th><th>Where</th></tr></thead><tbody>
+<tr><td>Voucher tiền / Sản phẩm / Tạm hết</td><td>Cash voucher / Product / Temporarily out</td><td>top-left tag</td></tr>
+<tr><td>P {n}</td><td>points badge</td><td>top-right</td></tr>
+<tr><td>Thời gian chờ HH:MM:SS (or "N ngày HH:MM:SS")</td><td>Wait time</td><td>cooldown chip</td></tr>
+<tr><td>Có thể đổi ngay</td><td>Can redeem now</td><td>Countdown zero label (shown only if the chip is still mounted at 0)</td></tr>
+<tr><td>Rút sau {n} vòng cược</td><td>Withdraw after n rollovers</td><td>vouchers only</td></tr>
+<tr><td>Đổi ngay / Thiếu {n} điểm / Tạm hết hàng / Đăng nhập để đổi / Hết lượt đổi</td><td>Redeem now / Short n points / Out of stock / Log in to redeem / No redemptions left</td><td>CTA</td></tr>
+</tbody></table>
+<h4>9. Data</h4><p>Card face never shows per-user data except the member's cooldown chip; the badge always shows <code>basePoints</code> (never the escalated cost). Values: <code>formatVnd</code> → "200.000 ₫"; <code>formatCount</code> → "1.000".</p>
+<h4>10. Behaviour &amp; a11y</h4><p>The whole card is not clickable; only the CTA. img alt = product name; fallback tile aria-label = name.</p>
+<div class="callout warn">Header comment promises a "disabled-everywhere card face" when the program budget breaker is paused; <code>paused</code> is never read by ProductCard, so with DEMO_PAUSED the cards still say "Đổi ngay" and only the dialog changes. CSS ships unused <code>.rollingSlot</code>, <code>.limitStatus*</code>, <code>.limitGlyph</code>, <code>.limitClock</code>, <code>.limitHelper</code> (an older in-body limit status).</div>
+</section>
+

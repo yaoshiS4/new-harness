@@ -1,0 +1,9 @@
+src/lib/mock/records.ts
+src/lib/mock/messages.ts
+src/lib/mock/notification-feed.ts
+src/lib/mock/profile.ts
+src/lib/mock/deposit.ts
+src/lib/mock/medals.ts
+src/lib/mock/contribution.ts
+src/lib/mock/lottery.ts
+src/lib/mock/index.ts

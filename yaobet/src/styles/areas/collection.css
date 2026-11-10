@@ -1,0 +1,495 @@
+/* Collection area partial: the rules kept as selectors. The plate wings, the
+ * whole pack stage sheet, the card-art keyframes and the ceremony's data-beat /
+ * data-ready states. Everything else on /bo-suu-tap is written as utilities in
+ * the components. */
+
+/* ══ collection: the section plate ═════════════════════════════════════════ */
+
+/* ============================================================================
+ * Yaobet — BỘ SƯU TẬP · "Tủ Kính".
+ * Zone 1 = chance, Zone 2 = contract. Semantic tokens only.
+ * ==========================================================================*/
+
+/* The two wings STAY gradients, and that is the ruling rather than an oversight:
+   the system bans gradients on buttons and cards and explicitly permits "subtle
+   directional gradients for background decoration". A 2px rule that fades into
+   the page is decoration by definition — it is not a control, it has no hit
+   area, and a solid gold bar either side of the heading is heavier than the
+   plate it frames. Re-pointed to the brand hairline so it follows the palette. */
+.collection-collection-plate-wing {
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, transparent, var(--brand-accent-hairline));
+}
+
+.collection-collection-plate .collection-collection-plate-wing:last-child {
+  background: linear-gradient(90deg, var(--brand-accent-hairline), transparent);
+}
+
+/* set name and dialog title use the h4 type role */
+.collection-heading-h4 {
+  font-family: var(--type-h4-family);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-leading);
+  font-weight: var(--type-h4-weight);
+}
+
+/* the set reward figure uses the num-lg type role: one line of tabular money */
+.collection-num-lg {
+  font-family: var(--type-num-lg-family);
+  font-size: var(--type-num-lg-size);
+  line-height: var(--type-num-lg-leading);
+  font-weight: var(--type-num-lg-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══ pack: the pack-opening stage ══════════════════════════════════════════ */
+
+/* ============================================================================
+ * Yaobet — pack-opening stage.
+ * Big, lit, animated. No money figure exists on this surface by construction.
+ * ==========================================================================*/
+
+.collection-pack-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  /* full-bleed: break out of the page gutter so the stage owns the screen */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: var(--space-3) var(--gutter) var(--space-5);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  min-height: 500px;
+  align-content: space-between;
+}
+
+/* every child sits in one centred column, whatever the viewport — except the
+   two out-of-flow layers: the backdrop and the terms button */
+.collection-pack-stage > *:not(.collection-pack-stadium):not(.collection-pack-chrome) {
+  width: 100%;
+  max-width: 620px;
+}
+
+.collection-pack-stadium {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  /* the light paint in the stadium and foil art reads currentColor */
+  color: var(--text-hi);
+}
+
+/* ── the terms button ───────────────────────────────────────────────────────
+   Sits in the sky, above the stands and clear of both the packs on the floor
+   and the CTA. An OPAQUE chip, not a bare glyph: the backdrop behind it runs
+   from a dark sky gradient to a bright floodlight ellipse, so a translucent
+   treatment fails contrast at one of the two ends. */
+
+/* The reference cluster: history + terms, paired top-right. Positioning moved
+   to the wrapper so the two buttons stay a unit and the stage keeps exactly one
+   piece of chrome rather than two floating chips. */
+.collection-pack-chrome {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  z-index: 2;
+}
+
+/* FLAT: a square-cornered control, not a pill. Pills are reserved for tags and
+   badges now; a control that is round for decoration reads as a chip. The gold
+   hairline is what separates it from the sky behind it — there is no shadow to
+   do that job. */
+.collection-pack-info {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-accent-hairline);
+  background: var(--surface);
+  color: var(--text-hi);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* Icons inside a hovered control step up 1.10 while the control steps 1.05 —
+   the group-hover idiom, applied identically to every icon-bearing control. */
+.collection-pack-info svg { transition: transform var(--dur-fast) var(--ease-standard); }
+
+.collection-pack-info:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent);
+  transform: scale(1.05);
+}
+
+.collection-pack-info:hover svg { transform: scale(1.1); }
+
+.collection-pack-info:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+
+
+/* ── the floor ──────────────────────────────────────────────────────────── */
+
+.collection-pack-floor {
+  display: grid;
+  place-items: center;
+  min-height: 322px;
+}
+
+.collection-pack-packs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  perspective: 900px;
+}
+
+.collection-pack-pack-slot { width: 66px; display: grid; place-items: center; }
+
+.collection-pack-pack {
+  width: 172px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform: translateX(calc(var(--i) * 8px)) rotate(calc(var(--i) * 3deg)) scale(0.8);
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 320ms ease, opacity 320ms ease;
+  filter: brightness(0.72) saturate(0.85);
+  animation: bob 3.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 180ms);
+}
+
+@keyframes bob {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -7px; }
+}
+
+.collection-pack-pack:disabled { cursor: default; }
+
+/* The pick reads through SIZE and LIGHT, not through a glow. A drop-shadow is
+   a shadow wearing a different property name, and the system has none. */
+.collection-pack-picked {
+  transform: translateX(calc(var(--i) * 8px)) rotate(0deg) scale(1.22);
+  filter: brightness(1.14) saturate(1.14);
+  z-index: 2;
+}
+
+.collection-pack-pack:not(:disabled):hover { filter: brightness(1) saturate(1); }
+
+.collection-pack-pack:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.collection-pack-foil { display: block; width: 100%; height: auto; color: var(--text-hi); }
+
+.collection-pack-sheen { animation: sheen 3.6s ease-in-out infinite; }
+
+@keyframes sheen {
+  0%, 100% { opacity: 0.25; transform: translateX(-16%); }
+  50%      { opacity: 0.7;  transform: translateX(16%); }
+}
+
+/* the tear */
+.collection-pack-tear { animation: tear 620ms cubic-bezier(0.3, 0, 0.2, 1) forwards; }
+
+@keyframes tear {
+  0%   { transform: translateX(calc(var(--i) * 8px)) scale(1.22) rotate(0deg); }
+  18%  { transform: translateX(calc(var(--i) * 8px)) scale(1.26) rotate(-3deg); }
+  34%  { transform: translateX(calc(var(--i) * 8px)) scale(1.26) rotate(3deg); }
+  100% { transform: translateX(calc(var(--i) * 8px)) scale(1.7) rotate(0deg); opacity: 0; }
+}
+
+.collection-pack-dim { opacity: 0; transform: translateY(24px) scale(0.7); }
+
+/* ── the prize ──────────────────────────────────────────────────────────── */
+
+.collection-pack-prize {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  animation: rise 420ms cubic-bezier(0.2, 0.9, 0.2, 1) backwards;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: scale(0.72) translateY(18px); }
+  60%  { transform: scale(1.05); }
+  to   { opacity: 1; transform: none; }
+}
+
+.collection-pack-prize-card { width: 200px; }
+
+/* The rare card USED to breathe inside a looping gold glow. Both halves of that
+   are now banned: the glow is a shadow, and a looping animation that only rare
+   cards get is rarity-differentiated motion — the same inducement rejects on
+   the rails. Rarity still reads, and reads honestly: `CardArt` draws a gold
+   stroke and a foil sweep on the face itself, and the line under it says
+   `Thẻ hiếm!`. The reveal is now one duration for every card. */
+
+.collection-pack-prize-line {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+
+/* The duplicate subline. Deliberately NOT a gain treatment — no `+`, no win
+   colour, no number. It states what happened and stops. */
+.collection-pack-prize-sub {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: center;
+}
+
+/* ── the action ─────────────────────────────────────────────────────────── */
+
+.collection-pack-action-wrap { display: grid; justify-items: center; gap: var(--space-2); }
+
+.collection-pack-turns {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: center;
+}
+
+.collection-pack-turns strong { color: var(--brand-accent-fg); font-variant-numeric: tabular-nums; }
+
+/* THE `MỞ` CTA — flat.
+   Was a 180° gold gradient plus a coloured drop-shadow plus an infinite
+   shadow-pulse. All three are gone: gradients are permitted only as background
+   decoration, and the system has no shadows at all, so a pulse built out of
+   `box-shadow` has nothing left to animate. The button is now a SOLID accent
+   plate whose hover is a COLOUR SHIFT (`--brand-accent` → `--brand-accent-2`)
+   plus the uniform 1.05 scale every button in this feature gets. */
+.collection-pack-cta {
+  width: min(300px, 82%);
+  min-height: 60px;
+  border-radius: var(--radius-lg);
+  border: 0;
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.collection-pack-cta:hover:not(:disabled) {
+  background: var(--brand-accent-2);
+  transform: scale(1.05);
+}
+
+.collection-pack-cta:disabled {
+  background: var(--surface-disabled);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.collection-pack-cta:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+/* ── reduced motion: keep the state changes, drop the theatre ───────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .collection-pack-pack, .collection-pack-sheen, .collection-pack-cta, .collection-pack-prize { animation: none; }
+  .collection-pack-tear { animation: none; opacity: 0; }
+  .collection-pack-pack, .collection-pack-info, .collection-pack-info svg, .collection-pack-cta { transition: none; }
+
+  /* The hover scale is not merely un-animated here, it is ABSENT. Snapping a
+     control 5% larger with a zero-length transition is the same jolt the query
+     was set to avoid; the hover still answers, in colour. */
+  .collection-pack-cta:hover:not(:disabled),
+  .collection-pack-info:hover,
+  .collection-pack-info:hover svg { transform: none; }
+}
+
+/* desktop: more room, so the packs can be bigger still */
+@media (min-width: 900px) {
+  .collection-pack-stage > *:not(.collection-pack-stadium):not(.collection-pack-info) { max-width: 780px; }
+  /* keep the button on the content column's right edge, not the viewport's —
+     the stage is full-bleed, the column is not */
+  .collection-pack-info { right: max(var(--space-3), calc(50% - 390px)); }
+  .collection-pack-stage { min-height: 560px; }
+  .collection-pack-floor { min-height: 372px; }
+  .collection-pack-pack-slot { width: 84px; }
+  .collection-pack-pack { width: 210px; }
+  .collection-pack-prize-card { width: 240px; }
+}
+
+/* ══ card-art: trading-card art ════════════════════════════════════════════ */
+
+/* ============================================================================
+ * Yaobet — trading-card art.
+ * ==========================================================================*/
+
+/* rare — a slow foil sweep, no burst.
+   Was a 1px gold ring plus a coloured drop shadow, both drawn with `box-shadow`.
+   The system has no shadows, so the ring survives as an INSET OUTLINE (the edge
+   is the whole signal) and the bloom does not survive at all. `outline` rather
+   than `border`: the wrap carries an `aspect-ratio`, and a border would eat 2px
+   of the card face at every tile size. */
+@keyframes card-foil-sweep {
+  0%, 100% { opacity: 0.16; transform: translateX(-14%); }
+  50%      { opacity: 0.42; transform: translateX(14%); }
+}
+
+@keyframes dealIn {
+  from { opacity: 0; transform: translateY(26px) rotate(-6deg) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ══ ceremony: the reward ceremony ═════════════════════════════════════════ */
+
+/* ============================================================================
+ * Yaobet — reward ceremony.
+ * ----------------------------------------------------------------------------
+ * Motion is TRANSFORM AND OPACITY ONLY, so the whole sequence stays on the
+ * compositor — a ceremony that janks on a mid-range Android is worse than none.
+ * No particle layer, no looping glow: every animation here runs once, forwards,
+ * and stops. See the component header for why this is a receipt, not a jackpot.
+ * ==========================================================================*/
+
+/* Each card starts spread by its signed index and settles to a tight stack.
+   `--i` is the signed offset from centre, so the fan is symmetric for any set
+   size — a 5-card set and an 11-card set gather the same way. */
+.collection-ceremony-card {
+  position: absolute;
+  inset: 0;
+  transform:
+    translateX(calc(var(--i) * 26px))
+    rotate(calc(var(--i) * 5deg));
+  transform-origin: 50% 120%;
+  transition:
+    transform 780ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 380ms ease;
+}
+
+/* Gathered: everything collapses onto the centre card, slightly fanned so the
+   stack still reads as several cards rather than one. */
+.collection-ceremony-panel[data-beat="seal"] .collection-ceremony-card,
+.collection-ceremony-panel[data-beat="receipt"] .collection-ceremony-card {
+  transform:
+    translateX(calc(var(--i) * 2px))
+    rotate(calc(var(--i) * 0.8deg))
+    scale(0.94);
+}
+
+.collection-ceremony-card svg,
+.collection-ceremony-card img {
+  width: 100%;
+  height: 100%;
+  /* --radius-md, matching `CardArt`'s own wrap. The two were 16 and 8 and the
+     mismatch showed as a bright corner sliver on every gathered card. */
+  border-radius: var(--radius-md);
+}
+
+/* ── the seal ───────────────────────────────────────────────────────────── */
+
+.collection-ceremony-seal {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  opacity: 0;
+  transform: scale(0.86);
+  transition: opacity 260ms ease, transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  pointer-events: none;
+}
+
+.collection-ceremony-panel[data-beat="seal"] .collection-ceremony-seal,
+.collection-ceremony-panel[data-beat="receipt"] .collection-ceremony-seal {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.collection-ceremony-seal-ring,
+.collection-ceremony-seal-ring-inner,
+.collection-ceremony-seal-tick {
+  fill: none;
+  stroke: var(--brand-accent-fg);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.collection-ceremony-seal-ring { stroke-width: 2.5; opacity: 0.9; }
+.collection-ceremony-seal-ring-inner { stroke-width: 1; opacity: 0.4; }
+.collection-ceremony-seal-tick { stroke-width: 5; }
+
+/* The ring and the tick DRAW rather than fade — the gesture of a stamp being
+   applied, which is what a completion is. */
+.collection-ceremony-seal-ring,
+.collection-ceremony-seal-tick {
+  stroke-dasharray: var(--len, 340);
+  stroke-dashoffset: var(--len, 340);
+}
+
+.collection-ceremony-seal-tick { --len: 60; }
+
+.collection-ceremony-panel[data-beat="seal"] .collection-ceremony-seal-ring,
+.collection-ceremony-panel[data-beat="receipt"] .collection-ceremony-seal-ring {
+  animation: draw 620ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.collection-ceremony-panel[data-beat="seal"] .collection-ceremony-seal-tick,
+.collection-ceremony-panel[data-beat="receipt"] .collection-ceremony-seal-tick {
+  animation: draw 380ms cubic-bezier(0.4, 0, 0.2, 1) 380ms forwards;
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ── the receipt ────────────────────────────────────────────────────────── */
+
+.collection-ceremony-receipt {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+
+.collection-ceremony-receipt[data-ready="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── reduced motion: arrive, do not perform ─────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .collection-ceremony-card,
+  .collection-ceremony-seal,
+  .collection-ceremony-receipt {
+    transition: none;
+  }
+
+  .collection-ceremony-seal-ring,
+  .collection-ceremony-seal-tick {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

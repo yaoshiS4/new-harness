@@ -1,0 +1,395 @@
+/* ============================================================================
+ * Vertical area partial: the CategoryGrid, LiveOddsBoard, [vertical] route,
+ * CategoryPage and CategoryBanner rules, in their original load order. Plain
+ * class rules only; the components layer comes from the import line in
+ * globals.css.
+ * ==========================================================================*/
+
+/* CategoryGrid — tab strip + filter/sort bar + game grid. 3/4/6 responsive.
+ * Tokens only; the page never scrolls horizontally (strips scroll in Scroller). */
+
+.vertical-category-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---- filter / sort bar ---- */
+.vertical-category-grid-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Input contract (DS input):
+ *   resting = the --surface-2 well PLUS a 1px --line-default control edge;
+ *   focus   = 2px SOLID --focus-ring border, no glow ring.
+ *
+ * The control edge is load-bearing: it holds the 3:1 UI-component floor
+ * (WCAG 1.4.11) against both the well and the page ground, so the field
+ * always shows its boundary. Focus is a WEIGHT change (1px → 2px) with
+ * padding compensating, so the box does not reflow. */
+.vertical-category-grid-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 1px calc(var(--space-3) + 1px);
+  min-height: var(--tap-min);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line-default);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.vertical-category-grid-search:focus-within {
+  border-width: 2px;
+  /* Focus is ONE affordance with ONE colour: --focus-ring, the pinned
+     AA indicator shared by every brand. Gold stays reward and selection
+     chrome, never focus. */
+  border-color: var(--focus-ring);
+  padding: 0 var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vertical-category-grid-search {
+    transition: none;
+  }
+}
+.vertical-category-grid-search-icon {
+  color: var(--text-mid);
+  flex: none;
+}
+.vertical-category-grid-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-hi);
+  font-size: var(--t-body);
+  font-family: var(--brand-font-body);
+}
+.vertical-category-grid-search-input::placeholder {
+  color: var(--text-mid);
+}
+
+.vertical-category-grid-sorts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- FIXED-TILE game grid: pinned 205px rows, 8-up at the frame ----
+ * Mirrors the home lobby (.game-list repeat(8,1fr) gap16, li height 205px).
+ * grid-auto-rows pins the cell height so a tile is one physical size — never
+ * width:100% fluid in a 1fr grid. Ladder: 3 → 4 → 6 → 8. */
+.vertical-category-grid-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: var(--tile-h);
+  gap: var(--band-gap);
+}
+.vertical-category-grid-cell {
+  min-width: 0;
+  display: flex;
+}
+.vertical-category-grid-cell > * {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .vertical-category-grid-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .vertical-category-grid-search {
+    flex: 0 1 320px;
+  }
+  .vertical-category-grid-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  .vertical-category-grid-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (min-width: 1424px) {
+  .vertical-category-grid-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}
+
+/* LiveOddsBoard — inline truthful live-odds board. Tokens only. */
+
+.vertical-live-odds-board-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* section heading = the h3 role (MAPPING type row --t-h2) */
+.vertical-live-odds-board-title {
+  font-family: var(--type-h3-family);
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-leading);
+  font-weight: var(--type-h3-weight);
+  color: var(--text-hi);
+}
+
+.vertical-live-odds-board-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.vertical-live-odds-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vertical-live-odds-board-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  color: var(--text-hi);
+}
+.vertical-live-odds-board-live-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  /* loss hue = a luminance-matched semantic color; the "TRỰC TIẾP" TEXT label
+   * carries the meaning, the dot is a non-load-bearing accent. */
+  background: var(--loss);
+}
+.vertical-live-odds-board-pre-tag {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+}
+
+.vertical-live-odds-board-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vertical-live-odds-board-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  min-height: var(--tap-min);
+}
+.vertical-live-odds-board-row:last-child {
+  border-bottom: 0;
+}
+/* team names wrap in full (never clipped) */
+.vertical-live-odds-board-team {
+  font-size: var(--t-body);
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+/* DS odds cell: the surface.2 fill with the control edge, ivory value */
+.vertical-live-odds-board-odds-val {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line-default);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+/* Odds movement: --odds-up / --odds-down are luminance-matched, and each one
+ * pairs with its arrow glyph and its spoken label (tăng / giảm), so colour is
+ * never the only cue. */
+.vertical-live-odds-board-up {
+  color: var(--odds-up);
+  transform: rotate(-90deg);
+}
+.vertical-live-odds-board-down {
+  color: var(--odds-down);
+}
+.vertical-live-odds-board-stale {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.vertical-live-odds-board-skel-row {
+  display: block;
+}
+
+/* [vertical] route-level UI — loading + not-found scaffolds. Tokens only. */
+
+.vertical-route-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-gap);
+  min-width: 0;
+}
+
+/* ---- loading: branded Skeletons in each band's reserved footprint ---- */
+.vertical-route-toolbar-skel {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* lobby column ladder: 3-up @375 → 4-up @768 → 6-up @992 → 8-up @1424 */
+.vertical-route-grid-skel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--band-gap);
+}
+.vertical-route-grid-skel > * {
+  height: var(--tile-h);
+}
+
+@media (min-width: 768px) {
+  .vertical-route-grid-skel {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (min-width: 992px) {
+  .vertical-route-grid-skel {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+@media (min-width: 1424px) {
+  .vertical-route-grid-skel {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}
+
+/* ---- not-found ---- */
+.vertical-route-not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--gutter);
+  text-align: center;
+}
+/* the 404 figure = the num-lg role, gold as a text accent */
+.vertical-route-code {
+  font-family: var(--type-num-lg-family);
+  font-size: var(--type-num-lg-size);
+  line-height: var(--type-num-lg-leading);
+  font-weight: var(--type-num-lg-weight);
+  color: var(--brand-accent-fg);
+  font-variant-numeric: tabular-nums;
+}
+/* page title = the h1 role */
+.vertical-route-heading {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  color: var(--text-hi);
+}
+.vertical-route-body {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+  max-width: 36ch;
+}
+.vertical-route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+/* CategoryPage — vertical-landing content column. Mobile-first @375 stack.
+ * Tokens only; the page body never scrolls horizontally (strips use Scroller). */
+
+/* band beat = 16px (the dominant gap), not 32px — the flex gap owns all
+ * vertical band rhythm so an omitted band collapses rather than leaving a hole. */
+.vertical-category-page-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-gap);
+  min-width: 0;
+}
+
+/* CategoryBanner — token-derived gradient SLOT hero. Tokens only. */
+
+.vertical-category-banner-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 140px;
+  padding: var(--space-5) var(--gutter);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--brand-accent-hairline);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* the placeholder art slot — the ivory corner sheen (--card-sheen-grad) over
+ * the surface ladder. Gold stays an accent (hairline and glyph), never a fill. */
+.vertical-category-banner-slot {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    var(--card-sheen-grad),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-3) 100%);
+}
+
+.vertical-category-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.vertical-category-banner-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--brand-accent-hairline);
+  color: var(--brand-accent-fg);
+}
+
+/* page title = the h1 role (fluid size, so no breakpoint step) */
+.vertical-category-banner-title {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  color: var(--text-hi);
+}
+
+.vertical-category-banner-kicker {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+}
+
+@media (min-width: 768px) {
+  .vertical-category-banner-banner {
+    min-height: 200px;
+    padding: var(--space-6) var(--space-6);
+  }
+}

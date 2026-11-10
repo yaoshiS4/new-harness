@@ -1,0 +1,756 @@
+<section>
+<h2 id="r-lottery-scratch-card">ScratchCardGame / ScratchCardStage (the ticket overlay)</h2>
+<h4>1. Purpose</h4><p>A modal scratch ticket: scratch the gold coating off four winning numbers and twelve of your numbers; when both halves are open the result appears.</p>
+<h4>2. Source</h4><p><code>src/components/lottery/ScratchCardGame.tsx</code>, <code>ScratchCardGame.module.css</code>; children <code>_internal/ScratchSurface.*</code>, <code>_internal/coverArt.ts</code>, <code>_internal/OutcomeFrame.*</code>, <code>_internal/useCountUp.ts</code>; shell <code>components/layout/_internal/Overlay</code> (<a href="#s-shell-h">#s-shell</a>).</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">ScratchCardStage({onExit}) = ScratchCardGame(open, onClose=onExit)
+ScratchCardGame: !open → null
+Overlay(open presentation="auto" labelledBy=titleId desktopMaxWidth=560 swipeDismiss=false)
+  ScratchCardBody
+    div.body data-motion="on"|"off"
+      header.head
+        h2#titleId.title  "Thẻ cào"
+        button.closeBtn aria-label="Đóng"  Icon close 22
+      p.fixedNote  "Kết quả của thẻ này đã được ấn định trước khi bạn cào nhát đầu tiên. Cào nhanh hay chậm, theo thứ tự nào, kết quả không đổi."
+      div.ticket
+        div.ticketChrome aria-hidden                      (inner rule)
+        section.section aria-label="Vùng số trúng thưởng"
+          div.sectionHead
+            h3.sectionLabel "Số trúng thưởng" · span.sectionRule · span.sectionState[data-open] "Cào để mở"|"Đã mở"
+          ScratchSurface(key="band-{id}" variant="band" className=bandWell revealed=bandOpen onReveal=revealBand)
+            ul.bandRow aria-hidden until open
+              li.bandCell × 4
+                span.bandCoin data-token [data-hit] style --k=index
+                  span.bandNum  "07"
+        div.perf aria-hidden                              (dashed tear line with two dots)
+        section.section aria-label="Vùng số của bạn"
+          div.sectionHead  h3 "Số của bạn" · rule · state
+          ScratchSurface(key="field-{id}" variant="field" className=fieldWell revealed=fieldOpen onReveal=revealField)
+            ul.fieldGrid aria-hidden until open
+              li.fieldCell × 12 [data-hit when settled &amp;&amp; matched] style --k=rung
+                span.fieldCoin data-token aria-hidden  span.fieldNum "42"
+                span.fieldPrize aria-hidden  span.prizeShort "10K" · span.prizeFull "10.000 ₫"
+                span.srOnly  sentence (see Copy)
+      p.hint
+      p.live role=status aria-live=polite   {notice}
+      settled &amp;&amp; OutcomeFrame(card, reduced)
+      footer.foot
+        h3.footLabel "Tỷ lệ công bố"
+        dl.odds: div.oddsRow × 3  (dt/dd)
+        p.ladder  "Mọi bậc giải tốn như nhau, … Các mức giải: 10.000 · 20.000 · … · 20.000.000 ₫"
+        !settled &amp;&amp; button.revealAll "Mở tất cả"
+        div.actions  Button(ghost md) "Đóng" · settled &amp;&amp; Button(ghost md) "Mở thẻ mới"
+        div.devBar
+          span.devTag "dev" · span.devLabel "Buộc kết quả"
+          div.devBtns role=group aria-label="Dev: buộc kết quả thẻ"
+            button.devBtn[data-active] aria-pressed  "Thua" | "Thưởng nhỏ" | "Thắng" | "Ngẫu nhiên"</code></pre>
+<p>Pre-deal (one paint): 4 empty band coins and 12 empty field coins with a non-breaking-space prize line, so the ticket never resizes.</p>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>open</td><td>boolean</td><td>mount/unmount (Stage always passes true)</td></tr>
+<tr><td>onClose</td><td>() =&gt; void</td><td>Đóng / Esc / scrim</td></tr>
+<tr><td>onPlay?</td><td>(card) =&gt; void</td><td>fired per dealt card (unused by host)</td></tr>
+<tr><td>onSettled?</td><td>(card) =&gt; void</td><td>fired once when both halves open (unused by host)</td></tr></tbody></table>
+<h4>5. Styles (key elements; full module verbatim below)</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.body</td><td>padding 8px 16px 24px</td><td>≥480: 8px 24px 24px</td></tr>
+<tr><td>.head / .title</td><td>flex space-between centre, margin-bottom 8px / Montserrat 20px #f2f0e4</td><td></td></tr>
+<tr><td>.closeBtn</td><td>44×44 min; margin-right −8px; transparent; #888888; radius 8px; hover #f2f0e4 scale 1.05</td><td></td></tr>
+<tr><td>.fixedNote</td><td>margin-bottom 16px; 12px lh 1.5 #888888</td><td></td></tr>
+<tr><td>.ticket</td><td>relative; padding 24px 16px; border 1px rgba(212,175,55,.55); radius 16px; user-select none; background <code>radial-gradient(130% 90% at 50% -12%, rgba(212,175,55,.11) 0%, transparent 62%), radial-gradient(100% 80% at 6% 108%, rgba(212,175,55,.07) 0%, transparent 58%), color-mix(#d4af37 4%, #1a1a1a)=#21201b</code></td><td>≥480: padding 24px</td></tr>
+<tr><td>.ticketChrome</td><td>absolute inset 8px; border 1px rgba(212,175,55,.20); radius 12px; pointer-events none</td><td></td></tr>
+<tr><td>.sectionHead</td><td>flex centre gap 12px</td><td></td></tr>
+<tr><td>.sectionLabel</td><td>Montserrat 12px 700; ls .14em; uppercase; lh 1.3; #d4af37</td><td></td></tr>
+<tr><td>.sectionRule</td><td>flex 1; 1px tall; min-width 16px; <code>linear-gradient(90deg, rgba(212,175,55,.45), transparent)</code></td><td></td></tr>
+<tr><td>.sectionState</td><td>padding 2px 8px; border 1px rgba(136,136,136,.55); pill; 12px lh 1.3 #888888; [data-open]: border rgba(212,175,55,.60), #d4af37</td><td></td></tr>
+<tr><td>.bandWell</td><td>margin-top 12px; padding 12px 16px; border 1px rgba(212,175,55,.58); radius 12px; background <code>radial-gradient(120% 160% at 50% -20%, rgba(212,175,55,.14) 0%, transparent 68%), #0a0a0a</code></td><td></td></tr>
+<tr><td>.bandRow</td><td>grid 4 × minmax(0,1fr); gap 8px</td><td></td></tr>
+<tr><td>.fieldWell</td><td>margin-top 12px; padding 12px; border 1px rgba(212,175,55,.26); radius 12px; #0a0a0a</td><td></td></tr>
+<tr><td>.fieldGrid</td><td>grid 4 × minmax(0,1fr); gap 12px 8px</td><td>≥480: gap 16px 12px</td></tr>
+<tr><td>.fieldCell</td><td>flex column centre; gap 4px</td><td></td></tr>
+<tr><td>.bandCoin/.fieldCoin</td><td>relative grid centred; width 100%; aspect 1; pill; num font 700 tabular lh 1.3; ::before inset 9% border 1px rgba(10,10,10,.30); ::after inset 17% border 1px dashed rgba(10,10,10,.18)</td><td></td></tr>
+<tr><td>.bandCoin</td><td>max-width 72px; border 1px color-mix(#b4952f 72%, #0a0a0a)=#846e25; colour #0a0a0a; 20px; struck-gold radial background (verbatim)</td><td></td></tr>
+<tr><td>.fieldCoin</td><td>max-width 58px; border color-mix(#d4af37 30%, #0a0a0a)=#473c18; colour #f2f0e4; 18px; unlit-bronze radial background (verbatim)</td><td></td></tr>
+<tr><td>.fieldPrize</td><td>num font 12px tabular lh 1.3 #888888 nowrap</td><td></td></tr>
+<tr><td>.prizeShort / .prizeFull</td><td>shown / display none</td><td>≥560: short none / full inline</td></tr>
+<tr><td>[data-hit] coin</td><td>field coin becomes full gold (same gradient as band), colour #0a0a0a, border #d4af37; outline 2px solid #45c9a5 offset 3px; animation token-pulse 300ms ease-standard 3 backwards, delay calc(k · 200ms / 4)</td><td></td></tr>
+<tr><td>.fieldCell[data-hit] .fieldPrize</td><td>#45c9a5 600</td><td></td></tr>
+<tr><td>.perf</td><td>height 0; margin 24px 0; border-top 1px dashed rgba(212,175,55,.34); ::before/::after 6×6 dots rgba(212,175,55,.70) at top −3px, 12px from each side</td><td></td></tr>
+<tr><td>.hint</td><td>margin 16px 0 0; 14px lh 1.5 #888888</td><td></td></tr>
+<tr><td>.foot</td><td>margin-top 24px; padding-top 16px; border-top 1px rgba(212,175,55,.55)</td><td></td></tr>
+<tr><td>.footLabel</td><td>12px 600 ls .06em uppercase #888888</td><td></td></tr>
+<tr><td>.odds</td><td>grid 1 col gap 8px margin-top 8px; rows flex baseline space-between; dt 12px #888888; dd num font 14px #f2f0e4 right</td><td>≥480: 3 cols gap 8px; rows block; dd left, margin-top 4px</td></tr>
+<tr><td>.ladder</td><td>margin-top 12px; 12px lh 1.5 #6f6f6f</td><td></td></tr>
+<tr><td>.revealAll</td><td>inline-block; margin-top 12px; padding 8px 0; min-height 44px; transparent; 14px #888888 underline offset 3px; hover #f2f0e4; focus outline + radius 4px</td><td></td></tr>
+<tr><td>.actions</td><td>flex wrap gap 8px margin-top 16px</td><td></td></tr>
+<tr><td>.devBar</td><td>flex wrap centre gap 8px; margin-top 24px; padding 12px; border 1px dashed #6f6f6f; radius 8px; #1a1a1a</td><td></td></tr>
+<tr><td>.devTag</td><td>padding 2px 8px pill; #018fff bg; #f2f0e4; 12px 700 ls .08em uppercase ("DEV")</td><td></td></tr>
+<tr><td>.devBtn</td><td>padding 4px 12px; min-height 32px; border 1px #6f6f6f; pill; transparent; 12px #888888; hover #f2f0e4 border #888888; [data-active] #f2f0e4 border #018fff</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim ScratchCardGame.module.css (623 lines)</summary><pre><code class="lang-css">/* ============================================================================
+ * ScratchCardGame — the ticket: a deep warm panel carrying two coated
+ * sections, published odds and the dev fence.
+ *
+ * Panel width (560px desktop dialog) comes from Overlay `desktopMaxWidth`.
+ * Semantic / --brand-* indirection vars only — never a raw ramp literal
+ * (--gold-*, --cta*, --font-body/-num, --text-on-gold). token-lint A2.
+ *
+ * ON THE GRADIENTS. The flat ban is about CARD and BUTTON fills; it is why
+ * every surface here is still a flat token and why there is not one box-shadow
+ * in the file — the gold hairline carries every edge, as everywhere else. The
+ * radial gradients below are LARGE DECORATION on a game surface: the warm bloom
+ * across the ticket, and the struck-metal medallions the values sit on. The
+ * medallion is the same object the canvas coating paints, so the two have to
+ * agree — a flat disc under an embossed coin would read as a printing error.
+ * ==========================================================================*/
+
+.body {
+  padding: var(--space-2) var(--space-4) var(--space-5);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  font-family: var(--brand-font-head);
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin-right: calc(var(--space-2) * -1);
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.closeBtn:hover {
+  color: var(--text-hi);
+  transform: scale(1.05);
+}
+.closeBtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* the "already decided" statement — shown before the first stroke */
+.fixedNote {
+  margin-bottom: var(--space-4);
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ══ THE TICKET ═══════════════════════════════════════════════════════════
+ * A deep warm panel with generous rounded chrome: gold hairline outside, a
+ * quieter rule inset from it, and a warm bloom falling from the top edge. */
+.ticket {
+  position: relative;
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  /* a scratch stroke must never start a text selection on the values it is
+   * uncovering — the coating swallows the pointer, the drag must not paint the
+   * DOM underneath blue. */
+  -webkit-user-select: none;
+  user-select: none;
+  background:
+    radial-gradient(
+      130% 90% at 50% -12%,
+      color-mix(in srgb, var(--brand-accent) 11%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      100% 80% at 6% 108%,
+      color-mix(in srgb, var(--brand-accent) 7%, transparent) 0%,
+      transparent 58%
+    ),
+    color-mix(in srgb, var(--brand-accent) 4%, var(--surface-2));
+}
+
+/* the inner rule — the second edge that makes the panel read as chrome */
+.ticketChrome {
+  position: absolute;
+  inset: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 20%, transparent);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+
+.section {
+  position: relative;
+}
+
+/* ---- section headings — label · rule · state ---- */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sectionLabel {
+  flex: none;
+  font-family: var(--brand-font-head);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: var(--lh-tight);
+  color: var(--brand-accent);
+}
+
+.sectionRule {
+  flex: 1 1 auto;
+  height: 1px;
+  min-width: var(--space-4);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--brand-accent) 45%, transparent),
+    transparent
+  );
+}
+
+.sectionState {
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--text-mid) 55%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.sectionState[data-open] {
+  border-color: color-mix(in srgb, var(--brand-accent) 60%, transparent);
+  color: var(--brand-accent);
+}
+
+/* ---- THE PRECIOUS BAND — four winning numbers, the smaller section --------
+ * Brighter edge, its own gold bloom, taller medallions: the band must never be
+ * mistaken for the field below it. */
+.bandWell {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 58%, transparent);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      120% 160% at 50% -20%,
+      color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%,
+      transparent 68%
+    ),
+    var(--canvas);
+}
+
+.bandRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--gap-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bandCell {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* ---- THE FIELD — twelve cells, 4 across x 3 down ---- */
+.fieldWell {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 26%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--gap-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fieldCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-xs);
+  min-width: 0;
+}
+
+/* ---- THE MEDALLION ------------------------------------------------------
+ * Struck coin, not a flat disc: the light centre sits toward the upper-left,
+ * the shade falls to the lower-right, a bevel ring is pressed into the face
+ * and a milled ring runs inside the rim. Same object the canvas paints. */
+.bandCoin,
+.fieldCoin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  font-family: var(--brand-font-num);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+}
+
+/* pressed bevel */
+.bandCoin::before,
+.fieldCoin::before {
+  content: "";
+  position: absolute;
+  inset: 9%;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--canvas) 30%, transparent);
+}
+
+/* milled inner ring */
+.bandCoin::after,
+.fieldCoin::after {
+  content: "";
+  position: absolute;
+  inset: 17%;
+  border-radius: inherit;
+  border: 1px dashed color-mix(in srgb, var(--canvas) 18%, transparent);
+}
+
+.bandNum,
+.fieldNum {
+  position: relative; /* above the two pressed rings */
+}
+
+/* the band coin is struck in full gold — these four ARE the prize numbers */
+.bandCoin {
+  max-width: 72px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent-2) 72%, var(--canvas));
+  background:
+    radial-gradient(
+      42% 34% at 30% 22%,
+      color-mix(in srgb, var(--text-hi) 55%, transparent) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      78% 78% at 32% 26%,
+      color-mix(in srgb, var(--text-hi) 52%, var(--brand-accent)) 0%,
+      var(--brand-accent) 42%,
+      var(--brand-accent-2) 78%,
+      color-mix(in srgb, var(--brand-accent-2) 52%, var(--canvas)) 100%
+    );
+  color: var(--brand-on-accent);
+  font-size: var(--t-h2);
+}
+
+/* the field coin is struck in UNLIT bronze until it pays — a full-gold coin on
+ * a cell that pays nothing would read as a win it is not */
+.fieldCoin {
+  max-width: 58px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, var(--canvas));
+  background:
+    radial-gradient(
+      42% 34% at 30% 22%,
+      color-mix(in srgb, var(--text-hi) 20%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      80% 80% at 32% 26%,
+      color-mix(in srgb, var(--brand-accent) 46%, var(--canvas)) 0%,
+      color-mix(in srgb, var(--brand-accent) 30%, var(--canvas)) 48%,
+      color-mix(in srgb, var(--brand-accent-2) 16%, var(--canvas)) 100%
+    );
+  color: var(--text-hi);
+  font-size: var(--t-h3);
+}
+
+.fieldPrize {
+  font-family: var(--brand-font-num);
+  font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+
+/* narrow cells carry the lossless short form (10K / 20Tr); once a cell is wide
+ * enough for "20.000.000 ₫" to sit on one line (560px up) the full figure is
+ * printed instead. The screen-reader sentence on every cell always carries the
+ * exact amount, at every width. */
+.prizeFull {
+  display: none;
+}
+
+/* ---- HIT: this cell matched a winning number ----------------------------
+ * The cell and the winning-number medallion it answers to share a pulse RUNG
+ * (--k), so the two beat in unison — that unison IS the link. */
+.fieldCell[data-hit] .fieldCoin {
+  border-color: var(--brand-accent);
+  background:
+    radial-gradient(
+      42% 34% at 30% 22%,
+      color-mix(in srgb, var(--text-hi) 55%, transparent) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      78% 78% at 32% 26%,
+      color-mix(in srgb, var(--text-hi) 52%, var(--brand-accent)) 0%,
+      var(--brand-accent) 42%,
+      var(--brand-accent-2) 78%,
+      color-mix(in srgb, var(--brand-accent-2) 52%, var(--canvas)) 100%
+    );
+  color: var(--brand-on-accent);
+}
+
+.fieldCell[data-hit] .fieldPrize {
+  color: var(--win);
+  font-weight: var(--weight-semi);
+}
+
+.bandCoin[data-hit],
+.fieldCell[data-hit] .fieldCoin {
+  outline: 2px solid var(--win);
+  outline-offset: 3px;
+  animation: token-pulse var(--dur-slow) var(--ease-standard) 3 backwards;
+  animation-delay: calc(var(--k, 0) * var(--dur-fast) / 4);
+}
+
+/* ---- the tear line between the two halves of the ticket ---- */
+.perf {
+  position: relative;
+  height: 0;
+  margin: var(--space-5) 0;
+  border-top: 1px dashed color-mix(in srgb, var(--brand-accent) 34%, transparent);
+}
+.perf::before,
+.perf::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--brand-accent) 70%, transparent);
+}
+.perf::before {
+  left: var(--space-3);
+}
+.perf::after {
+  right: var(--space-3);
+}
+
+.hint {
+  margin: var(--space-4) 0 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---- screen-reader-only text ------------------------------------------
+ * The canvas coating is decoration and says nothing. Every value it hides is
+ * spelled out here in the DOM underneath, and `.live` is the polite region
+ * that announces a section settling. */
+.srOnly,
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- FOOTER — odds, ladder, the quiet reveal-all, actions, dev fence ---- */
+.foot {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.footLabel {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+
+/* narrow: one label/value row per figure (a 3-up grid goes ragged at 390px).
+ * ≥480 it becomes the three-column strip. */
+.odds {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+.oddsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.oddsRow dt {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+}
+.oddsRow dd {
+  margin: 0;
+  text-align: right;
+  font-family: var(--brand-font-num);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  color: var(--text-hi);
+}
+
+.ladder {
+  margin-top: var(--space-3);
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+
+/* "Mở tất cả" — the keyboard / screen-reader path and the escape hatch for
+ *  anyone who cannot drag. Deliberately SECONDARY: a quiet text control, in
+ *  the footer, below the odds, physically away from the ticket. */
+.revealAll {
+  display: inline-block;
+  margin-top: var(--space-3);
+  padding: var(--space-2) 0;
+  min-height: var(--tap-min);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.revealAll:hover {
+  color: var(--text-hi);
+}
+.revealAll:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-sm);
+  margin-top: var(--space-4);
+}
+
+/* ---- DEV FENCE — obvious, cordoned off, not in the player's flow ---- */
+.devBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-top: var(--space-5);
+  padding: var(--space-3);
+  border: 1px dashed var(--text-dim);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.devTag {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--info);
+  color: var(--text-hi);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.devLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.devBtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-xs);
+}
+
+.devBtn {
+  padding: var(--space-1) var(--space-3);
+  min-height: var(--space-6);
+  border: 1px solid var(--text-dim);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: inherit;
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.devBtn:hover {
+  color: var(--text-hi);
+  border-color: var(--text-mid);
+}
+.devBtn[data-active] {
+  color: var(--text-hi);
+  border-color: var(--info);
+}
+.devBtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@keyframes token-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* REDUCED MOTION — mandatory. Every animation degrades to an instant state
+ * change with NO movement (transforms removed, not merely shortened). Both the
+ * media query and the JS-set data-motion="off" flag are honoured. */
+@media (prefers-reduced-motion: reduce) {
+  .closeBtn,
+  .sectionState,
+  .revealAll,
+  .devBtn {
+    transition: none;
+  }
+  .closeBtn:hover {
+    transform: none;
+  }
+  .bandCoin[data-hit],
+  .fieldCell[data-hit] .fieldCoin {
+    animation: none;
+    transform: none;
+  }
+}
+
+.body[data-motion="off"] .closeBtn,
+.body[data-motion="off"] .sectionState,
+.body[data-motion="off"] .revealAll,
+.body[data-motion="off"] .devBtn {
+  transition: none;
+}
+.body[data-motion="off"] .closeBtn:hover {
+  transform: none;
+}
+.body[data-motion="off"] .bandCoin[data-hit],
+.body[data-motion="off"] .fieldCell[data-hit] .fieldCoin {
+  animation: none;
+  transform: none;
+}
+
+/* ---- ≥480: a touch more room ---- */
+@media (min-width: 480px) {
+  .body {
+    padding: var(--space-2) var(--space-5) var(--space-5);
+  }
+  .ticket {
+    padding: var(--space-5);
+  }
+  .fieldGrid {
+    gap: var(--space-4) var(--space-3);
+  }
+  .odds {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-sm);
+  }
+  .oddsRow {
+    display: block;
+  }
+  .oddsRow dd {
+    margin-top: var(--space-1);
+    text-align: left;
+  }
+}
+
+/* ---- ≥560: the cell is finally wide enough for the exact figure ---- */
+@media (min-width: 560px) {
+  .prizeShort {
+    display: none;
+  }
+  .prizeFull {
+    display: inline;
+  }
+}</code></pre></details>
+<h4>6. States</h4>
+<table><thead><tr><th>State</th><th>What shows</th></tr></thead><tbody>
+<tr><td>pre-deal (1 paint)</td><td>placeholder coins, both state pills "Cào để mở"</td></tr>
+<tr><td>dealt, both coated</td><td>canvas coatings over both wells; "Mở tất cả" link; Đóng button</td></tr>
+<tr><td>band open only / field open only</td><td>that section's pill "Đã mở" (gold) and its values visible; notice "Đã cào xong vùng số trúng thưởng." / "Đã cào xong vùng số của bạn."</td></tr>
+<tr><td>settled (both open)</td><td>matched coins full gold + green outline pulsing ×3 (band medallion and its matching field cells share delay k); OutcomeFrame; "Mở tất cả" hidden; "Mở thẻ mới" appears</td></tr>
+<tr><td>"Mở tất cả"</td><td>both open instantly (no fade); notice "Đã mở cả hai vùng của thẻ."</td></tr>
+<tr><td>"Mở thẻ mới"</td><td>deal(forced): new card, coatings remount (keys change), states reset</td></tr>
+<tr><td>dev force</td><td>active pill bordered #018fff; sticky for later deals until "Ngẫu nhiên"</td></tr>
+</tbody></table>
+<h4>7. Motion &amp; timers</h4>
+<table><thead><tr><th>What</th><th>Value</th></tr></thead><tbody>
+<tr><td>token-pulse keyframes</td><td>0% scale(1) · 45% scale(1.06) · 100% scale(1); 300ms (<span class="tok">--dur-slow</span>) ease-standard × 3, fill backwards, delay k × 50ms (k = 0–3)</td></tr>
+<tr><td>closeBtn / sectionState / revealAll / devBtn</td><td>colour/border/transform transitions 200ms ease-standard</td></tr>
+<tr><td>Coating fade</td><td>CSS opacity 1→0 over 300ms ease-standard; JS waits CLEAR_MS 320ms then reveals</td></tr>
+<tr><td>Coverage sample throttle</td><td>SAMPLE_MS 120ms</td></tr>
+<tr><td>Outcome</td><td>frame-in 300ms ease-entrance; total-settle 300ms; count-up 900ms easeOutCubic (win only)</td></tr>
+<tr><td>Reduced motion</td><td><code>data-motion="off"</code> on .body + media query: no transitions, no pulse, no fade (coating removed instantly), no count-up</td></tr>
+</tbody></table>
+<h4>8. Copy</h4>
+<table><thead><tr><th>VI</th><th>EN gloss</th><th>Where</th></tr></thead><tbody>
+<tr><td>Thẻ cào · Đóng</td><td>Scratch card · Close</td><td>header (aria-label)</td></tr>
+<tr><td>Kết quả của thẻ này đã được ấn định trước khi bạn cào nhát đầu tiên. Cào nhanh hay chậm, theo thứ tự nào, kết quả không đổi.</td><td>The result was fixed before your first stroke; speed/order doesn't change it.</td><td>fixed note</td></tr>
+<tr><td>Số trúng thưởng · Số của bạn</td><td>Winning numbers · Your numbers</td><td>section labels</td></tr>
+<tr><td>Vùng số trúng thưởng · Vùng số của bạn</td><td>winning-number area · your-number area</td><td>section aria-labels</td></tr>
+<tr><td>Cào để mở · Đã mở</td><td>Scratch to open · Opened</td><td>section state pill</td></tr>
+<tr><td>Ô {i}: số {nn}, trùng số trúng thưởng {nn}, thưởng {vnd}.</td><td>Cell i: number nn, matches winning nn, prize …</td><td>sr-only, matched cell</td></tr>
+<tr><td>Ô {i}: số {nn}, không trùng. Giải của ô này là {vnd}.</td><td>Cell i: no match. This cell's prize is …</td><td>sr-only, unmatched</td></tr>
+<tr><td>Giữ và kéo qua lớp phủ để cào — một nhát kéo mở được nhiều ô liền nhau. Cào cả hai vùng thì thẻ mới ra kết quả.</td><td>Hold and drag across the coating; scratch both areas to get the result.</td><td>hint</td></tr>
+<tr><td>Đã cào xong vùng số trúng thưởng. / Đã cào xong vùng số của bạn. / Đã mở cả hai vùng của thẻ.</td><td>live-region notices</td><td>p.live</td></tr>
+<tr><td>Tỷ lệ công bố · Tỷ lệ trúng 38,7% · Giải cao nhất 1 vé trong 7.869 · Chi phí mỗi bậc giải 2.541,70 ₫</td><td>Published odds rows</td><td>footer</td></tr>
+<tr><td>Mọi bậc giải tốn như nhau, nên không bậc nào là bậc rẻ mà hệ thống lặng lẽ đẩy bạn về. Các mức giải: 10.000 · 20.000 · 50.000 · 100.000 · 200.000 · 500.000 · 1.000.000 · 2.000.000 · 5.000.000 · 10.000.000 · 20.000.000 ₫</td><td>ladder statement</td><td>footer</td></tr>
+<tr><td>Mở tất cả · Mở thẻ mới</td><td>Open all · New card</td><td>footer actions</td></tr>
+<tr><td>dev · Buộc kết quả · Thua · Thưởng nhỏ · Thắng · Ngẫu nhiên</td><td>dev · Force result · Lose · Small prize · Win · Random</td><td>dev bar</td></tr>
+</tbody></table>
+<p>Short prize form (<code>shortVnd</code>): ≥1,000,000 → "{n}Tr" (2Tr, 5Tr, 10Tr, 20Tr, 1Tr); else "{n}K" (10K … 500K).</p>
+<h4>9. Data</h4><p><code>makeScratchCard</code>, <code>LADDER</code>, <code>SCRATCH_ODDS</code>. Two-digit faces <code>pad2</code> ("07").</p>
+<h4>10. Behaviour &amp; a11y</h4><ul>
+<li>First card dealt in a mount effect (never during render). Body remounts per open, so closing resets everything.</li>
+<li>Overlay: role dialog/aria-modal, focus trap, Esc and scrim close, return focus to "Cào ngay", body scroll lock; swipe-to-dismiss disabled so downward strokes don't close the sheet.</li>
+<li>Value lists are aria-hidden until their section is open; the sr-only sentence per cell then exposes number, match and prize.</li>
+<li>"Mở tất cả" is the keyboard/screen-reader path; the canvas is aria-hidden and unfocusable.</li></ul>
+<div class="callout warn"><code>shortVnd</code>'s comment says the full figure is printed "from 480px up"; the CSS switch is at 560px. The breakpoints are viewport-based while the ticket lives in a ≤560px dialog, so at ≥560px viewport each cell (~100px) must fit "20.000.000 ₫" at 12px (inference: fits, tightly). The dev bar ("Buộc kết quả") ships in the player-facing overlay.</div>
+</section>
+

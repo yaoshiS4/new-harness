@@ -1,0 +1,1152 @@
+/* ============================================================================
+ * Home area partial: the HeroBand, CategoryLauncher, StatsBar, DevAuthToggle
+ * and Home page-layout rules, in their original load order (the bands first,
+ * the page sheet last). Plain class rules and @keyframes only; the components
+ * layer comes from the import line in globals.css.
+ * ==========================================================================*/
+
+/* HeroBand — EXACT banner-box swiper + progress-line + promo/news ticker.
+ * Tokens only (no raw hex/px/durations); source values noted inline. */
+
+.home-hero-band-hero {
+  display: flex;
+  flex-direction: column;
+  /* banner + progress-line + promo row read as ONE snug block joined by a
+   *  hairline gap. The progress/ticker rows trim their own vertical padding
+   *  to keep the stack tight. */
+  gap: var(--space-1);
+}
+
+/* .banner-box{border-radius:8px;overflow:hidden} — the swiper viewport. */
+.home-hero-band-viewport {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--brand-accent-hairline);
+  touch-action: pan-y; /* let vertical page-scroll through; we own horizontal drag */
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.home-hero-band-viewport:active {
+  cursor: grabbing;
+}
+
+.home-hero-band-track {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  transition: transform var(--dur-slow) var(--ease-standard);
+  will-change: transform;
+}
+
+.home-hero-band-cell {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+.home-hero-band-slide {
+  position: relative;
+  display: block;
+  /* banner native ratio = 1556/620 ≈ 2.5:1. Mobile keeps it a touch taller
+   * (5/2); desktop uses the native crop. The slide is JUST the banner
+   * image (no overlay text), so it has no padding or inner layout. */
+  aspect-ratio: 5 / 2;
+  text-decoration: none;
+  color: var(--text-hi);
+  overflow: hidden;
+}
+
+/* full-bleed banner art — object-fit:cover, fills the cell edge-to-edge */
+.home-hero-band-slide-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+}
+
+/* image SLOT — the honest fallback when no banner art exists (the empty-state
+ *  branch; banner slides are image-only). A full-bleed hero backdrop: the
+ *  ivory corner sheen (--card-sheen-grad) over the surface ladder. Gold stays
+ *  an accent here (the label below), never the fill. */
+.home-hero-band-slot,
+.home-hero-band-slot-empty {
+  background:
+    var(--card-sheen-grad),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-3) 100%);
+}
+
+.home-hero-band-slot-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-hero-band-slot-label {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  color: var(--brand-accent-fg);
+}
+
+@media (min-width: 768px) {
+  .home-hero-band-slide {
+    /* native banner ratio 1556×620 ≈ 2.5:1 — full art, no letterbox */
+    aspect-ratio: 1556 / 620;
+  }
+}
+
+/* ===========================================================================
+ * (a) ANIMATED PROGRESS-LINE INDICATOR  (EXACT)
+ * A thin FULL-WIDTH track with one node dot per slide; the ACTIVE node is a
+ * larger filled BRAND-ACCENT dot, and a brand-accent SEGMENT advances rightward
+ * over the autoplay dwell from the active node toward the next node. Nodes
+ * double as the clickable navigation; the band has no arrows.
+ *
+ * Selected/active state is the --brand-accent fill; --focus-ring stays
+ * exclusive to :focus-visible, so "the slide you are on" and "the control your
+ * keyboard is on" never share a colour. Inactive nodes = muted grey; the base
+ * rail is a hairline. Static under reduced-motion.
+ * ======================================================================== */
+.home-hero-band-progress {
+  position: relative;
+  /* MOBILE base: nodes distribute edge-to-edge (the nav row scrolls
+   *  independently here, so node-over-thumb sync isn't attempted). DESKTOP
+   *  (≥768) overrides this to the SAME N-column grid as .nav so each node sits
+   *  directly above its item's thumbnail. */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* node radius (5px) of horizontal inset so the end dots aren't clipped.
+   *  no extra vertical padding — the node's own tap-area defines the
+   *  row height, keeping the progress-line snug under the banner. */
+  padding: 0 5px;
+  /* --seg-frac = active node center as a fraction of the rail span. MOBILE
+   *  (edge-distributed): index/(n-1). DESKTOP grid recomputes this below. */
+  --seg-frac: calc(var(--seg-i) / (var(--n) - 1));
+  --seg-frac-next: calc((var(--seg-i) + 1) / (var(--n) - 1));
+}
+
+/* continuous hairline rail behind the nodes (centered between the end dots) */
+.home-hero-band-rail {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--progress-track); /* locked neutral hairline groove on dark */
+  pointer-events: none;
+}
+
+/* the advancing brand-accent segment. It starts at the rail's left and grows to the
+ * active node's center (--seg-frac), then advances one inter-node span across
+ * the dwell (--seg-dur). --seg-frac/-next are resolved per breakpoint so the
+ * fill always lands under the active node. */
+.home-hero-band-rail-fill {
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent); /* SELECTED-state colour — never --focus-ring */
+  pointer-events: none;
+  width: calc((100% - 10px) * var(--seg-frac));
+  /* never overshoot the rail (last slide: --seg-frac=1, no further node) */
+  max-width: calc(100% - 10px);
+  animation: heroSeg var(--seg-dur) linear forwards;
+}
+@keyframes heroSeg {
+  from {
+    width: calc((100% - 10px) * var(--seg-frac));
+  }
+  to {
+    width: calc((100% - 10px) * var(--seg-frac-next));
+  }
+}
+/* reduced motion / single-frame: fill only up to the active node (no advance) */
+.home-hero-band-rail-fill-static {
+  animation: none;
+  width: calc((100% - 10px) * var(--seg-frac));
+}
+
+/* clickable node — comfy tap target around the visible dot */
+.home-hero-band-node {
+  position: relative;
+  z-index: var(--z-content);
+  flex: 0 0 auto;
+  width: var(--tap-min); /* 44px horizontal hit area (full tap width kept) */
+  /* short row so the progress-line is a thin band hugging the banner,
+   *  not a tall 44px gap — the 44px WIDTH preserves a comfortable tap target. */
+  height: var(--space-5);
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* the visible dot — small muted grey by default */
+.home-hero-band-dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--text-dim);
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+/* reached/active nodes → larger filled ACCENT dot (active reads as the playhead) */
+.home-hero-band-node-on .home-hero-band-dot {
+  background: var(--brand-accent);
+  transform: scale(1.4);
+}
+
+.home-hero-band-node:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+  border-radius: var(--radius-pill);
+}
+
+/* ===========================================================================
+ * (c) PROMO NAVIGATOR ROW — the under-hero items ARE the hero slides (1:1).
+ * A de-carded thumb + short title in a horizontal row on the track —
+ * NO card border / box / background. Tapping item i navigates the hero to
+ * slide i; the active item is highlighted (synced with the current slide +
+ * progress node). Horizontally scrollable on narrow viewports so the page body
+ * never scrolls sideways.
+ * ======================================================================== */
+.home-hero-band-nav {
+  display: flex;
+  gap: var(--gap-sm);
+  list-style: none;
+  margin: 0;
+  /* zero horizontal inset so the row's left/right edges
+   *  line up exactly with the hero banner; zero vertical padding keeps it snug
+   *  under the progress-line. */
+  padding: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.home-hero-band-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.home-hero-band-nav-cell {
+  flex: 0 0 auto;
+  /* on mobile show ~2.2 items; desktop the row distributes across the band */
+  width: 168px;
+}
+
+/* DE-CARDED item — navigator: just a thumb + title in a row, no box.
+ * TOP-aligned (align-items:flex-start) so the title's first line sits at
+ * the TOP of the thumbnail, not vertically centered. */
+.home-hero-band-nav-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  /* small inner padding for the tap target only — NO border/background/box */
+  padding: var(--space-1) 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.62; /* inactive items recede; the active one reads as selected */
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.home-hero-band-nav-item:hover {
+  opacity: 0.85;
+}
+
+/* active item (synced with the current slide + progress node) */
+.home-hero-band-nav-item-on {
+  opacity: 1;
+}
+.home-hero-band-nav-item-on .home-hero-band-nav-title {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.home-hero-band-nav-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* small thumb cut from the slide's own banner art (the only rounded element) */
+.home-hero-band-nav-thumb {
+  flex: 0 0 auto;
+  width: 44px; /* below-hero promo thumbnail ≈ 44px square */
+  height: 44px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--tile);
+}
+.home-hero-band-nav-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* short title — the slide's own promo title, wrapped in full (never clipped) */
+.home-hero-band-nav-title {
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-leading);
+  font-weight: var(--weight-reg);
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: break-word;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+@media (min-width: 768px) {
+  /* node row + item row share ONE N-equal-column grid so each node's
+   *  center sits directly above its item's THUMBNAIL center. Both .progress and
+   *  .nav use the identical track (repeat(--n, minmax(0,1fr)) + the same
+   *  --gap-sm gutter), so column i occupies the exact same x-range in both
+   *  rows. Within a nav column the 44px thumb sits at the LEFT (thumb center =
+   *  colLeft + 22px); within a progress column the node is justify-self:start
+   *  (dot center = colLeft + 22px) → node i is directly above thumb i. */
+  .home-hero-band-nav {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    overflow-x: visible;
+  }
+  .home-hero-band-nav-cell {
+    /* the grid sizes the columns — no flex basis / fixed width */
+    width: auto;
+    min-width: 0;
+  }
+  .home-hero-band-nav-title {
+    font-size: var(--type-body-sm-size);
+  }
+
+  /* progress row → the SAME grid as .nav. Column geometry (shared by the rail
+   *  + fill below):
+   *    --half      = half a thumb/node = the node-center inset within a column
+   *    --col-pitch = x-distance between adjacent column lefts = adjacent node
+   *                  centers = (100% + gap) / n  (derived: c+g where
+   *                  c=(100% - (n-1)g)/n)  */
+  .home-hero-band-progress {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    column-gap: var(--gap-sm);
+    padding: 0;
+    --half: calc(var(--tap-min) / 2);
+    --col-pitch: calc((100% + var(--gap-sm)) / var(--n));
+    /* the line extends this far BEFORE the first dot and AFTER the last dot so
+     *  the ends aren't dead-ends. */
+    --rail-overhang: 18px;
+  }
+  .home-hero-band-node {
+    /* left-align the node in its column so the dot center = colLeft + 22px,
+     *  matching the thumbnail center in the nav column above. */
+    justify-self: start;
+  }
+
+  /* FULL hero-banner width: the line spans the entire .progress track (which is
+   *  edge-aligned to the banner), so the tail reaches the banner's right edge
+   *  and the head its left edge — no dead-ends. */
+  .home-hero-band-rail {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
+  /* fill is anchored at the first node center (--half) and grows in absolute
+   *  column-pitch units to the active node, then advances one pitch over the
+   *  dwell — so it always lands under the active node. */
+  .home-hero-band-rail-fill {
+    /* the accent fill grows from the LEFT edge (0) to the active node center
+     *  (= --half + seg-i·pitch); the trailing run to the banner's right edge
+     *  stays grey. */
+    left: 0;
+    --fill-from: calc(var(--half) + var(--seg-i) * var(--col-pitch));
+    --fill-to: calc(var(--half) + (var(--seg-i) + 1) * var(--col-pitch));
+    width: var(--fill-from);
+    max-width: calc(var(--half) + (var(--n) - 1) * var(--col-pitch));
+    animation: heroSegGrid var(--seg-dur) linear forwards;
+  }
+  .home-hero-band-rail-fill-static {
+    animation: none;
+    width: var(--fill-from);
+  }
+}
+
+/* desktop fill advance (absolute column-pitch units) */
+@keyframes heroSegGrid {
+  from {
+    width: var(--fill-from);
+  }
+  to {
+    width: var(--fill-to);
+  }
+}
+
+/* ---- reduced motion: static fill, no advance, no slide-transition ---------
+ * The active segment is shown FULL instantly; completed stay full; future
+ * stay empty. Autoplay is already disabled in JS. */
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-band-track {
+    transition: none;
+  }
+  /* progress segment never advances — fills only to the active node. The
+   *  static WIDTH is already correct per breakpoint (.railFill base = mobile
+   *  fraction; the desktop block = column-pitch); here we only kill the
+   *  advance animation defensively (JS also adds .railFillStatic). */
+  .home-hero-band-rail-fill {
+    animation: none;
+  }
+  .home-hero-band-dot {
+    transition: none;
+  }
+}
+
+/* CategoryLauncher — mobile round-icon vertical grid. Hidden ≥768. Tokens only. */
+
+.home-category-launcher-launcher {
+  display: block;
+}
+
+.home-category-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3) var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-category-launcher-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--text);
+  /* ≥44px row; the icon disc is the visual target */
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+}
+
+.home-category-launcher-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  /* gold is the glyph and the hairline only; the disc is a neutral step */
+  color: var(--brand-accent-fg);
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+/* icon affordance = scale(1.10) */
+.home-category-launcher-item:hover .home-category-launcher-icon-wrap {
+  transform: scale(1.1);
+  border-color: var(--brand-accent);
+}
+
+.home-category-launcher-item:active .home-category-launcher-icon-wrap {
+  transform: scale(0.96);
+}
+
+.home-category-launcher-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.home-category-launcher-label {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+  text-align: center;
+}
+
+/* desktop hands off to the Tier-2 CategoryRail */
+@media (min-width: 768px) {
+  .home-category-launcher-launcher {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-category-launcher-icon-wrap,
+  .home-category-launcher-item:hover .home-category-launcher-icon-wrap,
+  .home-category-launcher-item:active .home-category-launcher-icon-wrap {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* StatsBar — settled social-proof strip. Equal salience, tokens only. */
+
+.home-stats-bar-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.home-stats-bar-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.home-stats-bar-label {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.home-stats-bar-value {
+  margin: 0;
+  font-family: var(--type-num-md-family);
+  font-size: var(--type-num-md-size);
+  line-height: var(--type-num-md-leading);
+  font-weight: var(--type-num-md-weight);
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+/* DevAuthToggle — fixed top-left, clear of the sticky header. Tokens only. */
+
+.home-dev-auth-toggle-fab,
+.home-dev-auth-toggle-panel {
+  position: fixed;
+  /* below the 60px header band + a gap, so it never overlaps the TopBar */
+  top: calc(var(--header-h) + var(--space-2));
+  left: var(--space-2);
+  z-index: var(--z-toast);
+}
+
+.home-dev-auth-toggle-fab {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--brand-accent-hairline);
+  background: var(--scrim);
+  color: var(--brand-accent-fg);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.home-dev-auth-toggle-fab:hover {
+  opacity: 1;
+}
+
+.home-dev-auth-toggle-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  width: 160px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+  border: 1px dashed var(--brand-accent-hairline);
+}
+
+.home-dev-auth-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.home-dev-auth-toggle-tag {
+  font-size: var(--t-micro);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+  font-weight: var(--weight-bold);
+}
+.home-dev-auth-toggle-close {
+  border: none;
+  background: transparent;
+  color: var(--text-mid);
+  font-size: var(--t-h3);
+  line-height: 1;
+  cursor: pointer;
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+.home-dev-auth-toggle-cycle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-hi);
+  cursor: pointer;
+  width: 100%;
+}
+.home-dev-auth-toggle-state-label {
+  font-size: var(--t-body);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent-fg);
+}
+.home-dev-auth-toggle-hint {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+/* ============================================================================
+ * HOME / LOBBY — page layout.
+ * Mobile-first @375: a single vertical stack of bands. ≥1240 (--frame-w): the
+ * desktop right rail (RightRail surfaces) sits beside the main column; below
+ * 1240 those figures fold inline at their authored band positions (so the rail
+ * is simply not rendered on mobile).
+ *
+ * Tokens only — no raw hex/px/duration. The page body never scrolls
+ * horizontally (globals.css); wide strips scroll inside their own Scroller.
+ * ==========================================================================*/
+
+.home-page {
+  display: block;
+}
+
+/* main column: the authored band stack — band beat = 16px (the dominant gap,
+ * NOT 32px). The flex gap owns ALL vertical band rhythm; bands set no own margin,
+ * so an omitted band collapses the gap rather than leaving a hole. */
+.home-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-gap);
+  min-width: 0;
+}
+
+/* footer wrapper — must span the FULL 1424 frame (.footer-box{width:1424px}),
+ * so on the desktop grid it stretches across BOTH the main column and the rail.
+ * On mobile (.page is display:block) it is naturally full width. The top gap to
+ * the last band is the standard 16px band beat. */
+.home-footer-full {
+  margin-top: var(--band-gap);
+}
+
+/* desktop two-column: main + right rail at the fixed frame (1424). Rail gutter
+ * = the 16px gap, not 24px. The footer row spans both columns. */
+@media (min-width: 1424px) {
+  .home-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    gap: var(--band-gap);
+    align-items: start;
+  }
+  .home-footer-full {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- generic section scaffold reused by bands ---- */
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.home-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.home-section-link {
+  font-size: var(--t-sm);
+  color: var(--brand-accent-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  text-decoration: none;
+}
+
+/* ---- skeleton scaffolds (loading.tsx) ---- */
+.home-skel-row {
+  display: flex;
+  gap: var(--space-3);
+  overflow: hidden;
+}
+
+/* skeleton mirrors the lobby column ladder: 3-up @375 → 4-up → 6-up → 8-up */
+.home-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--band-gap);
+}
+.home-skel-grid > * {
+  height: var(--tile-h);
+}
+
+@media (min-width: 768px) {
+  .home-skel-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (min-width: 992px) {
+  .home-skel-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+@media (min-width: 1424px) {
+  .home-skel-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+}
+
+/* ============================================================================
+ * ProviderGameGrid — FIXED-TILE game lobby.
+ * Reference: `.game-list{grid-template-columns:repeat(8,1fr);gap:16px}` with each `li`
+ * a FIXED height (--tile-h), radius 8, the --tile surface, art object-fit:cover. Feature
+ * tiles span 2×2 (.iSlot) or 2-wide (.fishing). The grid pins every cell so a
+ * tile is ONE physical size — never viewport÷column-count fluid.
+ * Column ladder: 3-up @375 → 4-up @768 → 6-up @992 → 8-up @1424.
+ * ==========================================================================*/
+
+.home-provider-game-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-gap);
+}
+
+/* lobby grid — fixed-height rows (each row = one --tile-h). grid-auto-rows
+ * pins the row height so 1fr columns give ~164px width at the 1424 frame, and
+ * 2×2 feature tiles span exactly two rows of the same fixed height. */
+.home-provider-game-grid-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: var(--tile-h);
+  gap: var(--band-gap);
+  /* dense backfill: with a 2×2 row-spanning hero (.featureBig) under default
+   * auto-flow:row the renderer leaves a hole beside the hero, so the trailing
+   * filler count maps to a non-rectangular layout and the LAST ROW still shows
+   * ragged empty space. `dense` backfills those holes, so the (already correct)
+   * cell-count fill lands every breakpoint on complete rows. */
+  grid-auto-flow: row dense;
+}
+
+/* the cell — a tile fills its fixed-height row edge to edge (no width:100% fluid) */
+.home-provider-game-grid-cell {
+  min-width: 0;
+}
+
+/* feature tiles: 2×2 hero (.iSlot) + 2-wide strip (.fishing). On the narrow
+ * 3-up ladder a 2×2 would overflow, so spans only engage from 4-up upward. */
+.home-provider-game-grid-feature-big,
+.home-provider-game-grid-feature-wide {
+  grid-column: span 2;
+}
+
+@media (min-width: 768px) {
+  .home-provider-game-grid-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .home-provider-game-grid-feature-big {
+    grid-row: span 2; /* .iSlot 2×2 */
+  }
+}
+
+@media (min-width: 992px) {
+  .home-provider-game-grid-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (min-width: 1424px) {
+  .home-provider-game-grid-grid {
+    grid-template-columns: repeat(8, 1fr); /* .game-list — the 8-up lobby */
+  }
+}
+
+/* SportsMatchCard — COMPACT match card on the DS card tokens: --card-bg, the
+ * --border hairline and the level-1 --lift shadow. Gold is the kicker and the
+ * CTA fill only; odds read as ivory figures on the odds surface. */
+
+.home-sports-match-card-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--lift);
+  /* EQUAL HEIGHT: every card is pinned to the same height so all 4 align in
+   * the row regardless of content (live score vs VS, league length). The
+   * fixture/center rows below reserve fixed space so nothing reflows. */
+  height: 100%;
+  min-height: 168px;
+  box-sizing: border-box;
+  /* The fixture row measures the CARD, not the viewport: the same card sits
+   * 4-up beside the rail on desktop and much wider on mobile. */
+  container-type: inline-size;
+}
+
+/* league kicker */
+.home-sports-match-card-league {
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--weight-semi);
+  color: var(--brand-accent-fg);
+  overflow-wrap: break-word;
+}
+
+/* fixture row: Team A · centre · Team B */
+.home-sports-match-card-fixture {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-1);
+}
+.home-sports-match-card-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.home-sports-match-card-team[data-side="away"] {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.home-sports-match-card-flag {
+  font-size: var(--t-body);
+  line-height: 1;
+  flex: none;
+}
+/* team names wrap in full (never clipped) */
+.home-sports-match-card-team-name {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* A narrow card leaves each team column only a few characters wide, so names
+ * would break mid-word. Stack the fixture instead (home / centre / away): each
+ * name gets the full card width and wraps only between words. */
+@container (width < 20rem) {
+  .home-sports-match-card-fixture {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  .home-sports-match-card-team[data-side="away"] {
+    flex-direction: row;
+    text-align: left;
+  }
+  .home-sports-match-card-fixture .home-sports-match-card-center {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    height: auto;
+    min-width: 0;
+  }
+}
+
+/* centre status block — VS (pre) or Live + score */
+.home-sports-match-card-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 48px;
+  /* Reserve fixed height: a live "TRỰC TIẾP" + score (2 rows) and a "VS"
+   * (1 row) occupy the SAME vertical space → uniform card height. */
+  height: 38px;
+}
+.home-sports-match-card-vs {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+}
+.home-sports-match-card-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.03em;
+  color: var(--text-hi);
+}
+.home-sports-match-card-live-dot {
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--loss);
+}
+.home-sports-match-card-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--type-num-sm-family);
+  font-size: var(--type-num-sm-size);
+  line-height: var(--type-num-sm-leading);
+  font-weight: var(--type-num-sm-weight);
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+.home-sports-match-card-score-sep {
+  color: var(--text-mid);
+}
+
+/* a betting market = tiny heading + 3 tight cells */
+.home-sports-match-card-market {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.home-sports-match-card-market-name {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+.home-sports-match-card-cells {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+}
+.home-sports-match-card-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  /* DS odds cell: surface.2 fill, control edge, secondary label, ivory value */
+  background: var(--surface-2);
+  border: 1px solid var(--line-default);
+  min-height: 34px;
+}
+/* DS odds.suspended: the surface.1 fill with muted text */
+.home-sports-match-card-cell[data-suspended] {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.home-sports-match-card-cell[data-suspended] .home-sports-match-card-cell-label,
+.home-sports-match-card-cell[data-suspended] .home-sports-match-card-cell-price {
+  color: var(--text-mid);
+}
+/* cell labels (team names, lines) wrap in full (never clipped) */
+.home-sports-match-card-cell-label {
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-leading);
+  font-weight: var(--type-caption-weight);
+  color: var(--text);
+  text-align: center;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+.home-sports-match-card-cell-price {
+  font-family: var(--type-num-sm-family);
+  font-size: var(--type-num-sm-size);
+  line-height: var(--type-num-sm-leading);
+  font-weight: var(--type-num-sm-weight);
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+/* small gold CTA — full-width, compact */
+.home-sports-match-card-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  /* push the CTA to the bottom so it bottom-aligns across all 4 cards when a
+   * card grows to the shared height */
+  margin-top: auto;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  /* hover is a COLOUR shift + the uniform button scale — not a filter. A
+   * brightness() filter is depth-adjacent styling and it also cannot be
+   * re-skinned by a brand, whereas --brand-accent-2 follows [data-brand]. */
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.home-sports-match-card-cta:hover {
+  background: var(--brand-accent-2);
+  transform: scale(1.05);
+}
+.home-sports-match-card-cta:active {
+  background: var(--brand-accent-2);
+  transform: scale(0.98);
+}
+.home-sports-match-card-cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-sports-match-card-cta,
+  .home-sports-match-card-cta:hover,
+  .home-sports-match-card-cta:active {
+    transform: none;
+  }
+}
+
+/* SportsLifestyle — lifestyle cards, each with a compact match card. Tokens only. */
+
+.home-sports-lifestyle-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* section heading = the h3 role (MAPPING type row --t-h2) */
+.home-sports-lifestyle-title {
+  font-family: var(--type-h3-family);
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-leading);
+  font-weight: var(--type-h3-weight);
+  color: var(--text-hi);
+}
+
+/* 4 columns; each column stacks {lifestyle card + compact match card} */
+.home-sports-lifestyle-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--gutter);
+}
+
+@media (min-width: 768px) {
+  .home-sports-lifestyle-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-sports-lifestyle-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* a single column: lifestyle card on top, one compact match card beneath.
+ * The grid stretches every column to equal height; the match slot grows to
+ * fill the leftover space so all 4 match cards bottom-align (equal height). */
+.home-sports-lifestyle-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+}
+/* the match-card slot absorbs the column's slack so cards equalize; the
+ * lifestyle card above keeps its fixed 16/9 aspect ratio untouched. */
+.home-sports-lifestyle-match-slot {
+  flex: 1 1 auto;
+  display: flex;
+}
+.home-sports-lifestyle-match-slot > * {
+  flex: 1 1 auto;
+}
+
+/* lifestyle entry cards — filled image SLOTS (user key-art, object-fit:cover) */
+/* Every lifestyle card is the same 16:9 grid cell and hovers to the SAME
+ * scale(1.02) — no card is enlarged by what it links to. Background, the
+ * --border hairline, the --lift shadow and transition come from the Card base
+ * (.ui-card, .ui-card-promo, .ui-card-interactive). The promo variant has no
+ * padding, so the inset is set here; display is overridden to flex so the
+ * kicker and title stack on the card floor, over the scrim and clear of the
+ * key-art. Gold is the kicker text and the hover edge. */
+.home-sports-lifestyle-life-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  aspect-ratio: 16 / 9;
+  text-decoration: none;
+  color: var(--text-hi);
+  overflow: hidden;
+}
+.home-sports-lifestyle-life-card:hover {
+  transform: scale(1.02);
+  border-color: var(--brand-accent);
+}
+.home-sports-lifestyle-life-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.home-sports-lifestyle-life-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+/* legibility scrim so the kicker/title read over any key-art. Kept as a
+ * gradient on purpose: it is a full-bleed image overlay (the permitted
+ * "background decoration" class) and it is load-bearing for text contrast —
+ * a flat scrim would either hide the art or fail AA on the title. The dark
+ * stop reads the --scrim token. */
+.home-sports-lifestyle-life-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, transparent 30%, var(--scrim) 100%);
+  pointer-events: none;
+}
+.home-sports-lifestyle-life-kicker,
+.home-sports-lifestyle-life-title {
+  position: relative;
+  z-index: 2;
+}
+.home-sports-lifestyle-life-kicker {
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-accent-fg);
+  font-weight: var(--weight-semi);
+}
+/* card title = the h4 role (MAPPING type row --t-h3) */
+.home-sports-lifestyle-life-title {
+  font-family: var(--type-h4-family);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-leading);
+  font-weight: var(--type-h4-weight);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-sports-lifestyle-life-card,
+  .home-sports-lifestyle-life-card:hover {
+    transform: none;
+  }
+}

@@ -1,0 +1,146 @@
+<section>
+<h2 id="f-root-layout">Root layout &amp; provider tree</h2>
+<h3 id="f-root-layout-metadata">Metadata &amp; viewport</h3>
+<table><thead><tr><th>export</th><th>value</th></tr></thead><tbody><tr><td><code>metadata.title</code></td><td><code>Yaobet</code></td></tr><tr><td><code>metadata.description</code></td><td><code>Yaobet — nhà cái trực tuyến.</code> (gloss: Yaobet — online bookmaker.)</td></tr><tr><td><code>viewport.width</code></td><td><code>device-width</code></td></tr><tr><td><code>viewport.initialScale</code></td><td><code>1</code></td></tr><tr><td><code>viewport.themeColor</code></td><td><code>#0a0a0a</code> <span class="sw" style="background:#0a0a0a"></span> (a literal that duplicates <code>--canvas</code>)</td></tr></tbody></table>
+<p>There is no <code>icons</code>, <code>openGraph</code>, <code>manifest</code>, <code>robots</code> or title template. The favicon comes from the <code>app/favicon.ico</code> convention.</p>
+<h3 id="f-root-layout-html">&lt;html&gt; / &lt;body&gt;</h3>
+<pre><code class="lang-tsx">&lt;html lang="vi" data-brand="yaobet" data-theme="obsidian"
+      className={`${beVietnamPro.variable} ${montserrat.variable}`}&gt;
+  &lt;body&gt;
+    &lt;Providers&gt;
+      &lt;AppShell footer={&lt;Footer /&gt;}&gt;{children}&lt;/AppShell&gt;
+      &lt;QuickActionRail /&gt;
+    &lt;/Providers&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre>
+<h3 id="f-root-layout-providers">Provider tree (src/app/providers.tsx, "use client")</h3>
+<pre><code class="lang-tsx">&lt;MockAuthProvider initialState="tiered"&gt;     // src/lib/auth/session.tsx
+  &lt;AuthModalProvider&gt;                       // src/lib/auth/modal.tsx
+    {children}
+  &lt;/AuthModalProvider&gt;
+&lt;/MockAuthProvider&gt;</code></pre>
+<div class="callout warn"><code>initialState="tiered"</code>: every page load starts <strong>logged in</strong> as the tiered fixture user <code>Nguyễn Văn An</code> (VIP level 3, "Bạch Kim"). <code>MockAuthProvider</code> defaults to <code>"guest"</code>, but providers.tsx overrides it. State lives only in React memory: nothing goes to localStorage or cookies, and a full reload returns to <code>tiered</code>. The guest state is reachable only through logout (<code>signOut</code>) or the dev toggle.</div>
+<h3 id="f-root-layout-wrappers">What wraps every page</h3>
+<ul>
+<li><a href="#s-app-shell"><code>AppShell</code></a> (<code>src/components/layout/AppShell.tsx</code>): an async Server Component. It fetches <code>getVerticals()</code> + <code>getBalance()</code> and renders the client island <a href="#s-shell-chrome"><code>ShellChrome</code></a>, which composes <a href="#s-header"><code>Header</code></a>, <a href="#s-category-sheet"><code>CategorySheet</code></a>, <a href="#s-bottom-tab-bar"><code>BottomTabBar</code></a> and <a href="#s-auth-modal"><code>AuthModal</code></a> around <code>children</code>. It accepts optional <code>rightRail</code> (unused by the root) and <code>footer</code> props.</li>
+<li><a href="#s-footer"><code>Footer</code></a> (<code>src/components/layout/Footer.tsx</code>): passed into AppShell's <code>footer</code> slot.</li>
+<li><a href="#s-quick-action-rail"><code>QuickActionRail</code></a> (<code>src/components/layout/QuickActionRail.tsx</code>): a sibling of AppShell inside Providers, imported by its file path (not through the layout barrel).</li>
+</ul>
+<div class="callout note">Track S owns the specs of AppShell, ShellChrome, Header, CategorySheet, BottomTabBar, AuthModal, Footer and QuickActionRail. The anchors above follow the brief's naming convention (<code>s-&lt;kebab-name&gt;</code>), so the compiler should verify they match track S's ids. <code>DevAuthToggle</code> is not in the root layout; <code>app/page.tsx</code> (home) renders it.</div>
+<details><summary>Verbatim src/app/layout.tsx</summary><pre><code class="lang-tsx">/* ============================================================================
+ * Yaobet — ROOT layout (SPEC-04 PART 2 / Wave 3.1)
+ * ----------------------------------------------------------------------------
+ * &lt;html lang="vi" data-brand="yaobet" data-theme="obsidian"&gt; — Vietnamese-first,
+ * default Yaobet brand, OLED-dark. Imports the single global token sheet and
+ * wraps the tree in &lt;Providers&gt; (MockAuth + AuthModal).
+ *
+ * &lt;AppShell&gt; (two-tier Header + CategoryRail/Sheet + BottomTabBar + AuthModal,
+ * with Footer/SupportWidget slots owned by their agents) composes BELOW
+ * &lt;Providers&gt; so the whole tree sits under one client-context root while the
+ * shell itself stays a Server Component that fetches its truthful data (§F).
+ * ==========================================================================*/
+
+import type { Metadata, Viewport } from "next";
+import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
+import "./globals.css";
+import { Providers } from "./providers";
+
+/* CINZEL REMOVED. It was the display face for /vip headings and tier names,
+ * and it served `latin` + `latin-ext` only — no `vietnamese` subset — so
+ * U+1EA0–1EF1 fell out of the face mid-word. Measured on the running app:
+ * `Đồng` lost `ồ`; `Bạc` and `Bạch Kim` lost `ạ`. That is the identical defect
+ * that got Outfit rejected under ruling A4, so it could not be shipped.
+ *
+ * --brand-font-display now points at --font-head (Montserrat), which is both
+ * Vietnamese-complete AND the geometric sans the Flat system specifies for
+ * display — Cinzel was an inscriptional serif and off-system either way.
+ * Dropping the loader removes a webfont that had no remaining consumer. */
+
+/* ---- The two Vietnamese-complete app faces (PM ruling A4) ----------------
+ * Both declare subsets: ["latin", "vietnamese"], so Google serves the
+ * U+1EA0–1EF9 @font-face slice and every toned vowel (Ộ ổ ậ ư ợ …) resolves
+ * INSIDE the face — no mid-word fallback anywhere in the product. Outfit is
+ * rejected outright: it ships latin/latin-ext only and skips U+1EA0–1EF1.
+ * Consumed through tokens.css → --font-body / --font-head → --brand-font-*. */
+
+/* Body + tabular numerals. Named as the brand body face since SPEC-02 §4;
+ * this is the first time it is actually LOADED rather than named and left to
+ * fall through to system-ui (which varies per platform). */
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "600", "700"],
+  variable: "--font-be-vietnam",
+  display: "swap",
+});
+
+/* Display / headings / uppercase labels. The design system asks for "a
+ * geometric sans-serif that mirrors the shapes of the UI" — that is an intent
+ * about form, and Montserrat satisfies it while actually rendering the
+ * language. 700/800 only; the tracking treatment lives in typography.css. */
+const montserrat = Montserrat({
+  subsets: ["latin", "vietnamese"],
+  weight: ["700", "800"],
+  variable: "--font-montserrat",
+  display: "swap",
+});
+import { AppShell, Footer } from "@/components/layout";
+import { QuickActionRail } from "@/components/layout/QuickActionRail";
+
+export const metadata: Metadata = {
+  title: "Yaobet",
+  description: "Yaobet — nhà cái trực tuyến.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // mobile-first @375 base; obsidian canvas for the browser chrome (--canvas).
+  themeColor: "#0a0a0a",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly&lt;{ children: React.ReactNode }&gt;) {
+  return (
+    &lt;html
+      lang="vi"
+      data-brand="yaobet"
+      data-theme="obsidian"
+      className={`${beVietnamPro.variable} ${montserrat.variable}`}
+    &gt;
+      &lt;body&gt;
+        &lt;Providers&gt;
+          &lt;AppShell footer={&lt;Footer /&gt;}&gt;{children}&lt;/AppShell&gt;
+          &lt;QuickActionRail /&gt;
+        &lt;/Providers&gt;
+      &lt;/body&gt;
+    &lt;/html&gt;
+  );
+}
+</code></pre></details>
+<details><summary>Verbatim src/app/providers.tsx</summary><pre><code class="lang-tsx">/* ============================================================================
+ * Yaobet — client provider tree (SPEC-04 §3.1, dev-fe brief)
+ * ----------------------------------------------------------------------------
+ * Mounts the MockAuthProvider + AuthModalProvider (the openAuthModal API) at
+ * the client boundary so the rest of the tree (server components included)
+ * renders beneath one client island root. The AuthModal *content* and the
+ * Toast host are composed by the shell agent inside &lt;AppShell&gt; — this file
+ * owns only the context providers.
+ * ==========================================================================*/
+
+"use client";
+
+import type { ReactNode } from "react";
+import { MockAuthProvider } from "@/lib/auth/session";
+import { AuthModalProvider } from "@/lib/auth/modal";
+
+export function Providers({ children }: { children: ReactNode }) {
+  return (
+    &lt;MockAuthProvider initialState="tiered"&gt;
+      &lt;AuthModalProvider&gt;{children}&lt;/AuthModalProvider&gt;
+    &lt;/MockAuthProvider&gt;
+  );
+}
+</code></pre></details>
+</section>
+

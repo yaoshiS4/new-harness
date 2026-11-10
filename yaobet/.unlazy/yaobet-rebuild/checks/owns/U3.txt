@@ -1,0 +1,6 @@
+src/app/(member)/layout.tsx
+src/app/(member)/tai-khoan/**
+src/app/bao-mat/**
+src/app/lich-su/**
+src/components/account/**
+src/styles/areas/member.css

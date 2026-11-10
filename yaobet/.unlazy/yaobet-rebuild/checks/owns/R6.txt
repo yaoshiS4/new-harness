@@ -1,0 +1,3 @@
+src/components/lottery/**
+src/app/ve-so/**
+src/styles/areas/lottery.css

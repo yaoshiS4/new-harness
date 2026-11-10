@@ -1,0 +1,16 @@
+<section>
+<h2 id="r-lottery">R3 · Vé số (scratch card) — route /ve-so</h2>
+<table><tbody>
+<tr><th>URL</th><td><code>/ve-so</code></td></tr>
+<tr><th>Page file</th><td><code>src/app/ve-so/page.tsx</code> — server shell returning <code>&lt;LotteryRoot /&gt;</code>; <code>metadata.title = "Vé số — Yaobet"</code>.</td></tr>
+<tr><th>Auth gating</th><td>None. Guests can play the demo; nothing is charged or credited (mock).</td></tr>
+<tr><th>Section order</th><td>LotteryRoot <code>main.page</code>: 1 header (h1 "Vé số" + lede) → 2 shelf grid: featured live card "Vé số cào" (full row) + 4 disabled "Sắp ra mắt" cards → 3 game mount point (<code>display: contents</code>; the scratch-card overlay mounts here while playing) → 4 "Tỷ lệ công bố" fairness strip.</td></tr>
+<tr><th>375px</th><td>Shell content 343px; page padding 12px 16px (gutter) → 311px column. Shelf 1 column (≤640): featured card stacks (art full width 72px tall, CTA full width); 4 coming-soon cards one per row. Odds strip 1 column. Game: bottom sheet (Overlay "auto" &lt;640).</td></tr>
+<tr><th>768px</th><td>Page max-width 760px centred (content 736 → column 704px). Shelf 2 columns; featured spans both, art 88×72 left of body. Odds 3 columns. Game: centred dialog, max-width 560px.</td></tr>
+<tr><th>1024 / 1440px</th><td>Same as 768 (column capped at 760 − 32 = 728px).</td></tr>
+<tr><th>Page copy</th><td>"Vé số" (Lottery ticket) · lede "Vé bạn giữ trong tay và tự mở. Mua một tấm, mở ra, biết kết quả ngay — không phải chờ tới lượt quay nào." (A ticket you hold and open yourself. Buy one, open it, know the result at once — no waiting for a draw.)</td></tr>
+<tr><th>Loading / empty / error</th><td>None on the hub. The game shows placeholder medallions for one paint before the first card is dealt.</td></tr>
+</tbody></table>
+<div class="callout warn">The hub copy says "Mua một tấm" (buy one) but there is no price, no purchase and no balance change anywhere; "Cào ngay" opens a free demo card and the outcome copy claims winnings "Đã cộng vào số dư của bạn" (added to your balance) without any wallet call. LotteryRoot renders a <code>&lt;main&gt;</code> inside the shell's <code>&lt;main class="content"&gt;</code> (nested main landmarks).</div>
+</section>
+

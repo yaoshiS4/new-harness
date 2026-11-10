@@ -1,0 +1,8 @@
+src/ui/ui.css
+src/ui/Icon/**
+src/ui/Badge/**
+src/ui/Button/**
+src/ui/Card/**
+src/ui/Pill/**
+src/ui/MoneyValue/**
+src/ui/Skeleton/**

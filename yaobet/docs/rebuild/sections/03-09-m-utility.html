@@ -1,0 +1,68 @@
+<section>
+<h2 id="m-utility">m-utility — /hoan-tra, /lich-su, /ho-tro, /tro-giup, /tai-app, /phong-cach</h2>
+<p>None of these is in the <code>(member)</code> group: no MemberSidebar; they render directly inside the global shell content frame (<a href="#s-shell-h">#s-shell</a>). None has its own <code>loading.tsx</code> (inference: the root <code>app/loading.tsx</code> — the HOME skeleton — is the fallback for client transitions into them; see #s-home).</p>
+
+<h3 id="m-redirect-routes">Redirect routes</h3>
+<table>
+<thead><tr><th>URL</th><th>File</th><th>Behaviour</th><th>Who links here</th></tr></thead>
+<tbody>
+<tr><td>/hoan-tra</td><td><code>src/app/hoan-tra/page.tsx</code></td><td><code>redirect("/khuyen-mai")</code> (307)</td><td>MemberSidebar tiles "Hoàn trả" + "Sinh lời", action card "Trung tâm nhiệm vụ", header MemberMenu "Hoàn trả", HomeFooter</td></tr>
+<tr><td>/lich-su</td><td><code>src/app/lich-su/page.tsx</code></td><td><code>redirect("/tai-khoan")</code> (307) → lands on Hồ sơ panel</td><td>MemberSidebar "Lịch sử", MemberMenu, HomeFooter</td></tr>
+<tr><td>/bao-mat</td><td><code>src/app/bao-mat/page.tsx</code></td><td><code>redirect("/tai-khoan")</code> (see <a href="#m-route-bao-mat">#m-route-bao-mat</a>)</td><td>MemberMenu, HomeFooter</td></tr>
+<tr><td>/game-han-che</td><td><code>src/app/game-han-che/page.tsx</code></td><td><code>redirect("/cuoc-hop-le?tab=han-che")</code></td><td>(none internal)</td></tr>
+</tbody>
+</table>
+<div class="callout warn">Comments claim the targets "carry" the feature: <code>/khuyen-mai</code> is the promotions hub (no cashback claim surface found in this track), and <code>/tai-khoan</code> has no history surface (history is the Lịch sử tab of <code>/vi-tien</code>). The <code>getCashback()</code> mock and <code>vi.cashback.*</code> strings exist but no route in this track renders them (grep found no caller outside lib/mock).</div>
+
+<h3 id="m-stub-pattern">The stub page pattern (<code>src/app/stub.module.css</code>)</h3>
+<p><strong>Purpose</strong> — a minimal titled placeholder page so a link never 404s. <strong>Users</strong>: <code>/ho-tro</code>, <code>/tro-giup</code>, <code>/tai-app</code>, <code>/phong-cach</code> (this track) and <code>/cau-lac-bo</code> (imports <code>../stub.module.css</code>; owned by track R/S). Each page is a Server Component with a <code>metadata.title</code>.</p>
+<pre><code class="lang-txt">div.page
+├─ h1.heading {title}
+└─ p.body     {one sentence}</code></pre>
+<table>
+<thead><tr><th>Selector</th><th>Property</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>.page</td><td>display / flex-direction / gap / min-width</td><td>flex / column / <span class="tok">--space-4</span> 16px / 0</td></tr>
+<tr><td>.heading</td><td>font-size / color / font-weight</td><td><span class="tok">--t-h1</span> 24px / <span class="tok">--text-hi</span> #f2f0e4 / <span class="tok">--weight-bold</span> 700</td></tr>
+<tr><td>.body</td><td>font-size / color / max-width / line-height</td><td><span class="tok">--t-body</span> 16px / <span class="tok">--text-mid</span> #888888 / 60ch / 1.6 (literal)</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/app/stub.module.css</code></summary>
+<pre><code class="lang-css">/* Shared minimal stub-page styling. Tokens only; mobile-first @375. Matches the
+ * existing route pages (heading uses --t-h1 / --text-hi). */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.body {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+  max-width: 60ch;
+  line-height: 1.6;
+}
+</code></pre>
+</details>
+<p>No media queries, no states, no motion. Font family is inherited from the body (track F typography). Composition at every width: heading + one line at the top-left of the shell content frame, then the global footer.</p>
+<table>
+<thead><tr><th>URL</th><th>File</th><th>metadata.title</th><th>h1 (verbatim)</th><th>body (verbatim)</th><th>English gloss</th></tr></thead>
+<tbody>
+<tr><td>/ho-tro</td><td><code>src/app/ho-tro/page.tsx</code></td><td>Hỗ trợ — Yaobet</td><td>Hỗ trợ khách hàng</td><td>Đội ngũ chăm sóc khách hàng sẽ sớm sẵn sàng hỗ trợ bạn 24/7.</td><td>Customer support · The care team will soon be ready to help you 24/7.</td></tr>
+<tr><td>/tro-giup</td><td><code>src/app/tro-giup/page.tsx</code></td><td>Trung tâm trợ giúp — Yaobet</td><td>Trung tâm trợ giúp</td><td>Trung tâm trợ giúp sẽ sớm ra mắt.</td><td>Help center · The help center is coming soon.</td></tr>
+<tr><td>/tai-app</td><td><code>src/app/tai-app/page.tsx</code></td><td>Tải ứng dụng — Yaobet</td><td>Tải ứng dụng</td><td>Ứng dụng di động sẽ sớm có mặt.</td><td>Download the app · The mobile app is coming soon.</td></tr>
+<tr><td>/phong-cach</td><td><code>src/app/phong-cach/page.tsx</code></td><td>Phong cách — Yaobet</td><td>Phong cách</td><td>Chuyên mục phong cách sẽ sớm ra mắt.</td><td>Style · The style section is coming soon.</td></tr>
+</tbody>
+</table>
+<p>Inbound links (FACT, grep): <code>/tai-app</code> ← Footer "Tải ứng dụng"; <code>/phong-cach</code> ← Header utility "Phong cách" + Footer "Phong cách Yaobet"; <code>/tro-giup</code> ← Footer "Trung tâm trợ giúp", MemberSidebar "Hướng dẫn", NotFoundResolver "Vẫn chưa rõ? Xem Trợ giúp"; <code>/ho-tro</code> ← unused AccountMenu row (and QuickActionRail per its CSS comment, track S).</p>
+<div class="callout warn">Stub strings are hard-coded in each page (not in <code>lib/i18n</code>). <code>.body</code> uses literal <code>line-height: 1.6</code> instead of <span class="tok">--lh-body</span> (1.5). The CSS comment says "Matches the existing route pages", but member pages use 600-weight h2s while stubs use a 700 h1.</div>
+</section>
+

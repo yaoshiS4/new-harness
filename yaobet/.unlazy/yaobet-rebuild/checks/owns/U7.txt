@@ -1,0 +1,8 @@
+src/app/cuoc-hop-le/**
+src/app/game-han-che/**
+src/app/hoan-tra/**
+src/app/ho-tro/**
+src/app/tro-giup/**
+src/app/tai-app/**
+src/app/phong-cach/**
+src/components/restricted/**

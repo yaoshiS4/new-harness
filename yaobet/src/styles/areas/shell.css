@@ -1,0 +1,2141 @@
+/* ============================================================================
+ * Shell area partial — the shell-local internals (Overlay, NavDropdown,
+ * Countdown, Money) and every shell keyframe. Plain class rules only; the
+ * components layer comes from the import line in globals.css.
+ * ==========================================================================*/
+
+/* Overlay (shell-local) — scrim + panel. SOLID scrim, NEVER backdrop blur. */
+
+.shell-overlay-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--scrim); /* SOLID rgba — no backdrop-filter (lint) */
+  display: flex;
+  /* default: bottom-pinned (sheet). Dialog/auto ≥640 re-centre below. */
+  align-items: flex-end;
+  justify-content: center;
+  animation: scrim-in var(--dur-fast) var(--ease-standard);
+}
+
+.shell-overlay-panel {
+  position: relative;
+  background-color: var(--surface);
+  color: var(--text-hi);
+  /* A sheet/dialog is --surface sitting on a scrimmed --canvas; the --border
+   * hairline is its edge. */
+  border: 1px solid var(--border);
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* grab handle for the sheet presentation */
+.shell-overlay-grab {
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  margin: var(--space-2) auto var(--space-1);
+}
+
+/* ---- SHEET presentation (mobile, bottom-pinned) ---- */
+.shell-overlay-sheet,
+.shell-overlay-auto {
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  animation: sheet-up var(--dur-base) var(--ease-entrance);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+/* ---- DIALOG presentation (always centred) ---- */
+.shell-overlay-dialog {
+  border-radius: var(--radius-card);
+  max-width: var(--overlay-desktop-max, 420px);
+  margin: 0 var(--gutter);
+  animation: dialog-in var(--dur-base) var(--ease-entrance);
+}
+.shell-overlay-dialog .shell-overlay-grab {
+  display: none;
+}
+
+/* AUTO: sheet <640, centred dialog ≥640. */
+@media (min-width: 640px) {
+  .shell-overlay-scrim {
+    align-items: center;
+  }
+  .shell-overlay-auto {
+    border-radius: var(--radius-card);
+    max-width: var(--overlay-desktop-max, 420px);
+    margin: 0 var(--gutter);
+    /* DESKTOP dialog: no extra panel padding-bottom. The sheet needs it for the
+     *  safe-area; the centred dialog's inner zones own their own padding, so the
+     *  bottom edge stays symmetric with the top (no dead band under the layout). */
+    padding-bottom: 0;
+    animation: dialog-in var(--dur-base) var(--ease-entrance);
+  }
+  .shell-overlay-auto .shell-overlay-grab {
+    display: none;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes dialog-in {
+  from {
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+/* reduced-motion: instant mount, no slide (also covered by motion.css zeroing
+ * --dur-*; explicit here so the keyframes don't run). */
+@media (prefers-reduced-motion: reduce) {
+  .shell-overlay-scrim,
+  .shell-overlay-sheet,
+  .shell-overlay-auto,
+  .shell-overlay-dialog {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ============================================================================
+ * NavDropdown — reference-exact tier-2 category cell + mega panel.
+ *   reference .routers-list ul li { width:152px; height:48px; gap:8px; color:--text;
+ *                            font:16px/400; transition all .25s linear }
+ *   reference active/hover         { font:20px/600; gold-gradient text-clip }
+ * ==========================================================================*/
+
+.shell-nav-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.shell-nav-dropdown-trigger {
+  width: 152px;
+  height: var(--nav-h); /* 48px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2); /* 8px icon↔label */
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  /* Blue is FOCUS ONLY; the resting colour reads the --text ladder on --header-bg. */
+  color: var(--text);
+  font: inherit;
+  font-size: var(--t-body); /* 16px — FIXED at rest AND on hover */
+  font-weight: var(--weight-reg);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  /* explicit properties, not `all …  linear`: --ease-standard + --dur-base, and
+   * `all` would animate the transform/colour set unpredictably. */
+  transition: color var(--dur-base) var(--ease-standard),
+    transform var(--dur-base) var(--ease-standard);
+}
+
+/* Hover keeps the 16px size and a solid colour (no size jump, no gradient
+ * text-clip): the uniform 1.05 button scale plus the accent. ACTIVE reads as
+ * gold (--brand-accent), never as the focus blue.                            */
+.shell-nav-dropdown-trigger:hover,
+.shell-nav-dropdown-active {
+  color: var(--brand-accent); /* on --header-bg */
+}
+/* persistent SELECTED weight (a state marker, not a hover effect) */
+.shell-nav-dropdown-active {
+  font-weight: var(--weight-semi);
+}
+.shell-nav-dropdown-trigger:hover {
+  transform: scale(1.05);
+}
+
+.shell-nav-dropdown-trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+
+/* leading per-vertical glyph — reference .iconfont 24×24, keeps its own color.
+ * The -webkit-text-fill-color overrides existed only to punch the glyph back
+ * out of the gradient text-clip above; that clip is gone, so they are too. */
+.shell-nav-dropdown-icon {
+  flex: 0 0 auto;
+  color: var(--text-mid);
+  opacity: 0.9;
+}
+
+.shell-nav-dropdown-trigger:hover .shell-nav-dropdown-icon,
+.shell-nav-dropdown-active .shell-nav-dropdown-icon {
+  color: var(--brand-accent);
+  opacity: 1;
+}
+
+.shell-nav-dropdown-caret {
+  flex: 0 0 auto;
+  color: var(--text-mid);
+  opacity: 0.7;
+}
+.shell-nav-dropdown-trigger:hover .shell-nav-dropdown-caret,
+.shell-nav-dropdown-active .shell-nav-dropdown-caret {
+  color: var(--brand-accent);
+}
+
+.shell-nav-dropdown-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--space-1);
+  min-width: 220px;
+  background-color: var(--surface); /* opaque — never a backdrop blur */
+  /* --surface sits about 1.10:1 on --canvas, so the hairline and the level-2
+   * shadow carry the edge. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-2);
+  z-index: var(--z-dropdown);
+  animation: panel-in var(--dur-fast) var(--ease-entrance);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-nav-dropdown-panel {
+    animation: none;
+  }
+  .shell-nav-dropdown-trigger,
+  .shell-nav-dropdown-trigger:hover {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Countdown — tabular, equal-salience neutral. */
+
+.shell-countdown-clock {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.shell-countdown-unit {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.shell-countdown-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4ch;
+  padding: 2px var(--space-1);
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-hi);
+  /* The clock is the card's subject, so it reads the num-md numeral role: the
+     card's largest type, in single-line tabular figures. Four 2.4ch segments
+     plus padding and gaps stay inside the 304px rail at this size. */
+  font-family: var(--type-num-md-family);
+  font-size: var(--type-num-md-size);
+  line-height: var(--type-num-md-leading);
+  font-weight: var(--type-num-md-weight);
+  padding: 4px var(--space-2);
+}
+
+.shell-countdown-unit-label {
+  font-family: var(--brand-font-body);
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  letter-spacing: 0.02em;
+}
+
+.shell-countdown-ended {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+}
+
+/* Money (shell-local) — tabular numerals; equal win/loss salience. */
+
+.shell-money {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-weight: var(--weight-semi);
+  white-space: nowrap;
+}
+
+.shell-money-num {
+  font-size: var(--t-num);
+}
+
+.shell-money-num-lg {
+  font-size: var(--t-num-lg);
+  font-weight: var(--weight-bold);
+}
+
+/* equal-salience pair — same weight, luminance-matched hues from tokens */
+.shell-money-win {
+  color: var(--win);
+}
+
+.shell-money-loss {
+  color: var(--loss);
+}
+
+.shell-money-neutral {
+  color: var(--text-hi);
+}
+
+/* MemberMenu dropdown entrance. */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* NotificationBell: periodic swing and badge pulse, then the panel entrance. */
+@keyframes bell-swing {
+  0%, 15%, 100% { transform: rotate(0deg); }
+  3% { transform: rotate(11deg); }
+  6% { transform: rotate(-9deg); }
+  9% { transform: rotate(6deg); }
+  12% { transform: rotate(-3deg); }
+}
+
+@keyframes badge-pulse {
+  0%, 15%, 100% { transform: scale(1); }
+  5% { transform: scale(1.22); }
+}
+
+@keyframes notif-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ============================================================================
+ * Header — Reference-exact two-tier desktop / slim mobile. Both tiers opaque + sticky.
+ * Dimensions transcribed from reference sources/VIP_files CSS:
+ *   .app-header  height:72px;  .right_nav gap:9px li 48×56 iconfont 32 label 16
+ *   .routers-list height:48px width:1424; li width:152 active gold-grad text
+ *   .go_pay 70×40 gold gradient pill; .aa-line 3px active underline.
+ * ==========================================================================*/
+
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--header-bg); /* OPAQUE reference canvas — not the .8 blur */
+}
+
+/* ---------- TIER 1 (reference .app-header — 72px) ---------- */
+.shell-header-tier1 {
+  height: var(--header-h);
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+}
+
+.shell-header-tier1-inner {
+  position: relative;
+  height: 100%;
+  max-width: var(--frame-w);
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* mobile category launcher — hidden on desktop */
+.shell-header-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: 0;
+  background: transparent;
+  color: var(--text-hi);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.shell-header-menu-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* reference .logo-box — main logo height:44px (--logo-h) */
+.shell-header-logo {
+  display: inline-flex;
+  align-items: center;
+  height: var(--logo-h);
+  text-decoration: none;
+  white-space: nowrap;
+  flex: none;
+}
+.shell-header-logo-img {
+  height: var(--logo-h);
+  width: auto;
+  display: block;
+}
+
+/* ---------- reference ul.right_nav — 5 icon-over-label utility cells ----------
+ * margin-left:auto pushes the cluster (+ identity) to the right edge;
+ * gap:9px; each li 48×56 column in the --text ladder. */
+.shell-header-right-nav {
+  display: none; /* desktop-only; revealed ≥768 */
+  list-style: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  gap: 9px; /* reference .right_nav gap:9px */
+  text-align: center;
+}
+.shell-header-right-nav li {
+  display: flex;
+}
+/* reference cell is 48px for 2-char CJK; VN labels need more room, so the cell sizes
+ * to its label (min 48px, no overflow), keeping the icon-over-label rhythm. */
+.shell-header-right-nav-link {
+  min-width: 48px;
+  height: 56px;
+  padding: 0 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--gap-xs);
+  cursor: pointer;
+  /* Blue is RESERVED for focus; resting nav text reads the --text ladder on
+   * --header-bg. */
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--t-micro); /* 12px */
+  font-weight: var(--weight-reg);
+  line-height: 1.2;
+  border-radius: var(--radius-md);
+  transition: color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.shell-header-right-nav-link:hover {
+  color: var(--text-hi);
+  background-color: var(--tint);
+}
+.shell-header-right-nav-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+/* reference .right_nav li.VIP — gold-tinted highlight cell, mixed from
+ * --brand-accent so it follows the brand. */
+.shell-header-right-nav-vip .shell-header-right-nav-link {
+  background-color: color-mix(in srgb, var(--brand-accent) 15%, transparent);
+  color: var(--brand-accent);
+}
+.shell-header-right-nav-vip .shell-header-right-nav-link:hover {
+  background-color: color-mix(in srgb, var(--brand-accent) 24%, transparent);
+  color: var(--brand-accent);
+}
+.shell-header-right-nav-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.shell-header-right-nav-label {
+  height: 16px;
+  line-height: 16px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* ---------- reference .user_info_box — identity cluster ---------- */
+.shell-header-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-3); /* reference 24px sits the cluster off the nav */
+}
+
+/* member wallet: balance chip fused to the NẠP gold pill (reference wallet+go_pay) */
+.shell-header-wallet-group {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+}
+.shell-header-balance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-3);
+  color: var(--text-hi);
+  text-decoration: none;
+}
+.shell-header-balance-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-pill);
+}
+.shell-header-chip-icon {
+  color: var(--brand-accent);
+  flex: none;
+}
+.shell-header-chip-muted {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+}
+
+/* reference .go_pay — SOLID gold pill (was a gradient), fused to the chip's right edge.
+ * `background-color`, never the `background` shorthand: the shorthand leaves a
+ * background-image slot and a same-colour gradient still computes AS a gradient
+ * on a button, which is exactly what the Flat system bans. */
+.shell-header-go-pay {
+  height: 40px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-top-right-radius: var(--radius-pill);
+  border-bottom-right-radius: var(--radius-pill);
+  background-color: var(--brand-accent);
+  color: var(--brand-on-accent); /* the on-accent ink; never --text-hi on gold */
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  line-height: 40px;
+  text-align: center;
+  cursor: pointer;
+  flex: none;
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+/* uniform BUTTON hover — colour shift + 1.05. Same step as every other button
+ * in the chrome; the money CTA is NOT scaled harder than its neighbours. */
+.shell-header-go-pay:hover {
+  background-color: var(--brand-accent-2); /* --brand-on-accent stays AA on it */
+  transform: scale(1.05);
+}
+.shell-header-go-pay:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* NOTE: the header "Rút" link (.withdrawLink) was REMOVED — replaced by the
+ * NotificationBell (deposit-first header; Rút lives in the wallet/profile). */
+
+/* ---------- TIER 2 (reference .routers-list — 48px, 1424px frame) ---------- */
+.shell-header-tier2 {
+  display: none;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+}
+.shell-header-tier2-inner {
+  max-width: var(--frame-w);
+  height: var(--nav-h);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* reference .aa-line active underline: height:3px. SOLID accent — an ACTIVE indicator
+ * is --brand-accent, never --focus-ring (blue is focus only). */
+.shell-header-aa-line {
+  display: block;
+  height: 3px;
+  width: 50px;
+  margin-top: -3px;
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-accent);
+  transition: width var(--dur-base) var(--ease-standard),
+    background-color var(--dur-base) var(--ease-standard);
+}
+
+/* category dropdown panel list (reference sub-game grid stand-in) */
+.shell-header-mega-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.shell-header-mega-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-size: var(--t-sm);
+}
+.shell-header-mega-item:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-hi);
+}
+.shell-header-mega-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* ---------- RESPONSIVE: reveal desktop chrome ≥768 ---------- */
+@media (min-width: 768px) {
+  .shell-header-menu-btn {
+    display: none;
+  }
+  .shell-header-right-nav {
+    display: flex;
+  }
+  .shell-header-tier2 {
+    display: block;
+  }
+}
+
+/* ---------- COMPACT identity below 1024 ----------
+ * The row holds the 44px-tall logo, the utility nav and the identity cluster.
+ * The full cluster (balance chip + NẠP + bell + avatar) is wider than the room
+ * the logo and nav leave below 1024, and a flex item never shrinks below its
+ * content, so each range keeps the controls that have no other home.
+ * The guest pair (Đăng ký + Đăng nhập) takes a tighter inline padding below
+ * 1024; below 768 the logo also scales down, whole, into the room the pair
+ * leaves, and keeps its natural width whenever the row has room.            */
+@media (max-width: 1023px) {
+  .shell-header-identity > .ui-btn {
+    padding-inline: var(--space-2);
+  }
+}
+@media (max-width: 767px) {
+  /* the bottom tab bar carries NẠP, Ví and Tài khoản; the bell stays */
+  .shell-header-identity {
+    margin-left: auto;
+  }
+  .shell-header-identity .shell-header-wallet-group,
+  .shell-header-identity .shell-member-menu {
+    display: none;
+  }
+  .shell-header-logo {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .shell-header-logo-img {
+    min-width: 0;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: left center;
+  }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* icon-only utility cells; each label stays the link's accessible name */
+  .shell-header-right-nav {
+    gap: var(--space-1);
+  }
+  .shell-header-right-nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* NẠP stays as the header money action; the balance lives on /vi-tien */
+  .shell-header-balance-chip {
+    display: none;
+  }
+  .shell-header-go-pay {
+    border-radius: var(--radius-pill);
+  }
+}
+
+/* ---------- reduced motion ----------
+ * motion.css zeroes --dur-*, which removes the TRANSITION but leaves the
+ * transform applying instantly. Switch the transform itself off.            */
+@media (prefers-reduced-motion: reduce) {
+  .shell-header-go-pay,
+  .shell-header-go-pay:hover {
+    transform: none;
+    transition: none;
+  }
+  .shell-header-aa-line,
+  .shell-header-right-nav-link {
+    transition: none;
+  }
+}
+
+/* MemberMenu — avatar trigger + dropdown menu. */
+
+.shell-member-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.shell-member-menu-avatar-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+}
+.shell-member-menu-avatar-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.shell-member-menu-avatar,
+.shell-member-menu-avatar-lg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--brand-accent);
+  border: 1px solid var(--brand-accent-hairline);
+}
+.shell-member-menu-avatar {
+  width: 36px;
+  height: 36px;
+}
+.shell-member-menu-avatar-lg {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+
+/* unread dot on the avatar */
+.shell-member-menu-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent);
+  border: 2px solid var(--surface);
+}
+
+.shell-member-menu-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-2);
+  width: 260px;
+  background-color: var(--surface);
+  /* The hairline and the level-2 shadow carry the edge. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-2);
+  z-index: var(--z-dropdown);
+  animation: menu-in var(--dur-fast) var(--ease-entrance);
+}
+
+.shell-member-menu-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+.shell-member-menu-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.shell-member-menu-name {
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  font-size: var(--t-body);
+}
+.shell-member-menu-meta {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.shell-member-menu-list {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+}
+
+.shell-member-menu-item,
+.shell-member-menu-logout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--t-sm);
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.shell-member-menu-item:hover,
+.shell-member-menu-logout:hover {
+  background: var(--surface-hover);
+  color: var(--text-hi);
+}
+.shell-member-menu-item:focus-visible,
+.shell-member-menu-logout:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.shell-member-menu-item-icon {
+  color: var(--text-mid);
+  flex: none;
+}
+
+.shell-member-menu-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  border-radius: var(--radius-pill);
+}
+
+.shell-member-menu-logout {
+  border-top: 1px solid var(--border);
+  color: var(--loss);
+}
+.shell-member-menu-logout .shell-member-menu-item-icon {
+  color: var(--loss);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-member-menu-menu {
+    animation: none;
+  }
+}
+
+/* ============================================================================
+ * NotificationBell — header bell trigger + dropdown panel. THE notification
+ * surface: /thong-bao and its sheets are deleted.
+ *
+ * Mirrors MemberMenu's popover tokens (opaque --surface, --lift, --z-dropdown,
+ * reduced-motion-safe entrance). Trigger is a full ≥44px tap target; the panel
+ * is OPAQUE (never a blur) and clamps its width on mobile so it never overflows
+ * the 375px viewport. The list SCROLLS — the panel holds the whole feed now,
+ * and its rows keep their height rather than squashing to fit.
+ *
+ * The row itself is the owner's approved design and is not restyled here: the
+ * coloured category icon, the title, the detail line, the relative time, the
+ * unread dot and the left accent edge are all as they were. What changed is the
+ * icon's TINT map (four categories, not four legacy kinds), the removal of
+ * the per-row mark-read button and the addition of one delete control per
+ * row.
+ * ==========================================================================*/
+
+.shell-notification-bell {
+  position: relative;
+  display: inline-flex;
+}
+
+/* ---------- TRIGGER ---------- */
+.shell-notification-bell-bell-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: 0;
+  background: transparent;
+  color: var(--text-hi);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.shell-notification-bell-bell-btn:hover {
+  color: var(--brand-accent);
+  background-color: var(--tint);
+}
+.shell-notification-bell-bell-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* unread count pill — gold-on-dark, AA on-accent text */
+/* ---------- UNREAD: draw the eye without nagging ----------
+ * The glyph rings and the badge beats ONCE per long cycle — the motion fills
+ * only the first 15% of it, so it is a periodic glance, not a loop running in
+ * the corner of the screen. Every cycle starts and ends at rest, so when the
+ * last notification is read and `.bellUnread` comes off, nothing is stranded
+ * mid-swing. `.bellUnread` is present exactly while unread > 0. */
+.shell-notification-bell-bell-icon {
+  display: inline-flex;
+  transform-origin: 50% 15%;
+}
+.shell-notification-bell-bell-unread .shell-notification-bell-bell-icon {
+  animation: bell-swing calc(var(--dur-slow) * 15) var(--ease-standard) infinite;
+}
+.shell-notification-bell-bell-unread .shell-notification-bell-badge {
+  animation: badge-pulse calc(var(--dur-slow) * 15) var(--ease-standard) infinite;
+}
+
+.shell-notification-bell-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--header-bg);
+}
+
+/* ---------- PANEL ---------- */
+.shell-notification-bell-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-2);
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--gutter));
+  background-color: var(--surface); /* OPAQUE — never a backdrop blur */
+  /* The hairline and the level-2 shadow carry the edge. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+  animation: notif-in var(--dur-fast) var(--ease-entrance);
+}
+/* The panel is focusable (tabindex="-1") only so that deleting the LAST row has
+ * somewhere to put keyboard focus. Programmatic focus must not draw a ring; a
+ * keyboard-driven one still does. */
+.shell-notification-bell-panel:focus {
+  outline: none;
+}
+.shell-notification-bell-panel:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Three items — heading, unread count, mark-all — that do not fit one 390px
+ * line together. Left to squeeze they broke INSIDE their words ("Thông / báo",
+ * "Đánh dấu đã đọc / tất cả"). They now wrap as whole phrases instead: heading
+ * + count share the first line, mark-all takes the second and stays right. */
+.shell-notification-bell-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.shell-notification-bell-head-title {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  white-space: nowrap;
+}
+.shell-notification-bell-head-meta {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+.shell-notification-bell-mark-all {
+  margin-left: auto;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: var(--brand-accent);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.shell-notification-bell-mark-all:hover {
+  background: var(--tint);
+}
+.shell-notification-bell-mark-all:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* ---------- LIST ---------- */
+/* `gap` is what separates two ADJACENT unread rows. Without it their gold
+ * washes and their left accent edges meet, and three unread rows in a row read
+ * as one tall block instead of three notifications. */
+.shell-notification-bell-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(70vh, 440px);
+  overflow-y: auto;
+}
+/* Rows keep their natural height; the list scrolls. A flex child shrinks below
+ * its content by default, which squashes the rows and clips them. */
+.shell-notification-bell-list > li {
+  flex: none;
+}
+/* The li is the ROW + its one delete control, side by side. The control is a
+ * SIBLING of the link (a control nested in a link is invalid and unreachable),
+ * so the li has to be the thing that lays the two out. */
+.shell-notification-bell-list > li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+/* unread rows carry a faint gold wash + a left accent edge. The wash is mixed
+ * from --brand-accent so it follows the brand. An UNREAD row is an accent
+ * state, never a focus-blue one. */
+.shell-notification-bell-row-unread {
+  background-color: color-mix(in srgb, var(--brand-accent) 6%, transparent);
+}
+.shell-notification-bell-row-unread::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-accent);
+}
+
+.shell-notification-bell-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  min-height: var(--tap-min);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  /* takes the width the delete control leaves; min-width:0 is what lets the
+     detail line ellipsize instead of pushing the control off the panel */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* A row that leads NOWHERE is a <button> — it still marks itself read on tap.
+ * These four lines only undo the UA button chrome; the layout above is shared,
+ * so a link row and a button row are the same row. */
+.shell-notification-bell-row-btn {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-notification-bell-row:hover {
+  background: var(--surface-hover);
+}
+.shell-notification-bell-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.shell-notification-bell-row-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+}
+/* Per-CATEGORY tint of the leading glyph — the owner's four categories, one
+ * tint each, with the eight TYPES separated by the glyph inside the box. Never
+ * colour-only: the row prints the type's name as its title. */
+.shell-notification-bell-cat-balance {
+  color: var(--win);
+}
+.shell-notification-bell-cat-reward {
+  color: var(--brand-accent);
+  border-color: var(--brand-accent-hairline);
+}
+.shell-notification-bell-cat-announcement {
+  color: var(--info);
+}
+.shell-notification-bell-cat-profile {
+  color: var(--text-mid);
+}
+
+.shell-notification-bell-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+/* ONE line: the title, the unread dot, the time. The title is the only thing
+ * that may shrink, so the time never gets pushed off by a long title. */
+.shell-notification-bell-row-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.shell-notification-bell-row-time {
+  margin-left: auto;
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  white-space: nowrap;
+  flex: none;
+}
+.shell-notification-bell-row-title {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+  /* takes the slack and ellipsizes rather than wrapping onto a second line */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-notification-bell-row-read .shell-notification-bell-row-title {
+  color: var(--text);
+  font-weight: var(--weight-reg);
+}
+.shell-notification-bell-row-detail {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+  /* clamp to two lines so a long body never blows out the panel */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.shell-notification-bell-unread-dot {
+  flex: none;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent);
+}
+
+/* The row's ONE non-navigational control: DELETE. (The per-row "Đánh dấu đã
+ * đọc" that used to live here is gone — tapping the row marks it read.)
+ * A full --tap-min square so it is thumb-sized on the smallest screen, resting
+ * dim so it never competes with the notification, and turning --error on hover
+ * because the action is permanent. */
+/* Pinned to the TOP of the row so the X sits on the title/time line rather than
+ * floating at the vertical middle of a two-line row. It keeps a full --tap-min
+ * hit area; the negative top margin lets that 44px square centre itself on the
+ * title line without pushing the row taller. */
+.shell-notification-bell-row-delete {
+  flex: none;
+  align-self: flex-start;
+  margin-top: calc(var(--space-2) - (var(--tap-min) - var(--t-sm)) / 2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  margin-right: var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.shell-notification-bell-row-delete:hover {
+  color: var(--error);
+  background: var(--tint);
+}
+.shell-notification-bell-row-delete:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Visually hidden, still spoken: the unread dot's text equivalent and the
+ * jackpot card's full figure. */
+.shell-notification-bell-sr-only,
+.shell-quick-action-rail-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- EMPTY STATE ---------- */
+.shell-notification-bell-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-5);
+}
+.shell-notification-bell-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+}
+.shell-notification-bell-empty-title {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.shell-notification-bell-empty-hint {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* ---------- MOBILE (<768): anchor the panel to the viewport edges ---------- */
+@media (max-width: 767px) {
+  .shell-notification-bell-panel {
+    position: fixed;
+    top: var(--header-h);
+    right: var(--gutter);
+    left: var(--gutter);
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-notification-bell-panel {
+    animation: none;
+  }
+  .shell-notification-bell-bell-btn,
+  .shell-notification-bell-row-delete {
+    transition: none;
+  }
+  /* The unread ring is an attention cue, not information — the badge and its
+   * count still say everything it says, so it is dropped entirely here. */
+  .shell-notification-bell-bell-unread .shell-notification-bell-bell-icon,
+  .shell-notification-bell-bell-unread .shell-notification-bell-badge {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* BottomTabBar — mobile only; opaque; center-raised NẠP; safe-area aware. */
+
+.shell-bottom-tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: calc(var(--bottombar-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background-color: var(--surface); /* opaque */
+  border-top: 1px solid var(--border); /* load-bearing: --surface is ~1.10:1 on --canvas, so the hairline carries the edge */
+}
+
+.shell-bottom-tab-bar-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--tap-bar);
+  color: var(--text-mid);
+  text-decoration: none;
+  font: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.shell-bottom-tab-bar-tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.shell-bottom-tab-bar-label {
+  font-size: var(--t-micro);
+  line-height: 1;
+}
+
+.shell-bottom-tab-bar-active {
+  color: var(--brand-accent);
+}
+
+/* center raised NẠP */
+.shell-bottom-tab-bar-deposit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-height: var(--tap-bar);
+  border: 0;
+  background: transparent;
+  color: var(--text-hi);
+  cursor: pointer;
+  position: relative;
+}
+.shell-bottom-tab-bar-deposit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.shell-bottom-tab-bar-deposit-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-top: -22px; /* raise above the bar */
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-cta-accent); /* scarce/register accent — CTA, never an outcome */
+  color: var(--brand-on-accent); /* the on-accent ink on the gold fill */
+  /* Flat: no lift. The 3px --surface ring is what separates the raised circle
+   * from the bar; a shadow was doing nothing the ring does not. */
+  border: 3px solid var(--surface);
+}
+
+.shell-bottom-tab-bar-deposit-label {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  line-height: 1;
+}
+
+/* hidden on desktop (≥768px) — Tier-2 + MemberMenu take over */
+@media (min-width: 768px) {
+  .shell-bottom-tab-bar {
+    display: none;
+  }
+}
+
+/* CategorySheet — round-icon vertical grid in the bottom sheet. */
+
+.shell-category-sheet {
+  padding: 0 var(--gutter) var(--space-2);
+}
+
+.shell-category-sheet-title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.shell-category-sheet-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4) var(--space-2);
+}
+
+.shell-category-sheet-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  min-height: var(--tap-min);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+/* uniform CARD hover — 1.02, same as every other card in the chrome */
+.shell-category-sheet-tile:hover {
+  transform: scale(1.02);
+}
+.shell-category-sheet-tile:active {
+  transform: scale(0.98);
+}
+.shell-category-sheet-tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.shell-category-sheet-icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+  color: var(--brand-accent);
+}
+
+.shell-category-sheet-label {
+  font-size: var(--t-micro);
+  color: var(--text);
+  text-align: center;
+  line-height: var(--lh-tight);
+}
+
+/* motion.css zeroes --dur-*, which removes the TRANSITION but still lets the
+ * transform apply instantly — so the transforms themselves are switched off. */
+@media (prefers-reduced-motion: reduce) {
+  .shell-category-sheet-tile,
+  .shell-category-sheet-tile:hover,
+  .shell-category-sheet-tile:active {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ============================================================================
+ * Shell frame, footer and rails — ShellChrome, Footer, QuickActionRail and
+ * RightRail. Appended below the header/nav rules.
+ * ==========================================================================*/
+
+/* ShellChrome — content frame + optional right rail; mobile bottom-bar gap. */
+
+.shell-shell-chrome {
+  max-width: var(--frame-w);
+  min-width: 0;
+  margin: 0 auto;
+  /* The reference frame has NO horizontal padding at full width; keep a 16px gutter only so
+   * the 1424 column never kisses the edge on a <1424 laptop. The 8px TOP padding
+   * is the reference's .banner_content{padding-top:8px} — the breathing gap between the
+   * sticky header and the first content/banner (defect 1). */
+  padding: var(--space-2) var(--gutter) 0;
+  display: flex;
+  gap: var(--band-gap); /* reference rail gutter = 16, not 24 */
+  align-items: flex-start;
+  /* clear the fixed bottom tab bar on mobile */
+  padding-bottom: calc(var(--bottombar-h) + env(safe-area-inset-bottom, 0px) + var(--space-4));
+}
+
+.shell-shell-chrome-content {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  /* bottom bar hidden on desktop — drop the reserved gap */
+  .shell-shell-chrome {
+    padding-bottom: var(--space-6);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * RESERVE THE QuickActionRail COLUMN (≥1024, where the rail shows its promo
+ * cards at its full 60px width — see the QuickActionRail rules in shell.css).
+ *
+ * The rail is `position: fixed; right: var(--space-2)`, so it floats OVER this
+ * frame. At 1440 the frame's own right edge is x=1432 and the rail occupies
+ * 1372→1432: it covered the right 60px of every page, and a right-aligned
+ * link/card underneath took the tap instead of the content (measured: the home
+ * hero slide, the /khuyen-mai "Tải app" tile, the /tier scroller).
+ *
+ * Reserving 60px + the rail's 8px offset + an 8px gap keeps content clear of
+ * it at every width where the two would otherwise collide.
+ * ------------------------------------------------------------------------ */
+@media (min-width: 1024px) {
+  .shell-shell-chrome {
+    padding-right: calc(60px + var(--space-2) * 2);
+  }
+}
+
+/* ≥1600 the viewport is wide enough that the centred 1424 frame ends before the
+ * rail starts, so the reservation is no longer needed and the frame goes back
+ * to a symmetric gutter. */
+@media (min-width: 1600px) {
+  .shell-shell-chrome {
+    padding-right: var(--gutter);
+  }
+}
+
+/* ============================================================================
+ * Footer — Reference-exact. Dimensions transcribed from reference sources/VIP_files CSS:
+ *   .footer_wrap { background:--surface; padding:32px 0 16px }
+ *   .footer-box  { width:1424px; margin:0 auto; display:flex }
+ *   .footer-box>div { flex:1; display:grid; gap:16px }
+ *   .title { color:--text-hi; font:16px/150% 600 }
+ *   .bottom-box { display:flex; height:40px; gap:24px; align-items:center }
+ *   .connect img { width:30px }
+ *   .text { color:--text-mid; font:16px/150% 600; white-space:nowrap }
+ *   .bottom (copyright) below the box.
+ * Desktop = reference 1:1; @375px the three columns stack and the partner band wraps.
+ * ==========================================================================*/
+
+/* The band reads --surface, about 1.10:1 on --canvas and with no shadow, so the
+ * --border hairline on top is load-bearing: it carries the edge. */
+.shell-footer {
+  width: 100%;
+  background-color: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: var(--space-6) var(--gutter) var(--space-4); /* 32 / 16 / 16 */
+}
+
+.shell-footer-footer-box {
+  max-width: var(--frame-w); /* 1424 */
+  margin: 0 auto;
+  display: flex;
+  gap: var(--space-6);
+}
+
+/* reference .footer-box>div — equal columns, grid gap:16px (title ↔ content) */
+.shell-footer-col {
+  flex: 1;
+  display: grid;
+  gap: var(--band-gap); /* 16px */
+  align-content: start;
+}
+
+/* reference .title */
+.shell-footer-title {
+  color: var(--text-hi);
+  font-size: var(--t-body); /* 16 */
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-body);
+}
+
+/* reference .bottom-box — 40px row, 24px gap */
+.shell-footer-bottom-box {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 40px;
+  gap: var(--space-5); /* 24px */
+  align-items: center;
+}
+
+/* col-1 partner logos — reference height:40px lockups */
+.shell-footer-partner {
+  height: 36px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  opacity: 0.92;
+  border-radius: var(--radius-sm);
+}
+
+/* reference .connect — social row, img width:30px */
+.shell-footer-connect .shell-footer-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  color: var(--text-mid);
+  transition: color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.shell-footer-connect .shell-footer-social:hover {
+  color: var(--brand-accent);
+  background-color: var(--tint);
+}
+.shell-footer-connect .shell-footer-social:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* reference .text — muted brand link column (--text-mid) */
+.shell-footer-text {
+  flex-wrap: wrap;
+}
+.shell-footer-text-link {
+  color: var(--text-mid); /* reference muted link analog */
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-body);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.shell-footer-text-link:hover {
+  color: var(--text-hi);
+}
+.shell-footer-text-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* col-4 RG column — dedicated, never buried. Plain VN. */
+.shell-footer-rg .shell-footer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.shell-footer-rg-icon {
+  color: var(--brand-accent);
+  flex: 0 0 auto;
+}
+.shell-footer-rg-body {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.shell-footer-age-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--brand-accent);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+}
+.shell-footer-rg-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  color: var(--text-mid);
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+}
+.shell-footer-rg-link {
+  color: var(--text-mid);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.shell-footer-rg-link:hover {
+  color: var(--text-hi);
+}
+.shell-footer-rg-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* reference .bottom — copyright line */
+/* AA: the copyright is functional copy (operator, year), so it reads
+ * --text-mid, the muted step that holds AA on --surface; --text-dim is the
+ * decorative slot. */
+.shell-footer-copyright {
+  max-width: var(--frame-w);
+  margin: var(--space-6) auto 0;
+  color: var(--text-mid);
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+ * RESERVE THE QuickActionRail COLUMN — the same treatment ShellChrome gives the
+ * content frame. The footer is full-bleed and rendered OUTSIDE that frame, so
+ * it does not inherit the reservation: at 1440 its right column runs to x=1416
+ * while the fixed rail occupies 1372→1432. Today the RG column's text happens
+ * to stop short of the rail, so nothing is stolen — but that is a property of
+ * the current copy, not of the layout, and one longer link would put a footer
+ * link under the rail. Reserved explicitly. Mirrors the ShellChrome rules.
+ * ------------------------------------------------------------------------ */
+@media (min-width: 1024px) {
+  .shell-footer {
+    padding-right: calc(60px + var(--space-2) * 2);
+  }
+}
+@media (min-width: 1600px) {
+  .shell-footer {
+    padding-right: var(--gutter);
+  }
+}
+
+/* ---------- MOBILE (<768px) — stack the three columns ---------- */
+@media (max-width: 767px) {
+  .shell-footer {
+    padding: var(--space-5) var(--gutter) var(--space-4);
+  }
+  .shell-footer-footer-box {
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .shell-footer-copyright {
+    margin-top: var(--space-5);
+    text-align: left;
+  }
+}
+
+/* ============================================================================
+ * QuickActionRail — fixed right-edge floating column. Reference-exact gold-on-dark.
+ * COMPACT: a narrow icon-width column (~60px) with small promo cards — NOT a
+ * wide marketing panel. z below --z-modal (2000) so dialogs/sheets always
+ * cover it. Opaque surfaces. Reduced-motion handled globally (motion.css) +
+ * scrollTo behavior in TSX.
+ * ==========================================================================*/
+
+.shell-quick-action-rail {
+  position: fixed;
+  right: var(--space-2); /* 8px off the edge — reference suspended gutter */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: calc(var(--z-modal) - 1); /* 1999 — under modals, over content */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  /* 60px is MIRRORED in the ShellChrome rules (shell.css), which reserves this column in
+   * the content frame at ≥1024 so the fixed rail never covers a link. Change
+   * both together. */
+  width: 60px; /* one icon button wide — reference-compact */
+  pointer-events: none; /* re-enabled per interactive child below */
+}
+.shell-quick-action-rail > * {
+  pointer-events: auto;
+  width: 100%;
+}
+
+/* ---------- 1 · World-Cup promo thumbnail (compact, dismissable) ---------- */
+/* The image fills the card and the solid gold tag runs along its foot; the 1px
+ * gold hairline frames the card and carries its edge wherever the image runs dark
+ * against --canvas. */
+.shell-quick-action-rail-promo-thumb {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--brand-accent-hairline);
+  background: var(--surface);
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+/* uniform CARD hover — 1.02 on every card, never scaled by prominence/value */
+.shell-quick-action-rail-promo-thumb:hover {
+  transform: scale(1.02);
+  border-color: var(--brand-accent);
+}
+.shell-quick-action-rail-promo-link {
+  display: block;
+  position: relative;
+  text-decoration: none;
+}
+.shell-quick-action-rail-promo-img {
+  display: block;
+  width: 100%;
+  height: 48px;
+  object-fit: cover;
+}
+.shell-quick-action-rail-promo-tag {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  padding: 1px 2px;
+  font-size: 9px;
+  font-weight: var(--weight-semi);
+  color: var(--brand-on-accent); /* the on-accent ink on gold */
+  /* SOLID fill. `background-color` (not the `background` shorthand) so no
+   * background-image can ever be computed here. */
+  background-color: var(--brand-accent);
+  text-align: center;
+}
+
+/* shared corner close (×) on dismissable cards */
+.shell-quick-action-rail-promo-close {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  /* Opaque --surface + the hairline read over the promo image without a
+   * shadow or a blur. */
+  background-color: var(--surface);
+  color: var(--text-hi);
+  font-size: var(--t-micro);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+/* uniform BUTTON hover — 1.05 on every button */
+.shell-quick-action-rail-promo-close:hover {
+  background-color: var(--surface-hover);
+  transform: scale(1.05);
+}
+
+/* ---------- 2 · Super-jackpot card (compact, dismissable) ---------- */
+.shell-quick-action-rail-jackpot-card {
+  position: relative;
+  background-color: var(--surface-2);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-1) var(--space-1);
+  text-align: center;
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.shell-quick-action-rail-jackpot-card:hover {
+  transform: scale(1.02); /* same 1.02 as .promoThumb — value-blind */
+  border-color: var(--brand-accent);
+}
+.shell-quick-action-rail-jackpot-kicker {
+  margin: 0 0 2px;
+  font-size: 9px;
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+.shell-quick-action-rail-jackpot-figure {
+  margin: 0 0 var(--space-1);
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-micro); /* 12px — fits the 60px column */
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent-fg); /* gold text step; --brand-accent is the fill */
+  line-height: var(--type-caption-leading);
+}
+/* a number never splits; a line may break only between the number and its unit */
+.shell-quick-action-rail-jackpot-num {
+  white-space: nowrap;
+}
+/* Flat: SOLID gold pill, no gradient, no shadow, no filter. `background-color`
+ * is deliberate — the `background` shorthand would leave a background-image
+ * slot, and a same-colour gradient still *computes* as a gradient on a button. */
+.shell-quick-action-rail-jackpot-cta {
+  display: block;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-accent);
+  color: var(--brand-on-accent); /* the on-accent ink on gold */
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  text-align: center;
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+/* hover is a COLOUR SHIFT, never a filter. --brand-on-accent stays AA on
+ * --brand-accent-2. Scale is the uniform 1.05 button step. */
+.shell-quick-action-rail-jackpot-cta:hover {
+  background-color: var(--brand-accent-2);
+  transform: scale(1.05);
+}
+
+/* ---------- 3 · Icon stack ---------- */
+.shell-quick-action-rail-icon-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: center;
+  width: 100%;
+}
+.shell-quick-action-rail-icon-group {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.shell-quick-action-rail-icon-btn {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--text-mid);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  /* --dur-fast/--ease-standard, no hardcoded fallback: the fallback masked the
+   * reduced-motion contract (motion.css zeroes --dur-* at :root). */
+  transition: color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.shell-quick-action-rail-icon-btn:hover,
+.shell-quick-action-rail-icon-btn[aria-expanded="true"] {
+  color: var(--brand-accent);
+  border-color: var(--brand-accent);
+  background-color: var(--surface-hover);
+  transform: scale(1.05); /* uniform button step */
+}
+/* --focus-ring appears ONLY inside :focus-visible, never as a selected/expanded
+ * colour (the expanded state above is --brand-accent). */
+.shell-quick-action-rail-promo-link:focus-visible,
+.shell-quick-action-rail-promo-close:focus-visible,
+.shell-quick-action-rail-jackpot-cta:focus-visible,
+.shell-quick-action-rail-icon-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.shell-quick-action-rail-icon-label {
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* ---------- popovers (QR / CSKH) ---------- */
+.shell-quick-action-rail-popover {
+  position: absolute;
+  right: calc(100% + var(--space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  min-width: 132px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-3);
+  /* menu elevation: the level-2 shadow plus the hairline edge */
+  box-shadow: var(--shadow-2);
+  border: 1px solid var(--brand-accent-hairline);
+  text-align: center;
+}
+.shell-quick-action-rail-qr-box {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-2);
+}
+.shell-quick-action-rail-qr-box svg {
+  border-radius: var(--radius-sm);
+  /* the code keeps its light/dark pattern in forced-colours mode */
+  forced-color-adjust: none;
+}
+/* the QR paints through currentColor: modules in --canvas on --qr-surface */
+.shell-quick-action-rail-qr-surface {
+  color: var(--qr-surface);
+}
+.shell-quick-action-rail-qr-modules {
+  color: var(--canvas);
+}
+.shell-quick-action-rail-popover-head {
+  margin: 0 0 var(--space-1);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+}
+.shell-quick-action-rail-popover-text {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--fg-muted-raised); /* muted copy on --surface-3 */
+  line-height: 1.4;
+}
+
+/* ---------- responsive ---------- *
+ * Desktop (≥1024px): full rail with promo cards + icon stack. ShellChrome
+ * reserves the 60px column so it floats over the frame's gutter, not over
+ * content.
+ *
+ * Mobile (<1024px): the rail is REMOVED, not shrunk.
+ * ------------------------------------------------------------------------
+ * It previously kept a 48px-wide, ~204px-tall fixed icon stack pinned above
+ * the BottomTabBar. Measured at 390px, that column stole the tap from real
+ * content on 6 of 9 routes audited — the home provider scroller and its `JILI`
+ * tab, the /khuyen-mai filter tabs and the welcome-bonus card, two /vip tier
+ * cards, the /cua-hang `Đổi ngay` button, the /tier ladder scroller, and a
+ * /ho-tro footer link. There is no gutter to hide in at 390px: reserving one
+ * would cost ~15% of the content width on EVERY route (and the Footer is
+ * full-bleed outside the frame, so it would need the same treatment).
+ *
+ * Nothing is lost but a convenience: every destination is already one tap away
+ * — Sưu tập (header utility nav + /bo-suu-tap), Giải đấu (/tier), Tải app
+ * (/tai-app + footer), CSKH (/ho-tro + footer) — and mobile already carries a
+ * sticky Header, the Danh mục launcher and a 5-tab BottomTabBar. The one real
+ * casualty is back-to-top; see the backlog note.                              */
+@media (max-width: 1023px) {
+  .shell-quick-action-rail {
+    display: none;
+  }
+}
+
+/* ---------- reduced motion ----------
+ * motion.css zeroes --dur-* app-wide, which kills the TRANSITION but not the
+ * transform itself — a reduced-motion user would still get an instant jump.
+ * Every transform added above is switched off here, explicitly.            */
+@media (prefers-reduced-motion: reduce) {
+  .shell-quick-action-rail-promo-thumb,
+  .shell-quick-action-rail-promo-thumb:hover,
+  .shell-quick-action-rail-promo-close,
+  .shell-quick-action-rail-promo-close:hover,
+  .shell-quick-action-rail-jackpot-card,
+  .shell-quick-action-rail-jackpot-card:hover,
+  .shell-quick-action-rail-jackpot-cta,
+  .shell-quick-action-rail-jackpot-cta:hover,
+  .shell-quick-action-rail-icon-btn,
+  .shell-quick-action-rail-icon-btn:hover,
+  .shell-quick-action-rail-icon-btn[aria-expanded="true"] {
+    transform: none;
+    transition: none;
+  }
+  /* .rail's translateY(-50%) is LAYOUT, not motion — it must survive. */
+}
+
+/* RightRail — desktop ≥1240 only; hidden below (page folds figures inline). */
+
+.shell-right-rail {
+  display: none;
+}
+
+.shell-right-rail-card {
+  /* Establishes the containment context the jackpot's fluid type measures
+     against — the CARD, not the viewport. A viewport-relative size would keep
+     overflowing here, because this rail is a fixed 304px at every width above
+     1240px and does not grow with the screen. */
+  container-type: inline-size;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.shell-right-rail-card-title {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+  margin-bottom: var(--space-3);
+}
+
+.shell-right-rail-jackpot {
+  color: var(--brand-accent-fg);
+}
+
+/* The jackpot pool is UNBOUNDED IN LENGTH and the card is not. At a fixed
+   --t-num-lg (32px), "28.686.888.000 đ" needs ~304px inside a ~272px box and
+   broke out of the card. Fluid between two TOKENS so the type scale still owns
+   the bounds — never below --t-h2, never above the hero size it was designed
+   for, and whatever fits in between.
+
+   Two classes on purpose: MoneyValue sets font-size from its own `num-lg`
+   class, and a single-class rule here would be decided by stylesheet order
+   rather than intent. */
+.shell-right-rail-card .shell-right-rail-jackpot {
+  /* Bounded by --t-h1 (24px), NOT --t-num-lg (32px). Measured on the running
+     rail: at 32px this pool needed ~304px inside a 270px box and burst the
+     card; at 24px it measures 226px, leaving ~44px — about two more digits
+     before the clamp floor takes over. A jackpot only ever grows, so "fits
+     exactly" is not fitting. */
+  font-size: clamp(var(--t-h2), 9cqi, var(--t-h1));
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shell-right-rail-error-line {
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+}
+
+.shell-right-rail-row {
+  margin-bottom: var(--space-2);
+}
+
+.shell-right-rail-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.shell-right-rail-board-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--t-sm);
+}
+.shell-right-rail-board-row:last-child {
+  border-bottom: 0;
+}
+.shell-right-rail-rank {
+  width: 1.6em;
+  text-align: center;
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-family: var(--brand-font-num);
+}
+.shell-right-rail-player {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-right-rail-amount {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+  white-space: nowrap;
+}
+
+@media (min-width: 1240px) {
+  .shell-right-rail {
+    display: block;
+    width: var(--rail-w);
+    flex: none;
+  }
+}

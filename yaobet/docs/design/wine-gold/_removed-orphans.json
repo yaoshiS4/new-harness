@@ -1,0 +1,27 @@
+{
+  "primitive": [],
+  "semantic": [
+    "color.action.secondary.text",
+    "color.text.on-feedback",
+    "elevation.level.1.surface",
+    "elevation.level.2.surface",
+    "elevation.level.3.surface"
+  ],
+  "component": [
+    "color.button.primary.bg.rest",
+    "color.button.secondary.text",
+    "color.card.bg",
+    "color.control.checked.mark",
+    "color.input.error.text",
+    "color.input.helper",
+    "color.input.label",
+    "color.input.text",
+    "color.odds.down",
+    "color.odds.up",
+    "color.slip.row.bg",
+    "color.tab.text.active",
+    "color.tab.text.rest",
+    "color.vip.bg",
+    "color.vip.header.bg"
+  ]
+}

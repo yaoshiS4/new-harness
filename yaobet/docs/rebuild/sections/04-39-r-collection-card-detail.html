@@ -1,0 +1,179 @@
+<section>
+<h2 id="r-collection-card-detail">CardDetail</h2>
+<h4>1–2</h4><p>Card-scoped overlay: big card, copies held, first acquired, set membership links and per-set draw rates. <code>src/components/collection/CardDetail.tsx</code>, <code>card-detail.module.css</code>.</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">Overlay(auto, labelledBy)
+  div.panel
+    header.head  h2.name card.name · button.close "Đóng"
+    div.art  CardArt(ghost=!held)        (max-width 300px)
+    p.sub "{club} · {position}"
+    held ? div.block: p.fact "Đang giữ: " strong "{n} thẻ" · (n≥2) p.note "Trong đó {n−1} thẻ trùng." · p.fact "Nhận lần đầu: " strong "DD/MM HH:mm"
+         : div.block: p.fact "Chưa có thẻ này."
+    p.fact "Có trong: " Link.setLink "/bo-suu-tap#{setId}" set names separated by span.sep " · "
+    div.rate  p.rateHead "Tỷ lệ ra thẻ khi mở cho bộ:" · ul.rateList li "{set}: " strong "12,12%"
+    p.provisional "Số liệu demo — tỷ lệ là tạm tính, chưa phải tỷ lệ công bố."</code></pre>
+<h4>5. Styles (verbatim)</h4><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — card detail overlay. Semantic tokens only.
+ * The panel chrome (scrim, sheet/dialog presentation, radius, safe-area) is
+ * the house Overlay's; this module styles only the CONTENTS.
+ * ==========================================================================*/
+
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.close {
+  flex: 0 0 auto;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  transform: scale(1.05);
+}
+
+/* The one place the 300×420 face renders at 300+px — capped so the desktop
+   dialog does not turn into a poster. */
+.art {
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto var(--space-2);
+}
+
+.sub {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-tight);
+}
+
+/* A card, so it takes the gold hairline and the card radius (ruling A2). */
+.block {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.fact {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+.fact strong {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+  line-height: var(--lh-body);
+}
+
+.setLink {
+  color: var(--text);
+  font-weight: var(--weight-semi);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.setLink:hover {
+  color: var(--text-hi);
+}
+
+.sep {
+  color: var(--text-dim);
+}
+
+/* The published rate — the most expensive trust artefact in the feature, and
+   until now the only one that was built and then hidden. */
+.rate {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.rate strong {
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.rateHead {
+  margin: 0 0 var(--space-1);
+}
+
+/* One row per set the card can be drawn from. A card in three sets has three
+   rates and no single one — see the file header. */
+.rateList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.provisional {
+  margin: 0;
+  font-size: var(--t-micro);
+  color: var(--text-dim);
+  line-height: var(--lh-body);
+}
+
+.close:focus-visible,
+.setLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .close { transition: none; }
+  .close:hover { transform: none; }
+}</code></pre>
+<h4>6–10</h4><p>Rates via <code>formatPercent(rate·100, 2)</code> (VN comma). Example van Dijk: "5 Trung vệ thép: 12,12%", "Đội hình Liverpool: 7,76%", "11 Siêu sao: 6,30%". Close button hover #262626 scale 1.05.</p>
+</section>
+

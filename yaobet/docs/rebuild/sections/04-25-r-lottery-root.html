@@ -1,0 +1,434 @@
+<section>
+<h2 id="r-lottery-root">LotteryRoot (hub)</h2>
+<h4>1. Purpose</h4><p>The Vé số hub: one playable scratch-card type, four declared future types, and the published odds.</p>
+<h4>2. Source</h4><p><code>src/components/lottery/LotteryRoot.tsx</code>, <code>LotteryRoot.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">main.page
+  header.head
+    h1.title  "Vé số"
+    p.lede
+  ul.grid
+    li.featuredCell
+      article.featured
+        div.featuredArt aria-hidden   ScratchTicketArt (svg 64×48, currentColor gold)
+        div.featuredBody
+          p.liveBadge      "Đang mở"
+          h2.featuredName  "Vé số cào"
+          p.featuredBlurb  "Cào lớp phủ bằng chính tay bạn. Kết quả hiện ra ngay trên vé, không chờ kỳ mở thưởng."
+          button.playCta aria-expanded={playing}  "Cào ngay"  → playing = true
+    li.cell × 4
+      button.soonCard disabled aria-disabled
+        span.soonBadge "Sắp ra mắt" · span.soonName · span.soonBlurb
+  div.gameMount data-playing   playing ? ScratchCardStage(onExit → playing=false) : null
+  section.fairness aria-labelledby="veso-odds"
+    h2#veso-odds.fairnessHead "Tỷ lệ công bố"
+    dl.stats
+      div.stat  dt.statLabel "Tỷ lệ trúng"   dd.statBody: span.statValue "38,7%"            span.statNote "số vé có thưởng trên tổng số vé phát hành"
+      div.stat  dt "Giải cao nhất"           dd: "1 vé trong 7.869"                         "cơ hội chạm mức thưởng lớn nhất của bậc thang"
+      div.stat  dt "Mỗi bậc giải"            dd: "2.541,70 ₫"                               "mọi bậc đều tốn của nhà cái đúng số tiền này — không bậc nào rẻ hơn để hệ thống ưu tiên"
+    p.fairnessNote</code></pre>
+<h4>Inline art (verbatim)</h4><pre><code class="lang-tsx">/* ---- inline art (no external requests; currentColor follows the card) ---- */
+
+/** A scratch ticket: perforated left edge, a coin lifting the foil corner. */
+function ScratchTicketArt() {
+  return (
+    &lt;svg viewBox="0 0 64 48" width="64" height="48" fill="none" aria-hidden="true"&gt;
+      &lt;path
+        d="M10 8h44a2 2 0 0 1 2 2v28a2 2 0 0 1-2 2H10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      /&gt;
+      {/* perforated tear-off edge */}
+      &lt;path
+        d="M10 8v4M10 16v4M10 24v4M10 32v4M10 40v-4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      /&gt;
+      {/* the foil panel, one corner peeled back */}
+      &lt;path
+        d="M20 16h22v16H20z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      /&gt;
+      &lt;path d="M42 16l-7 7 7 2z" fill="currentColor" /&gt;
+      {/* the coin doing the scratching */}
+      &lt;circle cx="46" cy="34" r="6" stroke="currentColor" strokeWidth="2" /&gt;
+      &lt;path d="M46 31v6M44 34h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /&gt;
+    &lt;/svg&gt;
+  );
+}</code></pre>
+<h4>4. Props</h4><p>None. State <code>playing</code> (false).</p>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.page</td><td>padding 12px 16px calc(56px + 32px)=88px; max-width 760px; margin 0 auto; colour #d6d3c7</td><td></td></tr>
+<tr><td>.head / .title / .lede</td><td>margin-bottom 16px / margin 0 0 8px, 24px 700 #f2f0e4, letter-spacing .01em / max-width 52ch, 16px lh 1.5 #888888</td><td></td></tr>
+<tr><td>.grid</td><td>grid repeat(2, minmax(0,1fr)); gap 12px</td><td>≤640: 1 column</td></tr>
+<tr><td>.featuredCell</td><td>grid-column 1 / −1; flex</td><td></td></tr>
+<tr><td>.featured</td><td>flex 1 1 auto; flex start gap 16px; padding 16px; border 1px rgba(212,175,55,.55); radius 16px; background #1a1a1a</td><td>≤640: column, align stretch</td></tr>
+<tr><td>.featured:hover</td><td>scale(1.02); border-color #d4af37</td><td></td></tr>
+<tr><td>.featuredArt</td><td>flex 0 0 auto; centred; 88×72; radius 8px; border rgba(212,175,55,.55); background rgba(242,240,228,.05); colour #d4af37</td><td>≤640: width 100%</td></tr>
+<tr><td>.featuredBody</td><td>grid gap 8px; justify-items start</td><td></td></tr>
+<tr><td>.liveBadge</td><td>padding 2px 8px; pill; #d4af37 bg; #0a0a0a; 12px 700; letter-spacing .08em; uppercase ("ĐANG MỞ")</td><td></td></tr>
+<tr><td>.featuredName / .featuredBlurb</td><td>20px 700 #f2f0e4 / max 46ch 14px lh 1.5 #888888</td><td></td></tr>
+<tr><td>.playCta</td><td>margin-top 4px; min-height 44px; padding 0 24px; border 0; pill; #d4af37; #0a0a0a; 14px 700</td><td>≤640: width 100%</td></tr>
+<tr><td>.playCta:hover</td><td>background #b4952f; scale(1.05)</td><td></td></tr>
+<tr><td>.soonCard</td><td>flex 1 1 auto; grid gap 4px; left; padding 12px; border 1px rgba(212,175,55,.55); radius 16px; background #303030; cursor not-allowed</td><td></td></tr>
+<tr><td>.soonBadge / .soonName / .soonBlurb</td><td>padding 2px 8px pill, border, bg #141414, #6f6f6f 12px 600 ls .06em / 18px 600 #888888 / 14px lh 1.5 #6f6f6f</td><td></td></tr>
+<tr><td>.gameMount</td><td>display contents</td><td></td></tr>
+<tr><td>.fairness</td><td>margin-top 24px; padding 16px; border rgba(212,175,55,.55); radius 16px; #141414</td><td></td></tr>
+<tr><td>.fairnessHead</td><td>margin 0 0 12px; 14px 700; ls .12em; uppercase; #f2f0e4</td><td></td></tr>
+<tr><td>.stats</td><td>grid repeat(3, minmax(0,1fr)); gap 12px</td><td>≤640: 1 column</td></tr>
+<tr><td>.stat</td><td>grid gap 4px; padding-left 12px; border-left 1px rgba(212,175,55,.55)</td><td></td></tr>
+<tr><td>.statLabel</td><td>12px 600 ls .06em uppercase #6f6f6f</td><td></td></tr>
+<tr><td>.statValue</td><td>num font tabular 18px 700 #d4af37 lh 1.2</td><td></td></tr>
+<tr><td>.statNote</td><td>12px lh 1.5 #888888</td><td></td></tr>
+<tr><td>.fairnessNote</td><td>margin 12px 0 0; padding-top 8px; border-top 1px dashed rgba(212,175,55,.55); 12px lh 1.5 #6f6f6f</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim LotteryRoot.module.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — VÉ SỐ · the hub.
+ * Lucky Obsidian, flat: no shadows anywhere. A 1px hairline is the only
+ * separation mechanism, and gold is spent on ONE thing — the live ticket.
+ * Semantic / --brand-* indirection tokens only (token-lint A2).
+ * ==========================================================================*/
+
+.page {
+  padding: var(--space-3) var(--gutter) calc(var(--bottombar-h) + var(--space-6));
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--text);
+}
+
+/* ── head ────────────────────────────────────────────────────────────────── */
+
+.head {
+  margin-bottom: var(--space-4);
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--t-h1);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  letter-spacing: 0.01em;
+}
+
+.lede {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ── the shelf ───────────────────────────────────────────────────────────── */
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.cell {
+  display: flex;
+  min-width: 0;
+}
+
+/* The live type takes the full row. Prominence here is LAYOUT plus the gold
+   hairline — not a bigger shadow, and not a bigger hover step (the hover
+   scale stays the house 1.02 that every other card gets). */
+.featuredCell {
+  grid-column: 1 / -1;
+  display: flex;
+  min-width: 0;
+}
+
+.featured {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-card);
+  background-color: var(--surface-2);
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.featured:hover {
+  transform: scale(1.02); /* uniform CARD step — never scaled by prominence */
+  border-color: var(--brand-accent);
+}
+
+.featuredArt {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-accent-hairline);
+  background-color: var(--tint);
+  color: var(--brand-accent);
+}
+
+.featuredBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+/* SOLID gold pill — `background-color`, so no background-image slot is left
+   for a gradient to creep into. Dark ink on gold reads 9.42:1. */
+.liveBadge {
+  margin: 0;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.featuredName {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+
+.featuredBlurb {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+.playCta {
+  margin-top: var(--space-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+/* Hover is a COLOUR SHIFT, not a filter: a non-`none` computed filter is banned
+   house-wide. --brand-accent-2 keeps the dark ink at 6.86:1 — still AA. */
+.playCta:hover {
+  background-color: var(--brand-accent-2);
+  transform: scale(1.05); /* uniform BUTTON step */
+}
+
+.playCta:focus-visible,
+.soonCard:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── declared, not yet open ──────────────────────────────────────────────── */
+
+/* Dimmed by SURFACE and TEXT tokens rather than by `opacity`: opacity would
+   also fade the hairline into the canvas, and the card would stop reading as a
+   card at all. No gold anywhere on these — gold means "you can play this". */
+.soonCard {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  text-align: left;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background-color: var(--surface-disabled);
+  font: inherit;
+  cursor: not-allowed;
+}
+
+.soonBadge {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text-dim);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.06em;
+}
+
+.soonName {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-semi);
+  color: var(--text-mid);
+}
+
+.soonBlurb {
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+
+/* ── game mount point ────────────────────────────────────────────────────── */
+
+/* Empty today. `display: contents` means it contributes no box, so mounting
+   the game later changes the page without this wrapper ever having nudged it. */
+.gameMount {
+  display: contents;
+}
+
+/* ── published odds ──────────────────────────────────────────────────────── */
+
+.fairness {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background-color: var(--surface);
+}
+
+.fairnessHead {
+  margin: 0 0 var(--space-3);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-hi);
+}
+
+.stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* Label above, figure below, plain-language gloss under that. The gold hairline
+   on the left is what marks the three as PUBLISHED figures rather than
+   marketing copy — no badge, no icon, no shadow. */
+.stat {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--brand-accent-hairline);
+}
+
+.statLabel {
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.statBody {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* The values arrive as bare VN numerals, so they get the numeral face and
+   tabular figures — the three columns line up on the digits. */
+.statValue {
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.statNote {
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+.fairnessNote {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border);
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+
+/* ── responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .featured {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .featuredArt {
+    width: 100%;
+  }
+  .playCta {
+    width: 100%;
+  }
+  .stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── reduced motion ──────────────────────────────────────────────────────── *
+ * motion.css zeroes --dur-* app-wide, which kills the TRANSITION but not the
+ * transform — a reduced-motion user would still get an instant jump. Every
+ * transform above is switched off here, explicitly, exactly as the rail does.
+ * There is no JS-driven motion on this page, so `usePrefersReducedMotion` has
+ * nothing to gate: the contract is honoured where the motion actually lives. */
+@media (prefers-reduced-motion: reduce) {
+  .featured,
+  .featured:hover,
+  .playCta,
+  .playCta:hover {
+    transform: none;
+    transition: none;
+  }
+}</code></pre></details>
+<h4>6. States</h4><p>Featured hover scale/border; CTA hover darker gold + scale; focus-visible 2px #6ea8ff offset 2px on .playCta (and .soonCard, which is disabled and unfocusable). Coming-soon cards disabled (no hover). While playing, the hub stays rendered underneath the overlay.</p>
+<h4>7. Motion</h4><p>.featured transform/border-color 200ms; .playCta background-color/transform 200ms (ease-standard). Reduced motion: transforms and transitions none.</p>
+<h4>8. Copy</h4>
+<table><thead><tr><th>VI</th><th>EN gloss</th><th>Where</th></tr></thead><tbody>
+<tr><td>Đang mở · Vé số cào · Cào ngay</td><td>Open now · Scratch ticket · Scratch now</td><td>featured</td></tr>
+<tr><td>Sắp ra mắt</td><td>Coming soon</td><td>soon badge</td></tr>
+<tr><td>Quay số nhanh — Chọn số của bạn, quay một lượt, biết kết quả sau vài giây.</td><td>Quick draw — pick your numbers, spin once, result in seconds</td><td>soon 1</td></tr>
+<tr><td>Lô tô — Dò số trên bảng của bạn, khớp càng nhiều hàng thì thưởng càng lớn.</td><td>Lotto — match rows on your board</td><td>soon 2</td></tr>
+<tr><td>Vé số truyền thống — Giữ vé trước, chờ tới kỳ mở thưởng cố định trong ngày.</td><td>Traditional lottery — hold a ticket for the daily draw</td><td>soon 3</td></tr>
+<tr><td>Bốc thăm may mắn — Mỗi lượt tham gia là một lá thăm trong hộp, mở thăm theo đợt.</td><td>Lucky draw — each entry is a slip, opened in batches</td><td>soon 4</td></tr>
+<tr><td>Tỷ lệ công bố · Tỷ lệ trúng · Giải cao nhất · Mỗi bậc giải</td><td>Published odds · Hit rate · Top prize · Per prize level</td><td>fairness strip</td></tr>
+<tr><td>Tỷ lệ được công bố trước và không thay đổi trong lúc bạn chơi. Đây là bản demo — số liệu hiển thị là dữ liệu mẫu, chưa phải điều khoản công bố chính thức.</td><td>Odds are published in advance and never change while you play. This is a demo — sample data, not official terms.</td><td>fairness note</td></tr>
+</tbody></table>
+<h4>9. Data</h4><p><code>SCRATCH_ODDS</code> from <code>src/lib/mock/lottery.ts</code>: hitRate "38,7%", topPrize "1 vé trong 7.869", rungCost "2.541,70 ₫".</p>
+<h4>10. Behaviour &amp; a11y</h4><p>"Cào ngay" sets playing → mounts ScratchCardStage → Overlay (focus trap, Esc, return focus to the trigger). <code>aria-expanded</code> reflects playing.</p>
+</section>
+

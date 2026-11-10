@@ -1,0 +1,424 @@
+<section>
+<h2 id="r-store-redeem-dialog">RedeemDialog</h2>
+<h4>1. Purpose</h4><p>Confirm-redeem modal showing the points it will cost (escalated when redeeming early), the balance before/after and the withdrawal condition, then a success receipt.</p>
+<h4>2. Source</h4><p><code>src/components/store/RedeemDialog.tsx</code>, <code>RedeemDialog.module.css</code>; Modal per <a href="#f-ui-button">track F</a> (size "sm").</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">phase==="success":
+Modal(open size=sm onClose)            (no title)
+  div.result
+    span.successBadge aria-hidden  Icon check 32
+    div.successHead
+      h3.successTitle  "Đổi quà thành công"
+      p.successSub     b.successName {name} + " đã được thêm vào ví quà của bạn."
+    span.successBalance  span.successBalanceLabel "Số dư còn lại" · span.successBalanceValue "{balanceAfter} điểm"
+    Button(gold fullWidth) "Xong" → onClose
+paused:
+Modal(title "Xác nhận đổi quà" size=sm)
+  div.confirm
+    ItemHeader
+    p.banner data-tone=info role=status  "Đổi quà đang tạm dừng, sẽ mở lại ít phút nữa."
+    div.actions  Button(ghost fullWidth) "Hủy"
+confirm (idle | submitting):
+Modal(title "Xác nhận đổi quà" size=sm)
+  div.confirm
+    ItemHeader: div.item  span.coin aria-hidden "P" · div.itemMeta  p.itemName name · p.itemValue span.valueLabel "Trị giá" + span.valueAmount formatVnd(face)
+    div.cost data-tone = alert | caution | normal
+      div.costMain  span.costLabel "Điểm cần dùng" · span.costValue formatCount(pointCost) + span.costUnit "điểm"
+      div.costDivider
+      div.costRow  span.costRowLabel "Số dư hiện tại" · span.costRowValue "{points} điểm"
+      div.costRow  span.costRowLabel "Sau khi đổi"   · span.costRowAfter "{points − cost} điểm"
+      voucher &amp;&amp; div.costRow  "Điều kiện rút" · "{n} vòng cược"
+    early &amp;&amp; div.callout  Icon history 18 .calloutGlyph · p.calloutLine  "Thời gian chờ còn " Countdown.calloutClock " . Nếu đổi ngay, …"
+    !affordable &amp;&amp; p.insufficientHint "Chờ về mức thường để cần ít điểm hơn."
+    div.actions
+      Button(ghost) "Hủy" → onClose
+      Button(gold loading=submitting disabled=!affordable) early ? "Đổi ngay" : "Xác nhận đổi" → confirm</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>default</th><th>effect</th></tr></thead><tbody>
+<tr><td>product</td><td>Product</td><td>—</td><td>item</td></tr><tr><td>points</td><td>number</td><td>—</td><td>balance</td></tr><tr><td>onClose</td><td>() =&gt; void</td><td>—</td><td>unmount</td></tr><tr><td>paused</td><td>boolean</td><td>false</td><td>paused variant</td></tr></tbody></table>
+<h4>Cost math</h4><p>early = isCooldownRunning(product, nowMs); step = early ? currentStep + 1 : 1; pointCost = pointsAtStep(base, q, step, maxSteps); affordable = points ≥ pointCost; balanceAfter = points − pointCost; costTone = !affordable ? "alert" : early ? "caution" : "normal".</p>
+<h4>Dialog steps (state machine)</h4>
+<pre><code class="lang-txt">mount → phase "idle" (confirm)
+  [Hủy | Esc | scrim] → onClose (unmount)
+  [Xác nhận đổi / Đổi ngay] (affordable) → phase "submitting" (gold button loading)
+        setTimeout 600ms → phase "success" (receipt)
+  [Xong | close] → onClose
+early countdown reaches 0 → onZero → nowMs = now → early false → cost drops to base, callout disappears, label back to "Xác nhận đổi"</code></pre>
+<h4>Worked examples (member, 3,250 pts)</h4>
+<table><thead><tr><th>Product</th><th>Tone</th><th>Hero cost</th><th>Số dư hiện tại → Sau khi đổi</th><th>Rolling row</th><th>Confirm label</th></tr></thead><tbody>
+<tr><td>Voucher 200K (base)</td><td>normal (#f2f0e4)</td><td>200 điểm</td><td>3.250 điểm → 3.050 điểm</td><td>5 vòng cược</td><td>Xác nhận đổi</td></tr>
+<tr><td>Voucher 1 triệu (base)</td><td>normal</td><td>1.000 điểm</td><td>3.250 → 2.250</td><td>3 vòng cược</td><td>Xác nhận đổi</td></tr>
+<tr><td>Voucher 2 triệu (early, step 2)</td><td>caution (#f5a623 numeral, amber border)</td><td>2.858 điểm</td><td>3.250 → 392</td><td>8 vòng cược</td><td>Đổi ngay + amber callout</td></tr>
+<tr><td>escalated cost &gt; balance ≥ base (no mock product)</td><td>alert (#f53f55)</td><td>—</td><td>negative "Sau khi đổi"</td><td>—</td><td>disabled + hint</td></tr>
+</tbody></table>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th></tr></thead><tbody>
+<tr><td>.confirm</td><td>flex column; gap 16px</td></tr>
+<tr><td>.item / .itemMeta</td><td>flex centre gap 12px / column gap 2px min-width 0</td></tr>
+<tr><td>.coin</td><td>44×44; radius 8px; #d4af37; colour #0a0a0a; 18px 700; line-height 1; centred</td></tr>
+<tr><td>.itemName</td><td>16px 600 #f2f0e4 lh 1.3</td></tr>
+<tr><td>.valueLabel / .valueAmount</td><td>14px #888888 / 18px 700 #d4af37 tabular</td></tr>
+<tr><td>.cost</td><td>padding 12px 16px; radius 8px; #1a1a1a; border 1px rgba(212,175,55,.55)</td></tr>
+<tr><td>.costMain</td><td>flex baseline space-between gap 12px</td></tr>
+<tr><td>.costLabel</td><td>14px #888888</td></tr>
+<tr><td>.costValue</td><td>inline-flex baseline gap 4px; 40px (<span class="tok">--t-hero</span>) 700 #f2f0e4 tabular lh 1.3</td></tr>
+<tr><td>.costUnit</td><td>16px 600 #888888</td></tr>
+<tr><td>.costDivider</td><td>1px tall; margin 12px 0; background rgba(212,175,55,.55)</td></tr>
+<tr><td>.costRow</td><td>flex baseline space-between gap 12px; 14px; + .costRow margin-top 8px</td></tr>
+<tr><td>.costRowLabel / .costRowValue / .costRowAfter</td><td>#888888 / #f2f0e4 600 tabular / #d4af37 600 tabular</td></tr>
+<tr><td>.cost[data-tone=caution]</td><td>border color-mix(#f5a623 45%, rgba(212,175,55,.55)); .costValue #f5a623</td></tr>
+<tr><td>.cost[data-tone=alert]</td><td>border color-mix(#f53f55 45%, rgba(212,175,55,.55)); .costValue #f53f55</td></tr>
+<tr><td>.callout</td><td>flex gap 8px; padding 12px; border 1px color-mix(#f5a623 40%, border); border-left 2px rgba(245,166,35,.70); radius 8px</td></tr>
+<tr><td>.calloutGlyph / .calloutLine / .calloutClock</td><td>#f5a623 margin-top 1px / 14px lh 1.5 #888888 / #f5a623 600 tabular</td></tr>
+<tr><td>.insufficientHint</td><td>14px lh 1.5 #888888</td></tr>
+<tr><td>.banner (paused)</td><td>14px lh 1.5; padding 12px; radius 8px; #f2f0e4; background rgba(1,143,255,.12); border rgba(1,143,255,.36)</td></tr>
+<tr><td>.actions</td><td>flex gap 12px margin-top 4px; children flex 1 1 0 (equal width)</td></tr>
+<tr><td>.result</td><td>flex column centred; text centre; gap 16px; padding 8px 0</td></tr>
+<tr><td>.successBadge</td><td>64×64 pill; background rgba(212,175,55,.14); border 1px rgba(212,175,55,.40); #d4af37</td></tr>
+<tr><td>.successTitle / .successSub / .successName</td><td>20px 700 #f2f0e4 / 14px lh 1.5 #888888 / #f2f0e4 600</td></tr>
+<tr><td>.successBalance</td><td>inline-flex baseline gap 4px; padding 8px 12px; radius pill; #1a1a1a; border rgba(212,175,55,.55)</td></tr>
+<tr><td>.successBalanceLabel / Value</td><td>14px #888888 / 16px 700 #d4af37 tabular</td></tr>
+</tbody></table>
+<details><summary>Verbatim RedeemDialog.module.css</summary><pre><code class="lang-css">/* RedeemDialog — confirm / success. Tokens only. Cost is the hero of the confirm
+ * step; success is a clean receipt. No win-juice, no reduced-value cues. */
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4); /* premium rhythm — hero cost breathes above the callout */
+}
+
+/* ---- Item header (gold-P coin + name + value) --------------------------- */
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Gold-P coin — rounded-square SOLID gold with a dark on-accent "P".
+ * --brand-accent-grad resolves to a flat #d4af37 under the flat re-skin; the
+ * token name is historical. Dark ink on gold = 9.42:1 (white would be 2.11:1). */
+.coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.itemMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemName {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+}
+
+.itemValue {
+  margin: 0;
+  line-height: var(--lh-tight);
+}
+
+/* "Trị giá" muted label. */
+.valueLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* The gold face-value amount. */
+.valueAmount {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Cost — hero fact on a NEUTRAL card (no muddy amber fill) ----------- */
+.cost {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* Label left, big number right — receipt-clean. */
+.costMain {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.costLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* The HERO numeral — dominates every other figure in the dialog. State-driven
+   colour: --text-hi base / --caution early / --loss unaffordable. */
+.costValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--t-hero);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+}
+
+/* Small unit beside the hero numeral — quiet, never competes with the number. */
+.costUnit {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-mid);
+}
+
+/* BASE quiet subline (Mức thường · Tỷ lệ 100%). */
+.baseSubline {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* EARLY honest base-cost comparison, right-aligned under the escalated hero.
+ * --text-mid, not --text-dim: this line is the ONLY place the member sees what
+ * the reward would cost at the normal rate. Honest disclosure cannot sit at
+ * 3.6:1 on --surface-2 — it holds the 4.5:1 AA floor (--text-mid = 4.91:1). */
+.costCompare {
+  display: block;
+  margin-top: var(--space-1);
+  text-align: right;
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Cost-card breakdown (divider + label/value rows) ------------------- */
+.costDivider {
+  height: 1px;
+  margin: var(--space-3) 0;
+  background: var(--border);
+}
+
+.costRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--t-sm);
+}
+
+.costRow + .costRow {
+  margin-top: var(--space-2);
+}
+
+.costRowLabel {
+  color: var(--text-mid);
+}
+
+.costRowValue {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Sau khi đổi" — the resulting balance, in gold. */
+.costRowAfter {
+  color: var(--brand-accent);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Escalated (early) — colour lives on the NUMBER + a hairline, not a fill. */
+.cost[data-tone="caution"] {
+  border-color: color-mix(in srgb, var(--caution) 45%, var(--border));
+}
+.cost[data-tone="caution"] .costValue {
+  color: var(--caution);
+}
+
+/* Unaffordable — red. */
+.cost[data-tone="alert"] {
+  border-color: color-mix(in srgb, var(--loss) 45%, var(--border));
+}
+.cost[data-tone="alert"] .costValue {
+  color: var(--loss);
+}
+
+/* BASE reassurance line — value intact + reset is normal. */
+.reassure {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---- EARLY caution callout — the TWO explicit facts (costs-more + reset) --
+   Amber, subordinate to the hero: a left accent + hairline, no muddy fill. */
+.callout {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--caution) 40%, var(--border));
+  border-left: 2px solid color-mix(in srgb, var(--caution) 70%, transparent);
+  border-radius: var(--radius-md);
+}
+
+.calloutGlyph {
+  flex: none;
+  margin-top: 1px;
+  color: var(--caution);
+}
+
+.calloutLine {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+  min-width: 0;
+}
+
+/* The live countdown spliced into the callout copy — amber, emphasised. */
+.calloutClock {
+  color: var(--caution);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Unaffordable — one quiet neutral hint under the red hero (no blue banner). */
+.insufficientHint {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---- Info banner (paused) ---------------------------------------------- */
+.banner {
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  color: var(--text-hi);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--info) 36%, transparent);
+}
+
+/* ---- Actions — two buttons, ONE line, equal width ---------------------- */
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+.actions &gt; * {
+  flex: 1 1 0;
+}
+
+/* ---- SUCCESS receipt ---------------------------------------------------- */
+.result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+/* GOLD success badge — on-brand (gold ring + gold check), NEVER green/--win. */
+.successBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 40%, transparent);
+  color: var(--brand-accent);
+}
+
+.successHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.successTitle {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+
+.successSub {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* Product name emphasised inside the success subline. */
+.successName {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+/* Remaining-balance pill — muted label + gold number. */
+.successBalance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.successBalanceLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.successBalanceValue {
+  font-size: var(--t-body);
+  font-weight: var(--weight-bold);
+  color: var(--brand-accent);
+  font-variant-numeric: tabular-nums;
+}</code></pre></details>
+<h4>6. States</h4><p>Confirmation (normal / early / unaffordable), submitting (gold button loading spinner per F, 600 ms), success, paused, error: <em>none</em> (the mock never fails).</p>
+<h4>7. Motion</h4><p>Modal open/close per F. Countdown in callout ticks 1 s.</p>
+<h4>8. Copy</h4>
+<table><thead><tr><th>VI</th><th>EN gloss</th><th>Where</th></tr></thead><tbody>
+<tr><td>Xác nhận đổi quà</td><td>Confirm gift redemption</td><td>modal title</td></tr>
+<tr><td>Trị giá</td><td>Worth</td><td>item header</td></tr>
+<tr><td>Điểm cần dùng · điểm</td><td>Points needed · points</td><td>cost hero</td></tr>
+<tr><td>Số dư hiện tại / Sau khi đổi / Điều kiện rút / {n} vòng cược</td><td>Current balance / After redeeming / Withdrawal condition / n rollovers</td><td>rows</td></tr>
+<tr><td>Thời gian chờ còn {time}. Nếu đổi ngay, bạn sẽ cần dùng nhiều điểm hơn và thời gian chờ bị đặt lại từ đầu.</td><td>Wait time left {time}. If you redeem now you'll need more points and the wait restarts.</td><td>early callout</td></tr>
+<tr><td>Chờ về mức thường để cần ít điểm hơn.</td><td>Wait for the normal rate to need fewer points.</td><td>unaffordable hint</td></tr>
+<tr><td>Hủy / Xác nhận đổi / Đổi ngay</td><td>Cancel / Confirm / Redeem now</td><td>actions</td></tr>
+<tr><td>Đổi quà đang tạm dừng, sẽ mở lại ít phút nữa.</td><td>Redemption paused, reopens in a few minutes.</td><td>paused banner (hard-coded JSX)</td></tr>
+<tr><td>Đổi quà thành công</td><td>Redeemed successfully</td><td>success title</td></tr>
+<tr><td>{name} đã được thêm vào ví quà của bạn.</td><td>{name} was added to your gift wallet.</td><td>success sub</td></tr>
+<tr><td>Số dư còn lại · Xong</td><td>Remaining balance · Done</td><td>success</td></tr>
+</tbody></table>
+<h4>9. Data</h4><p>Product + points; escalation helpers.</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Focus trap/Esc per Modal. Double-submit guarded (phase check).</p>
+<div class="callout warn">After "success" the balance prop is not decremented — reopening any card still shows "Số dư hiện tại 3.250 điểm", and the receipt's remaining balance is never reflected in PointsHeader. The at_floor and unlimited_deep disclosures (<code>vi.claim.atFloor</code>, <code>unlimitedDeep</code>, <code>earlyEscalated</code>…) exist in i18n but are never rendered; an unlimited package escalates silently with no "no floor" warning. StoreTerms says "the exact points always show on the redeem button" but the early button reads only "Đổi ngay".</div>
+</section>
+

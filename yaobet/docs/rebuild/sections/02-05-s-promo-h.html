@@ -1,0 +1,525 @@
+<section id="s-promo">
+<h2 id="s-promo-h">S5 · Promotions "/khuyen-mai" and "/khuyen-mai/[id]"</h2>
+
+<h3 id="s-promo-route">Route template: /khuyen-mai</h3>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Page file</td><td><code>src/app/khuyen-mai/page.tsx</code>, <code>khuyen-mai.module.css</code></td></tr>
+<tr><td>Metadata</td><td>title "Khuyến mãi — Yaobet"</td></tr>
+<tr><td>Auth</td><td>None</td></tr>
+<tr><td>Data</td><td>getPromos(): 8 promos (table below)</td></tr>
+<tr><td>Section order</td><td><code>div.page</code> (flex column, gap 32px) containing PromoHero, then <code>section.gridSection aria-label="Khuyến mãi"</code> (gap 16px) with <code>h2.heading "Tất cả khuyến mãi"</code> (24px/700 #f2f0e4) and PromoGrid.</td></tr>
+<tr><td>375</td><td>Hero stacked (16:9 gradient media on top, body below, padding 16px). Grid 1 column.</td></tr>
+<tr><td>768</td><td>Hero in a row: media 48% wide with a right hairline, body padding 32px, vertically centred. Grid 2 columns (≥640).</td></tr>
+<tr><td>1024 / 1440</td><td>Grid 3 columns.</td></tr>
+<tr><td>Loading</td><td>No route-level loading file, so the ROOT <code>src/app/loading.tsx</code> (the home skeleton) shows.</td></tr>
+<tr><td>Empty</td><td>PromoHero returns null; PromoGrid shows EmptyState icon=gift, title "Chưa có khuyến mãi", message "Hiện chưa có chương trình khuyến mãi nào đang diễn ra." The heading "Tất cả khuyến mãi" still renders.</td></tr>
+</tbody></table>
+<p>Style table: <code>src/app/khuyen-mai/khuyen-mai.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.page</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>gap</td><td><code>var(<span class="tok">--space-6</span>)</code></td><td>32px</td><td>all</td></tr>
+<tr><td><code>.page</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.gridSection</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.gridSection</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.gridSection</code></td><td>gap</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.heading</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h1</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.heading</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.heading</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+</tbody></table>
+
+<p><strong>Promo data (order as served).</strong></p>
+<table><thead><tr><th>id</th><th>title</th><th>category</th><th>imageSrc</th><th>endsAt</th><th>href</th></tr></thead><tbody>
+<tr><td>pr1</td><td>Thưởng chào mừng thành viên mới</td><td>Thành viên mới</td><td>/assets/banners/hero-banner-1.jpg</td><td>null</td><td>/khuyen-mai/pr1</td></tr>
+<tr><td>pr2</td><td>Cúp C1 Châu Âu — Đặt cược nhận thưởng</td><td>Thể thao</td><td>/assets/banners/pc-hero-banner-UCLfinal.jpg</td><td>now + 2880 min (48h, set at fetch time)</td><td>/khuyen-mai/pr2</td></tr>
+<tr><td>pr3</td><td>Tải app — Tăng tốc &amp; bảo mật</td><td>Sự kiện</td><td>/assets/banners/pc-banner-vpn.jpg</td><td>null</td><td>/khuyen-mai/pr3</td></tr>
+<tr><td>pr7</td><td>Hoàn trả mỗi ngày — Cược càng nhiều, nhận càng cao</td><td>Hoàn trả</td><td>/assets/banners/hero-banner-1.jpg</td><td>null</td><td>/khuyen-mai/pr7</td></tr>
+<tr><td>pr8</td><td>Vòng quay vàng — Trúng thưởng cực lớn</td><td>Sự kiện</td><td>/assets/banners/pc-hero-banner-UCLfinal.jpg</td><td>now + 1440 min</td><td>/khuyen-mai/pr8</td></tr>
+<tr><td>pr4</td><td>Hoàn trả không giới hạn</td><td>Hoàn trả</td><td>/assets/placeholders/promo.svg (343×160)</td><td>null</td><td>/khuyen-mai/pr4</td></tr>
+<tr><td>pr5</td><td>Vòng quay may mắn mỗi ngày</td><td>Sự kiện</td><td>/assets/placeholders/promo.svg</td><td>now + 660 min</td><td>/khuyen-mai/pr5</td></tr>
+<tr><td>pr6</td><td>Nạp lần đầu — Quà tặng đặc biệt</td><td>Nạp tiền</td><td>/assets/placeholders/promo.svg</td><td>null</td><td>/khuyen-mai/pr6</td></tr>
+</tbody></table>
+<p><code>promo.svg</code> is a 343×160 rounded rect (rx 16) with a gradient from #1f222e to #25282f, a #f4b740 stroke at 0.32 opacity, and centred 13px text "Khuyến mãi" in #f4b740. These are raw hex values outside the token palette.</p>
+
+<h3 id="s-promo-hero">PromoHero</h3>
+<p><strong>Purpose.</strong> A featured card for the first time-limited promo (pr2): gold category badge, title, live countdown, and a gold "Xem chi tiết" link.</p>
+<p><strong>Source.</strong> <code>src/components/promo/PromoHero.tsx</code>, <code>PromoHero.module.css</code>; Card variant "promo", <a href="#f-ui-badge">Badge</a> tone gold, <a href="#f-ui-countdown">Countdown</a> (ui), Icon.</p>
+<p><strong>Structure.</strong> If promos is empty → null. <code>featured = promos.find(p =&gt; p.endsAt) ?? promos[0]</code>. Then: <code>Card.hero variant="promo"</code> containing <code>span.media aria-hidden</code> and <code>div.body</code> [<code>Badge tone="gold" {category}</code>; <code>h1.title {title}</code>; if endsAt, <code>div.timer</code> (<code>span.timerLabel "Kết thúc sau"</code> + <code>Countdown endsAt zeroLabel="Đã kết thúc"</code>), else <code>span.evergreen "Đang diễn ra"</code>; <code>Link.cta href {"Xem chi tiết"} Icon chevronRight 16</code>].</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>promos</td><td>Promo[]</td><td>Featured selection.</td></tr></tbody></table>
+<p>Style table: <code>src/components/promo/PromoHero.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.hero</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>aspect-ratio</td><td><code>16 / 9</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>background</td><td><code>radial-gradient(120% 100% at 80% 0%, var(<span class="tok">--brand-accent-hairline</span>), transparent 60%), linear-gradient(135deg, var(<span class="tok">--surface-3</span>), var(<span class="tok">--surface</span>))</code></td><td>radial-gradient(120% 100% at 80% 0%, rgba(212, 175, 55, 0.55), transparent 60%), linear-gradient(135deg, #212121, #141414)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>border-bottom</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>align-items</td><td><code>flex-start</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>padding</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h1</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.timerLabel</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.timerLabel</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>padding</td><td><code>var(<span class="tok">--space-2</span>) var(<span class="tok">--space-4</span>)</code></td><td>8px 16px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-lg</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent-grad</span>)</code></td><td><span class="sw" style="background:#d4af37"></span>#d4af37</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>color</td><td><code>var(<span class="tok">--brand-on-accent</span>)</code></td><td><span class="sw" style="background:#0a0a0a"></span>#0a0a0a</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>transition</td><td><code>transform var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>), background var(<span class="tok">--dur-fast</span>) var(<span class="tok">--ease-standard</span>)</code></td><td>transform 200ms cubic-bezier(0.645, 0.045, 0.355, 1), background 200ms cubic-bezier(0.645, 0.045, 0.355, 1)</td><td>all</td></tr>
+<tr><td><code>.cta:hover</code></td><td>background</td><td><code>var(<span class="tok">--brand-accent-2</span>)</code></td><td><span class="sw" style="background:#b4952f"></span>#b4952f</td><td>all</td></tr>
+<tr><td><code>.cta:hover</code></td><td>transform</td><td><code>scale(1.05)</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta:focus-visible</code></td><td>outline</td><td><code>2px solid var(<span class="tok">--focus-ring</span>)</code></td><td>2px solid #6ea8ff</td><td>all</td></tr>
+<tr><td><code>.cta:focus-visible</code></td><td>outline-offset</td><td><code>2px</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta, .cta:hover</code></td><td>transform</td><td><code>none</code></td><td>(literal)</td><td>(prefers-reduced-motion: reduce)</td></tr>
+<tr><td><code>.hero</code></td><td>flex-direction</td><td><code>row</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.hero</code></td><td>align-items</td><td><code>stretch</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.media</code></td><td>width</td><td><code>48%</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.media</code></td><td>aspect-ratio</td><td><code>auto</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.media</code></td><td>border-bottom</td><td><code>0</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.media</code></td><td>border-right</td><td><code>1px solid var(<span class="tok">--brand-accent-hairline</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.body</code></td><td>flex</td><td><code>1</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.body</code></td><td>justify-content</td><td><code>center</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.body</code></td><td>padding</td><td><code>var(<span class="tok">--space-6</span>)</code></td><td>32px</td><td>(min-width: 768px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/promo/PromoHero.module.css</code></summary><pre><code class="lang-css">/* PromoHero — featured promo band. Tokens only; mobile-first @375. */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* FULL-BLEED hero backdrop — the one gradient class the flat system still
+ * permits (&quot;subtle directional gradients&quot; as large background decoration).
+ * It is the placeholder for licensed banner art, not a card or button fill. */
+.media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 100% at 80% 0%, var(--brand-accent-hairline), transparent 60%),
+    linear-gradient(135deg, var(--surface-3), var(--surface));
+  border-bottom: 1px solid var(--brand-accent-hairline);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h1);
+  line-height: var(--lh-tight);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+}
+
+.timerLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.evergreen {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* solid gold fill (--brand-accent-grad is a solid colour at the token layer),
+ * dark on-gold ink for AA, uniform button hover: scale(1.05) + colour shift */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.cta:hover {
+  background: var(--brand-accent-2);
+  transform: scale(1.05);
+}
+.cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta,
+  .cta:hover {
+    transform: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .hero {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .media {
+    width: 48%;
+    aspect-ratio: auto;
+    border-bottom: 0;
+    border-right: 1px solid var(--brand-accent-hairline);
+  }
+  .body {
+    flex: 1;
+    justify-content: center;
+    padding: var(--space-6);
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> CTA hover: bg #b4952f, scale(1.05). Focus-visible: outline 2px #6ea8ff, offset 2px. Reduced motion: no transform. <strong>Copy:</strong> Kết thúc sau (Ends in), Đã kết thúc (Ended), Đang diễn ra (Ongoing), Xem chi tiết (View details).</p>
+<div class="callout warn">The hero media is always the gradient placeholder, even though pr2 has a real banner JPG. The page's only <code>h1</code> is the promo title, so the page has no "Khuyến mãi" h1.</div>
+
+<h3 id="s-promo-grid">PromoGrid</h3>
+<p><strong>Purpose.</strong> Category tabs over equal-width 16:9 promo tiles, each with a countdown bar or "Đang diễn ra".</p>
+<p><strong>Source.</strong> <code>src/components/promo/PromoGrid.tsx</code>, <code>PromoGrid.module.css</code>; Tabs, Tile (aspect "16 / 9", href, badge), Badge, Countdown, EmptyState.</p>
+<p><strong>Structure.</strong> If promos is empty → EmptyState (see route). Otherwise: <code>div.wrap</code> containing Tabs (items = "Tất cả" + categories in order of first appearance: Thành viên mới, Thể thao, Sự kiện, Hoàn trả, Nạp tiền; label "Lọc khuyến mãi theo danh mục"), then either filtered-empty → <code>EmptyState variant="filtered" icon="gift" message="Không có khuyến mãi trong danh mục này." onReset</code>, or <code>ul.grid</code> with <code>li.cell</code> × N [<code>Tile label={title} imageSrc aspect="16 / 9" href badge=Badge gold {category}</code>; endsAt → <code>div.timer</code> (<code>span.timerLabel "Kết thúc sau"</code> + Countdown) | <code>span.evergreen "Đang diễn ra"</code>].</p>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>promos</td><td>Promo[]</td><td>Tabs and cells.</td></tr></tbody></table>
+<p>Style table: <code>src/components/promo/PromoGrid.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.wrap</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.wrap</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.wrap</code></td><td>gap</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>display</td><td><code>grid</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>1fr</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>gap</td><td><code>var(<span class="tok">--gutter</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>list-style</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(2, 1fr)</code></td><td>(literal)</td><td>(min-width: 640px)</td></tr>
+<tr><td><code>.grid</code></td><td>grid-template-columns</td><td><code>repeat(3, 1fr)</code></td><td>(literal)</td><td>(min-width: 1024px)</td></tr>
+<tr><td><code>.cell</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.cell</code></td><td>min-width</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>justify-content</td><td><code>space-between</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>padding</td><td><code>var(<span class="tok">--space-2</span>) var(<span class="tok">--space-3</span>)</code></td><td>8px 12px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>border-radius</td><td><code>var(<span class="tok">--radius-md</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>background</td><td><code>var(<span class="tok">--surface-2</span>)</code></td><td><span class="sw" style="background:#1a1a1a"></span>#1a1a1a</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>border</td><td><code>1px solid var(<span class="tok">--border</span>)</code></td><td>1px solid rgba(212, 175, 55, 0.55)</td><td>all</td></tr>
+<tr><td><code>.timerLabel</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.timerLabel</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>padding</td><td><code>var(<span class="tok">--space-1</span>) var(<span class="tok">--space-2</span>)</code></td><td>4px 8px</td><td>all</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/promo/PromoGrid.module.css</code></summary><pre><code class="lang-css">/* PromoGrid — filterable promo grid. Tokens only; mobile-first @375. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--gutter);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* RULING B1: the grid track is repeat(N, 1fr) at every breakpoint, so every
+ * promo cell is exactly the same width regardless of the offer inside it — no
+ * &quot;featured&quot; promo is rendered larger, and none scales differently. */
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.timerLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.evergreen {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  padding: var(--space-1) var(--space-2);
+}
+</code></pre></details>
+<p><strong>Copy.</strong> Tất cả, Lọc khuyến mãi theo danh mục (Filter promotions by category), the 5 category names, Kết thúc sau, Đang diễn ra, Không có khuyến mãi trong danh mục này. (No promotions in this category.), Chưa có khuyến mãi (No promotions yet), Hiện chưa có chương trình khuyến mãi nào đang diễn ra. (No promotions are running right now.).</p>
+
+<h3 id="s-promo-detail-route">Route template: /khuyen-mai/[id]</h3>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Page file</td><td><code>src/app/khuyen-mai/[id]/page.tsx</code></td></tr>
+<tr><td>Metadata</td><td>None, so it inherits "Yaobet".</td></tr>
+<tr><td>Resolve</td><td><code>promos.find(p =&gt; p.href.endsWith("/" + id) || p.id === id)</code>; no match → <code>notFound()</code>, which shows the default Next.js 404 (there is no not-found file here).</td></tr>
+<tr><td>Valid ids</td><td>pr1, pr2, pr3, pr4, pr5, pr6, pr7, pr8</td></tr>
+<tr><td>Composition</td><td>PromoDetail. At every width: a single column inside the content frame. CTA is sticky at the bottom below 768px; from 768 it is static with max-width 320px.</td></tr>
+<tr><td>Loading</td><td>Root loading.tsx (home skeleton).</td></tr>
+</tbody></table>
+
+<h3 id="s-promo-detail">PromoDetail</h3>
+<p><strong>Purpose.</strong> A single promotion page: back link, hero card (gradient placeholder, badge, title, countdown), generic programme text, a 4-item terms list, and an auth-aware join button.</p>
+<p><strong>Source.</strong> <code>src/components/promo/PromoDetail.tsx</code>, <code>PromoDetail.module.css</code>.</p>
+<p><strong>Structure.</strong></p>
+<pre><code class="lang-txt">article.detail
+  Link.back href="/khuyen-mai"   Icon chevronLeft 18 + " Khuyến mãi"
+  Card.hero variant="promo"
+    span.media aria-hidden
+    div.head
+      Badge tone="gold" {category}
+      h1.title {title}
+      endsAt → div.timer (span.timerLabel "Kết thúc sau" + Countdown endsAt zeroLabel="Đã kết thúc")  | span.evergreen "Đang diễn ra"
+  section.section aria-label="Nội dung khuyến mãi"
+    h2.sectionTitle "Thông tin chương trình"
+    p.body "Tham gia chương trình {title.toLowerCase()} của Yaobet. Điều kiện, mức thưởng và thời gian áp dụng được công bố minh bạch theo điều khoản chương trình. Vui lòng đọc kỹ trước khi tham gia."
+  section.section aria-label="Điều khoản"
+    h2.sectionTitle "Điều khoản &amp; điều kiện"
+    ul.terms  li x4
+  div.cta
+    Button variant="gold" size="lg" fullWidth onClick=onJoin   {allowed ? "Tham gia ngay" : "Đăng nhập để tham gia"}</code></pre>
+<table><thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead><tbody><tr><td>promo</td><td>Promo</td><td>All fields.</td></tr></tbody></table>
+<p>Style table: <code>src/components/promo/PromoDetail.module.css</code></p>
+<table><thead><tr><th>Selector</th><th>Property</th><th>Authored value</th><th>Resolved value (:root, data-brand=yaobet)</th><th>Breakpoint / media</th></tr></thead>
+<tbody>
+<tr><td><code>.detail</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.detail</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.detail</code></td><td>gap</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>display</td><td><code>inline-flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>gap</td><td><code>var(<span class="tok">--space-1</span>)</code></td><td>4px</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>align-self</td><td><code>flex-start</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>min-height</td><td><code>var(<span class="tok">--tap-min</span>)</code></td><td>44px</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.back</code></td><td>text-decoration</td><td><code>none</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>overflow</td><td><code>hidden</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.hero</code></td><td>padding</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>display</td><td><code>block</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>width</td><td><code>100%</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>aspect-ratio</td><td><code>16 / 9</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.media</code></td><td>background</td><td><code>radial-gradient(120% 100% at 80% 0%, var(<span class="tok">--brand-accent-hairline</span>), transparent 60%), linear-gradient(135deg, var(<span class="tok">--surface-3</span>), var(<span class="tok">--surface</span>))</code></td><td>radial-gradient(120% 100% at 80% 0%, rgba(212, 175, 55, 0.55), transparent 60%), linear-gradient(135deg, #212121, #141414)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>align-items</td><td><code>flex-start</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.head</code></td><td>padding</td><td><code>var(<span class="tok">--space-4</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h1</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-tight</span>)</code></td><td>1.3</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.title</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-bold</span>)</code></td><td>700</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>align-items</td><td><code>center</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.timer</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.timerLabel</code></td><td>font-size</td><td><code>var(<span class="tok">--t-micro</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.timerLabel</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.evergreen</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.section</code></td><td>gap</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>font-size</td><td><code>var(<span class="tok">--t-h3</span>)</code></td><td>18px</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>color</td><td><code>var(<span class="tok">--text-hi</span>)</code></td><td><span class="sw" style="background:#f2f0e4"></span>#f2f0e4</td><td>all</td></tr>
+<tr><td><code>.sectionTitle</code></td><td>font-weight</td><td><code>var(<span class="tok">--weight-semi</span>)</code></td><td>600</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>font-size</td><td><code>var(<span class="tok">--t-body</span>)</code></td><td>16px</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-body</span>)</code></td><td>1.5</td><td>all</td></tr>
+<tr><td><code>.body</code></td><td>color</td><td><code>var(<span class="tok">--text</span>)</code></td><td><span class="sw" style="background:#d6d3c7"></span>#d6d3c7</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>display</td><td><code>flex</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>flex-direction</td><td><code>column</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>gap</td><td><code>var(<span class="tok">--space-2</span>)</code></td><td>8px</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>margin</td><td><code>0</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>padding-left</td><td><code>var(<span class="tok">--space-5</span>)</code></td><td>24px</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>color</td><td><code>var(<span class="tok">--text-mid</span>)</code></td><td><span class="sw" style="background:#888888"></span>#888888</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>font-size</td><td><code>var(<span class="tok">--t-sm</span>)</code></td><td>14px</td><td>all</td></tr>
+<tr><td><code>.terms</code></td><td>line-height</td><td><code>var(<span class="tok">--lh-body</span>)</code></td><td>1.5</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>position</td><td><code>sticky</code></td><td>(literal)</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>bottom</td><td><code>var(<span class="tok">--space-3</span>)</code></td><td>12px</td><td>all</td></tr>
+<tr><td><code>.cta</code></td><td>position</td><td><code>static</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+<tr><td><code>.cta</code></td><td>max-width</td><td><code>320px</code></td><td>(literal)</td><td>(min-width: 768px)</td></tr>
+</tbody></table>
+
+<details><summary>Verbatim CSS — <code>src/components/promo/PromoDetail.module.css</code></summary><pre><code class="lang-css">/* PromoDetail — single promo surface. Tokens only; mobile-first @375. */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  text-decoration: none;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* FULL-BLEED hero backdrop — permitted background decoration, not a card fill;
+ * the placeholder for licensed banner art. */
+.media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 100% at 80% 0%, var(--brand-accent-hairline), transparent 60%),
+    linear-gradient(135deg, var(--surface-3), var(--surface));
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h1);
+  line-height: var(--lh-tight);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+}
+
+.timerLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.evergreen {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.body {
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+
+.terms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+.cta {
+  position: sticky;
+  bottom: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .cta {
+    position: static;
+    max-width: 320px;
+  }
+}
+</code></pre></details>
+<p><strong>States.</strong> Guest: the button reads "Đăng nhập để tham gia" and a tap opens the login modal. Member: "Tham gia ngay", and a tap does nothing (mock).</p>
+<p><strong>Copy.</strong> Khuyến mãi (back link), Kết thúc sau, Đã kết thúc, Đang diễn ra, Nội dung khuyến mãi (Promotion content, aria), Thông tin chương trình (Programme information), the body text above, Điều khoản (Terms, aria), Điều khoản &amp; điều kiện (Terms &amp; conditions), terms: "Chỉ áp dụng cho thành viên đủ 18 tuổi trở lên." / "Mỗi thành viên được tham gia theo quy định của chương trình." / "Yêu cầu vòng cược áp dụng theo điều khoản công bố." / "Yaobet có quyền điều chỉnh hoặc kết thúc chương trình theo quy định.", Tham gia ngay (Join now), Đăng nhập để tham gia (Log in to join).</p>
+<div class="callout warn">Below 768px the CTA is <code>position:sticky; bottom:12px</code>, but the fixed BottomTabBar (56px + safe area, z 100) covers the bottom of the viewport. The sticky button sits under the bar until the page scrolls to the end (inference). <code>title.toLowerCase()</code> lowercases the whole title inside the sentence ("cúp c1 châu âu — đặt cược nhận thưởng").</div>
+</section>
+

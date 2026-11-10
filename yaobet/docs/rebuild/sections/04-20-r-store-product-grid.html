@@ -1,0 +1,33 @@
+<section>
+<h2 id="r-store-product-grid">ProductGrid (+ filter tabs)</h2>
+<h4>1. Purpose</h4><p>Filterable grid of reward cards; owns the redeem dialog and the guest gate.</p>
+<h4>2. Source</h4><p><code>src/components/store/ProductGrid.tsx</code>, <code>ProductGrid.module.css</code> (shared with ProductCard)</p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">status==="loading" → ul.grid aria-busy  li.cell × max(cols||2, computeGridFill(cols,1,2)+1)  TileSkeleton
+status==="error"   → ErrorState title "Không tải được cửa hàng" message "Không tải được danh sách quà đổi điểm. Vui lòng thử lại." onRetry=load
+items.length===0   → EmptyState icon gift title "Cửa hàng trống" message "Hiện chưa có sản phẩm nào để đổi điểm."
+else:
+  div.tabs role=tablist aria-label="Cửa hàng điểm"
+    button.tab[.tabActive] role=tab aria-selected  "Tất cả" | "Voucher tiền" | "Sản phẩm"
+  ul.grid (ref → useGridCols)
+    li.cell per visible product → ProductCard(product, points=effectivePoints, allowed, paused, onRedeem)
+  selected &amp;&amp; RedeemDialog(product=selected, points=effectivePoints, paused, onClose)</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>products</td><td>Product[]</td><td>seed items</td></tr><tr><td>points</td><td>number</td><td>balance; guests get effectivePoints 0</td></tr></tbody></table>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.tabs</td><td>flex; gap 8px; margin-bottom 16px; wrap</td><td></td></tr>
+<tr><td>.tab</td><td>padding 6px 12px; radius pill; border 1px rgba(212,175,55,.55); transparent; #888888; 14px 600; line-height 1</td><td></td></tr>
+<tr><td>.tab:hover</td><td>#f2f0e4; scale(1.05)</td><td></td></tr>
+<tr><td>.tabActive</td><td>#d4af37; background #1a1a1a; border rgba(212,175,55,.55)</td><td></td></tr>
+<tr><td>.grid</td><td>grid repeat(2, 1fr); gap 16px; no list style</td><td>≥768: repeat(3,1fr); ≥1024: repeat(4,1fr)</td></tr>
+<tr><td>.cell</td><td>flex; min-width 0 (stretches card to row height)</td><td></td></tr>
+</tbody></table>
+<h4>6. States</h4><p>Tab active by colour only (also scales on hover). Tabs have no :focus-visible rule (browser default). Filter is client-side by <code>category</code>; "Voucher tiền" shows 6, "Sản phẩm" 5, "Tất cả" 11. An empty filtered list renders an empty <code>ul</code> (no empty state).</p>
+<h4>7. Motion</h4><p>.tab color/border-color/transform 200ms ease-standard; reduced motion: transition none, hover transform none.</p>
+<h4>8. Copy</h4><p>"Tất cả" (All), "Voucher tiền" (Cash vouchers), "Sản phẩm" (Products); error/empty strings above.</p>
+<h4>9. Data</h4><p>Product shape: <code>src/lib/types.ts</code> lines 187–233.</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Card CTA → onRedeem: guest → <code>promptAuth()</code>; member → setSelected(product) mounts RedeemDialog. Dialog close → selected null (unmount).</p>
+<div class="callout warn"><code>status</code> starts "ready" and <code>load()</code> is only called from the ErrorState retry, so the TileSkeleton loading grid and the ErrorState are unreachable; a server fetch failure is swallowed into <code>[]</code> and shows "Cửa hàng trống" instead of an error. The tabs claim <code>role="tab"</code> with no tabpanel.</div>
+</section>
+

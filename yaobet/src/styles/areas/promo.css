@@ -1,0 +1,350 @@
+/* ============================================================================
+ * Promo area partial: the PromoHero, PromoGrid, PromoDetail and promotions
+ * page rules, in their original load order (the components first, the page
+ * sheet last). Plain class rules and @media only; the components layer comes
+ * from the import line in globals.css.
+ * ==========================================================================*/
+
+/* Heading and numeral type roles, shared by the promo, referral and message
+ * surfaces. The display face renders only in the h1 and h2 roles (26px and
+ * up at 375); h4 takes the body face. Headings keep 0 tracking. */
+.promo-type-h1 {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-leading);
+  font-weight: var(--type-h1-weight);
+  letter-spacing: 0;
+}
+
+.promo-type-h2 {
+  font-family: var(--type-h2-family);
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-leading);
+  font-weight: var(--type-h2-weight);
+  letter-spacing: 0;
+}
+
+.promo-type-h4 {
+  font-family: var(--type-h4-family);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-leading);
+  font-weight: var(--type-h4-weight);
+  letter-spacing: 0;
+}
+
+.promo-type-num-lg {
+  font-family: var(--type-num-lg-family);
+  font-size: var(--type-num-lg-size);
+  line-height: var(--type-num-lg-leading);
+  font-weight: var(--type-num-lg-weight);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* PromoHero — featured promo band. Tokens only; mobile-first @375. */
+
+.promo-hero-hero {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* FULL-BLEED hero backdrop — the one gradient class the flat system still
+ * permits ("subtle directional gradients" as large background decoration).
+ * It is the placeholder for banner art, not a card or button fill. */
+.promo-hero-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 100% at 80% 0%, var(--brand-accent-hairline), transparent 60%),
+    linear-gradient(135deg, var(--surface-3), var(--surface));
+  border-bottom: 1px solid var(--brand-accent-hairline);
+}
+
+.promo-hero-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.promo-hero-title {
+  color: var(--text-hi);
+}
+
+.promo-hero-timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+}
+
+.promo-hero-timer-label {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.promo-hero-evergreen {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* The hero's primary action, styled as .ui-btn-primary: the sheen
+ * (--brand-accent-grad) over the flat --brand-accent fallback, the
+ * --brand-on-accent label (7.97:1 on the fill) and the control radius. Hover
+ * drops the sheen and lifts the flat fill 15% toward --text-hi, plus the
+ * uniform scale(1.05); :active takes the pressed step --brand-accent-2. Focus
+ * is the shared ring outside a --canvas gap. */
+.promo-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background-color: var(--brand-accent);
+  background-image: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.promo-hero-cta:hover {
+  background-image: none;
+  background-color: color-mix(in srgb, var(--brand-accent) 85%, var(--text-hi));
+}
+/* The hover scale needs a fine pointer; placed before :active so its
+ * scale(.98) still wins. */
+@media (hover: hover) and (pointer: fine) {
+  .promo-hero-cta:hover {
+    transform: scale(1.05);
+  }
+}
+.promo-hero-cta:active {
+  background-image: none;
+  background-color: var(--brand-accent-2);
+  transform: scale(0.98);
+}
+.promo-hero-cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-hero-cta,
+  .promo-hero-cta:hover,
+  .promo-hero-cta:active {
+    transform: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .promo-hero-hero {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .promo-hero-media {
+    width: 48%;
+    aspect-ratio: auto;
+    border-bottom: 0;
+    border-right: 1px solid var(--brand-accent-hairline);
+  }
+  .promo-hero-body {
+    flex: 1;
+    justify-content: center;
+    padding: var(--space-6);
+  }
+}
+
+/* PromoGrid — filterable promo grid. Tokens only; mobile-first @375. */
+
+.promo-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.promo-grid-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--gutter);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .promo-grid-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .promo-grid-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* The grid track is repeat(N, 1fr) at every breakpoint, so every
+ * promo cell is exactly the same width regardless of the offer inside it — no
+ * "featured" promo is rendered larger, and none scales differently. */
+.promo-grid-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.promo-grid-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.promo-grid-timer-label {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.promo-grid-evergreen {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  padding: var(--space-1) var(--space-2);
+}
+
+/* PromoDetail — single promo surface. Tokens only; mobile-first @375. */
+
+.promo-detail-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.promo-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  text-decoration: none;
+}
+
+.promo-detail-hero {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* FULL-BLEED hero backdrop — permitted background decoration, not a card fill;
+ * the placeholder for banner art. */
+.promo-detail-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 100% at 80% 0%, var(--brand-accent-hairline), transparent 60%),
+    linear-gradient(135deg, var(--surface-3), var(--surface));
+}
+
+.promo-detail-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.promo-detail-title {
+  color: var(--text-hi);
+}
+
+.promo-detail-timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--t-sm);
+  color: var(--text-hi);
+}
+
+.promo-detail-timer-label {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.promo-detail-evergreen {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.promo-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.promo-detail-section-title {
+  color: var(--text-hi);
+}
+
+.promo-detail-body {
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+
+.promo-detail-terms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+.promo-detail-cta {
+  position: sticky;
+  bottom: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .promo-detail-cta {
+    position: static;
+    max-width: 320px;
+  }
+}
+
+/* Promotions page — wide canvas. Tokens only; mobile-first @375. */
+
+.promo-khuyen-mai-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.promo-khuyen-mai-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.promo-khuyen-mai-heading {
+  color: var(--text-hi);
+}

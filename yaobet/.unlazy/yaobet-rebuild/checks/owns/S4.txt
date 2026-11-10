@@ -1,0 +1,2 @@
+src/components/auth/**
+src/styles/areas/auth.css

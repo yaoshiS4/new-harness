@@ -1,0 +1,24 @@
+<section>
+<h2 id="m-unused">m-unused — Unused / dead code in the member area</h2>
+<p>Each item below was confirmed with a repository-wide grep of <code>apps/web/src</code> (no importer outside its own file/barrel).</p>
+<table>
+<thead><tr><th>Item</th><th>File</th><th>Status / evidence</th></tr></thead>
+<tbody>
+<tr><td><code>ProfileHeader</code> (+ <code>ProfileHeader.module.css</code>, 117 lines)</td><td><code>src/components/account/ProfileHeader.tsx</code></td><td>Exported from <code>components/account/index.ts</code>; no importer. Old /tai-khoan identity card (Card vip, avatar slot, name, "Đã xác minh" info badge, gold tier badge "Thành viên mới"/tier, ID chip with copy). Guest: Card vip with Icon account 32, "Khách", "Đăng nhập để xem tài khoản của bạn.", gold Đăng nhập.</td></tr>
+<tr><td><code>QuickActions</code> (+ CSS, 36 lines)</td><td><code>src/components/account/QuickActions.tsx</code></td><td>No importer. Row (<code>role="group" aria-label="Thao tác nhanh"</code>) of 3 interactive Cards: Nạp (/vi-tien, intent deposit), Rút (/vi-tien, intent withdraw), Lịch sử (/lich-su); guest taps call <code>promptAuth({action})</code>.</td></tr>
+<tr><td><code>AccountMenu</code> (+ CSS, 75 lines)</td><td><code>src/components/account/AccountMenu.tsx</code></td><td>No importer. List rows: Bảo mật "Mật khẩu, 2FA, mật khẩu rút tiền" → /bao-mat; "Giới hạn &amp; Trách nhiệm" "Giới hạn nạp/thua, tự loại trừ — do hệ thống quản lý" → /bao-mat#trach-nhiem; "Xác minh danh tính (KYC)" "Tên thật, giấy tờ tùy thân" → /bao-mat#kyc; Khuyến mãi "Ưu đãi &amp; sự kiện" → /khuyen-mai; Hỗ trợ "Liên hệ chăm sóc khách hàng" → /ho-tro. Hashes <code>#trach-nhiem</code>/<code>#kyc</code> exist nowhere.</td></tr>
+<tr><td><code>LogoutMenuItem</code></td><td><code>src/components/account/LogoutButton.tsx</code></td><td>Exported, no importer; references undefined <code>styles.menuIcon</code>.</td></tr>
+<tr><td>Unused CSS classes</td><td><code>SecurityCenter.module.css</code></td><td><code>.rows .groupLabel .list .row .rowMain .rowLabel .rowValue .rowEmpty .rowEnd</code> — no JSX reference.</td></tr>
+<tr><td><code>.heading</code></td><td><code>vi-tien.module.css</code>, <code>gioi-thieu.module.css</code>, <code>dai-ly.module.css</code></td><td>Used only by loading.tsx (vi-tien, gioi-thieu) or not at all (dai-ly). <code>tai-khoan/loading.tsx</code> references a <code>.heading</code> that does not exist.</td></tr>
+<tr><td><code>AccountSummary.rebate</code></td><td><code>lib/mock/profile.ts</code> → MemberSidebar</td><td>Fetched and passed, never rendered.</td></tr>
+<tr><td><code>SecurityIndex.factors[].label</code></td><td><code>lib/mock/profile.ts</code></td><td>Only used to compute <code>score</code>; labels never shown.</td></tr>
+<tr><td><code>Transaction.note</code></td><td><code>lib/mock/records.ts</code></td><td>Never rendered by WalletHistory.</td></tr>
+<tr><td><code>isGuest</code>, <code>isLevelZero</code>, <code>isTiered</code></td><td><code>lib/auth/guard.ts</code></td><td>Exported via <code>lib/auth/index.ts</code>; no caller.</td></tr>
+<tr><td><code>getCashback()</code>, <code>vi.cashback.*</code></td><td><code>lib/mock/cashback.ts</code>, <code>lib/i18n.ts</code></td><td>No caller in <code>src/app</code> or <code>src/components</code> (the /hoan-tra route redirects).</td></tr>
+<tr><td>i18n keys</td><td><code>lib/i18n.ts</code></td><td>No reader anywhere in <code>src</code> (word-boundary grep): <code>member.profile</code>, <code>member.bank</code>, <code>member.crypto</code>, <code>account.points</code>, <code>account.rebate</code>, <code>account.activated</code>, <code>account.notActivated</code>, <code>account.tabVerify</code>, <code>account.tabOther</code>, <code>account.basicInfo</code>, <code>account.fundPassword</code>, <code>account.dynamicCode</code>, <code>account.avatar</code>, <code>account.displayName</code>, <code>account.setDefault</code>, <code>account.remove</code>, <code>restricted.metaTitle</code>, every <code>cashback.*</code> key. (<code>member.agentClub</code>, <code>member.support</code>, <code>member.vip</code>, <code>member.nextTier</code> are read by tracks S/home, not here.)</td></tr>
+<tr><td><code>--status-locked-bg</code>, <code>--status-locked-text</code>, <code>--progress-tag-bg</code>, <code>--progress-tag-border</code>, <code>--progress-dot-glow</code></td><td><code>styles/tokens.css</code> §9</td><td>Member-hub tokens not referenced by any member module (the activation chip they were for is not rendered; <code>.nextTag</code> uses its own color-mix instead of <code>--progress-tag-bg</code>).</td></tr>
+<tr><td><code>/dai-ly</code> route</td><td><code>src/app/(member)/dai-ly/page.tsx</code></td><td>Live, but reachable only via the header "CLB" link; not in the sidebar. <code>AgentTiers</code> is used only here and its current-tier highlight can never fire (<code>currentLevel={0}</code>).</td></tr>
+</tbody>
+</table>
+</section>
+

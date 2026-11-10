@@ -1,0 +1,156 @@
+<section>
+<h2 id="r-vip-tier-ladder">TierLadder (/tier)</h2>
+<h4>1. Purpose</h4><p>Horizontal deck of the five legacy tiers with their rebate rate and perk lines, marking the member's current and locked tiers.</p>
+<h4>2. Source</h4><p><code>src/components/vip/TierLadder.tsx</code>, <code>TierLadder.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">Scroller(snap peek label="Bậc thang VIP").scroller
+  ul.deck
+    li.item  per tier
+      Card(variant="vip" active=isCurrent).tierCard[.locked]  aria-label="{name} — Hạng {level}"
+        span.cardTop
+          isCurrent &amp;&amp; Badge(tone gold, solid) "Hiện tại"
+          isLocked  &amp;&amp; span.lockChip  Icon lock 13 + " Chưa mở"
+        span.badge aria-hidden  Icon vip 30
+        span.level  "Hạng {level}"
+        span.name   tier name
+        span.rate   "Hoàn trả {rate}%"
+        !compact &amp;&amp; perks &amp;&amp; ul.perkLine: li.perkLineItem  Icon check 13 .perkTick + perk</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>default</th><th>effect</th></tr></thead><tbody>
+<tr><td>tiers</td><td>VipTier[]</td><td>—</td><td>cards</td></tr>
+<tr><td>compact</td><td>boolean</td><td>false</td><td>hides perk list (never passed true)</td></tr></tbody></table>
+<h4>5. Styles</h4><p>.deck flex gap 12px; .item flex 0 0 auto (≥768: 1 1 0, min-width 0); .tierCard flex column centred gap 8px, width 168px (≥768: 100%), min-height 100%, padding 16px, scroll-snap-align start; ≥768 the Scroller rail is forced width 100%, padding-right 0; .locked opacity .66; .cardTop min-height 22px centred; .lockChip 12px #888888 gap 4px; .badge 48×48 (<span class="tok">--space-8</span>) pill #212121 border rgba(212,175,55,.55) colour #d4af37; .level 12px uppercase .03em #888888; .name 18px 700 #f2f0e4 centred; .rate 14px 600 #d4af37; .perkLine margin-top 8px column gap 4px full width; .perkLineItem 12px lh 1.3 #d6d3c7 gap 4px; .perkTick #45c9a5 margin-top 2px.</p>
+<details><summary>Verbatim TierLadder.module.css</summary><pre><code class="lang-css">/* TierLadder — horizontal tier deck. Tokens only.
+ *
+ * RULING B1: every tier card is the SAME 168px box (and the same flex:1 1 0
+ * share on desktop) regardless of tier. Rank is carried by POSITION in the
+ * ladder and by the Card `active` border, never by size. There is deliberately
+ * NO :hover transform here — these are display cards, not links or buttons, so
+ * a hover scale would advertise an affordance that does not exist. */
+
+.deck {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.item {
+  flex: 0 0 auto;
+}
+
+.tierCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 168px;
+  min-height: 100%;
+  padding: var(--space-4);
+  scroll-snap-align: start;
+}
+
+/* Desktop: the deck fits without scrolling, so distribute the cards across the
+ * full container width instead of left-packing them and leaving dead space to
+ * the right. Cards grow equally; @375 they keep the 168px snap-scroll deck. */
+@media (min-width: 768px) {
+  /* full-width rail with no peek-padding so the deck spans the whole frame */
+  .scroller &gt; div {
+    width: 100%;
+    padding-right: 0;
+  }
+  .deck {
+    width: 100%;
+  }
+  .item {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .tierCard {
+    width: 100%;
+  }
+}
+.locked {
+  opacity: 0.66;
+}
+
+.cardTop {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lockChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.badge {
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  color: var(--brand-accent);
+  /* flat: solid raised surface + gold hairline (was a raw-rgba radial fill) */
+  background: var(--surface-3);
+  border: 1px solid var(--brand-accent-hairline);
+}
+
+.level {
+  font-size: var(--t-micro);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.name {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+  text-align: center;
+}
+.rate {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--brand-accent);
+}
+
+.perkLine {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+.perkLineItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+.perkTick {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--win);
+}</code></pre></details>
+<h4>6. States / 9. Data</h4>
+<table><thead><tr><th>Tier (mock/vip.ts)</th><th>Level label</th><th>Rate</th><th>Perks</th><th>Guest</th><th>Member L3</th><th>Member L0</th></tr></thead><tbody>
+<tr><td>Tân thủ</td><td>Hạng 0</td><td>Hoàn trả 0,6%</td><td>Hoàn trả cơ bản</td><td>plain</td><td>plain</td><td>Hiện tại</td></tr>
+<tr><td>Đồng</td><td>Hạng 1</td><td>Hoàn trả 0,8%</td><td>Hoàn trả 0,8% · Quà sinh nhật</td><td>plain</td><td>plain</td><td>Chưa mở</td></tr>
+<tr><td>Bạc</td><td>Hạng 2</td><td>Hoàn trả 1%</td><td>Hoàn trả 1,0% · Rút nhanh</td><td>plain</td><td>plain</td><td>Chưa mở</td></tr>
+<tr><td>Bạch Kim</td><td>Hạng 3</td><td>Hoàn trả 1,2%</td><td>Hoàn trả 1,2% · Quản lý riêng</td><td>plain</td><td>Hiện tại (Card active)</td><td>Chưa mở</td></tr>
+<tr><td>Kim Cương</td><td>Hạng 4</td><td>Hoàn trả 1,5%</td><td>Hoàn trả 1,5% · Sự kiện VIP</td><td>plain</td><td>Chưa mở</td><td>Chưa mở</td></tr>
+</tbody></table>
+<p>All tiers use badgeSrc "/assets/placeholders/tier-badge.svg" in data but the component renders Icon vip, not the image.</p>
+<h4>7. Motion</h4><p>None (no hover transform by design).</p>
+<h4>8. Copy</h4><p>"Hiện tại", "Chưa mở", "Hạng {n}", "Hoàn trả {x}%", perk strings above.</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Scroller handles snap/peek (track F). Cards are non-interactive.</p>
+<div class="callout warn">Rate "Hoàn trả 1%" for Bạc (1.0.toString() = "1") sits next to its perk line "Hoàn trả 1,0%".</div>
+</section>
+

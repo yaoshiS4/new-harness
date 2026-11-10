@@ -1,0 +1,58 @@
+<section>
+<h2 id="r-unused">R5 · Unused / dead code and open discrepancies (track R)</h2>
+<h3 id="r-unused-dead">Dead or unreachable code</h3>
+<table><thead><tr><th>Location</th><th>What</th><th>Evidence</th></tr></thead><tbody>
+<tr><td>src/components/vip/VipProgram.tsx</td><td><code>vipLvl</code> state + hidden <code>&lt;span hidden aria-hidden&gt;{vipLvl}&lt;/span&gt;</code></td><td>no consumer; LevelTable/Comparison ignore it</td></tr>
+<tr><td>src/lib/vip/tiers.ts</td><td><code>grad</code> field, <code>gift</code> field</td><td>never read by any component</td></tr>
+<tr><td>src/styles/tokens.css</td><td><span class="tok">--vip-tier-*-grad</span>, <span class="tok">--vip-gold-grad</span>, <span class="tok">--vip-negative</span></td><td>no CSS/TSX paints them</td></tr>
+<tr><td>src/lib/vip/formulas.ts</td><td><code>rebateAtLevel</code> alias</td><td>exported, never imported</td></tr>
+<tr><td>src/components/vip/copy.ts</td><td><code>pageTitle</code>, <code>detailLink</code>, <code>colPerks</code></td><td>no reference</td></tr>
+<tr><td>src/components/vip/VipPage.module.css</td><td><code>.detailLink</code></td><td>no JSX uses it</td></tr>
+<tr><td>src/components/vip/TierLadder.tsx</td><td><code>compact</code> prop</td><td>never passed</td></tr>
+<tr><td>src/components/vip/VipSection.tsx</td><td><code>action</code> prop</td><td>never passed</td></tr>
+<tr><td>src/components/vip/PrivilegeTable.module.css</td><td><code>.col:last-child .cell {}</code></td><td>empty rule</td></tr>
+<tr><td>src/components/vip/VipRules.module.css</td><td><code>counter-reset: rule</code></td><td>no counter() use</td></tr>
+<tr><td>src/components/vip/PerkGallery.module.css</td><td>≥1024 <code>1fr 1fr</code></td><td>identical to ≥640</td></tr>
+<tr><td>src/components/store/ProductGrid.module.css</td><td><code>.rollingSlot</code>, <code>.limitStatus</code>, <code>.limitGlyph</code>, <code>.limitStatusText</code>, <code>.limitStatusLine</code>, <code>.limitClock</code>, <code>.limitHelper</code></td><td>no JSX reference</td></tr>
+<tr><td>src/components/store/RedeemDialog.module.css</td><td><code>.baseSubline</code>, <code>.costCompare</code>, <code>.reassure</code></td><td>no JSX reference</td></tr>
+<tr><td>src/components/store/ProductGrid.tsx</td><td>loading (TileSkeleton) and ErrorState branches</td><td><code>load()</code> only reachable from ErrorState.onRetry; initial status "ready"</td></tr>
+<tr><td>src/components/store/ProductCard.tsx</td><td><code>paused</code> prop</td><td>not destructured</td></tr>
+<tr><td>src/lib/i18n.ts (store/claim)</td><td>store.pointsUnit, store.redeemedCount, store.waitForBaseLabel; claim.fullRate, earlyEscalated, atFloor, unlimitedDeep, insufficient, paused, resetConfirm, committedEscalated, btnFullRate, btnEscalated, btnWait, earlyWarn, earlyResetWarn, baseSubline, successPointsRow</td><td>no component reads them</td></tr>
+<tr><td>src/lib/store/escalation.ts</td><td><code>ratePct</code>; branch "unlimited_deep"</td><td>no UI consumer</td></tr>
+<tr><td>src/lib/mock/store.ts</td><td>DEMO_* fixtures, <code>stockTotal</code>, <code>redeemedCount</code>, <code>cooldownMinutes</code>, <code>userRedeemedCount</code>, <code>cyclePointsBurned</code></td><td>flags off; fields never rendered</td></tr>
+<tr><td>src/components/lottery/ScratchCardGame.tsx</td><td><code>onPlay</code>, <code>onSettled</code> props</td><td>ScratchCardStage passes neither</td></tr>
+<tr><td>src/lib/mock/lottery.ts</td><td><code>assertCard</code>, <code>selfTest</code></td><td>dev self-test only</td></tr>
+<tr><td>src/components/collection/CardArt.tsx + card-art.module.css</td><td><code>CardBack</code>, <code>.back</code>, <code>.dealt</code>, <code>@keyframes dealIn</code></td><td>never imported</td></tr>
+<tr><td>src/components/collection/pack.module.css</td><td>≥900 <code>.info { right: … }</code></td><td>.info is no longer positioned (inside .chrome)</td></tr>
+<tr><td>src/lib/collection/math.ts</td><td><code>backstopDue</code>, <code>opensToBackstop</code>, <code>guaranteedOpensCeiling</code>, <code>shardsForDuplicate</code>, <code>completionFraction</code></td><td>no caller (pity not enforced)</td></tr>
+<tr><td>src/lib/collection/ports + fixtures</td><td><code>craftToComplete</code>, <code>setPriorityOrder</code> (only the dev harness), <code>risk</code>/<code>rg</code>/<code>holdout</code> verdicts, <code>entitlement.consume</code></td><td>no player surface calls them; suppression verdicts never gate rendering</td></tr>
+<tr><td>src/lib/collection/adapters/clock.ts</td><td><code>setTo</code>, <code>getOffsetMs</code></td><td>no caller</td></tr>
+<tr><td>src/lib/collection/index.ts</td><td>comment points to <code>./provider</code></td><td>file does not exist (roots are in src/app)</td></tr>
+<tr><td>src/app/dev/collection-ports</td><td>whole route</td><td>self-described throwaway; unlinked</td></tr>
+</tbody></table>
+
+<h3 id="r-unused-discrepancies">Discrepancies index (all callouts in this fragment)</h3>
+<ol>
+<li>/vip and /tier publish two incompatible VIP systems (tier lists, rebate economics, ranking rule).</li>
+<li>/vip member hero is always the demo "Jordan Rivera · VÀNG", not the logged-in user; points in en-US grouping; level-table rates with decimal points and "$" gifts.</li>
+<li>Per-tier metallic gradients declared but never painted; flat accents everywhere.</li>
+<li>"Đăng ký ngay" on /vip opens the auth modal in login mode.</li>
+<li>FAQ #5 (host from Bạch Kim) contradicts the privilege data (host only at Kim Cương).</li>
+<li>PrivilegeComparison "always an upgrade" comment vs lower-tier right card.</li>
+<li>PrivilegeTable perks are non-cumulative (higher tiers appear to lose perks).</li>
+<li>/tier progress envelope ignores the user's tier.</li>
+<li>QuickActionRail labels the /tier link "Giải đấu".</li>
+<li>Store cooldown expiries fixed at server module load (states decay with uptime).</li>
+<li>Store ErrorState/loading unreachable; fetch failure shows "Cửa hàng trống".</li>
+<li>Store paused flag ignored by cards; at-floor/unlimited disclosures never rendered; balance not decremented after success; StoreTerms promises points on the button.</li>
+<li>Lottery: "Mua một tấm" with no purchase; outcome claims money "added to your balance"; dev force bar in the player overlay; consolation dust on every card; near-miss lure by construction; shortVnd comment 480 vs CSS 560.</li>
+<li>Nested <code>&lt;main&gt;</code> in /ve-so and /dev/collection-ports inside the shell's <code>&lt;main&gt;</code>.</li>
+<li>Collection: published 12-open rare guarantee not enforced by the draw.</li>
+<li>Collection: re-entry breaks "+1 lượt mở" and collides entitlement ids.</li>
+<li>Collection: rail order "frozen" comment vs remount on every demo action.</li>
+<li>Collection: ceremony beat timers run during the confirm step (animation skipped after 1.6 s).</li>
+<li>Collection: "returns to 0/N" copy wrong when spares exist; "1.8" decimal point; rare-only infinite foil animation vs "no rarity-differentiated motion"; filters used despite the house filter ban; duplicate SVG ids.</li>
+<li>Dev harness writes into the player's persisted store (history rows "probe-set", bogus priority order).</li>
+</ol>
+<div class="callout note">Not determinable from source: Card/Button/Badge/Modal/Overlay/Tabs/Scroller visual chrome (owned by tracks F and S); the rendered pixel metrics of the native <code>&lt;select&gt;</code>; real image licensing. Everything else above is extracted from code.</div>
+</section>

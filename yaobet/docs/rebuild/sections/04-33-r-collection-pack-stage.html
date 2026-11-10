@@ -1,0 +1,437 @@
+<section>
+<h2 id="r-collection-pack-stage">PackStage (pack opening)</h2>
+<h4>1. Purpose</h4><p>A floodlit stadium with five foil packs: pick one, press "MỞ", the pack tears and the drawn card rises out.</p>
+<h4>2. Source</h4><p><code>src/components/collection/PackStage.tsx</code>, <code>pack.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">section.stage aria-label="Mở thẻ"
+  Stadium  svg.stadium viewBox 0 0 390 460 (slice) aria-hidden
+  div.chrome
+    button.info aria-label="Lịch sử"    Icon history 20 → onOpenHistory
+    button.info aria-label="Điều khoản" Icon info 20    → onOpenInfo
+  div.floor
+    phase ≠ revealed: ul.packs
+      li.packSlot × 5
+        button.pack[.picked][.tear][.dim] style --i = i−2 aria-label="Túi {i+1}" aria-pressed disabled=phase≠idle
+          Foil  svg.foil 120×168
+    phase = revealed &amp;&amp; card: div.prize
+        div.prizeCard  CardArt(card, rare)
+        p.prizeLine  "Trùng thẻ" | "Thẻ hiếm!" | "Thẻ mới"
+        duplicate &amp;&amp; p.prizeSub "Bạn đã có thẻ này."
+  div.actionWrap
+    button.cta disabled=!(opens&gt;0 &amp;&amp; !busy)  phase=revealed ? "MỞ TIẾP" : "MỞ"
+    p.turns  "Lượt mở còn lại: " strong {opens}</code></pre>
+<h4>Pack-opening state machine</h4>
+<pre><code class="lang-txt">initial phase = last ? "revealed" : "idle"; picked = 2 (middle pack)
+idle:      tap pack i → picked = i   (pick is ritual; it does not affect the draw)
+           press MỞ → onOpen() → draw resolves (≈220ms latency) → `last` changes
+on new last: phase = "tearing" (picked pack plays `tear`, others `.dim`), timeout 620ms → "revealed"
+revealed:  card + line; press "MỞ TIẾP" → phase = "idle" then onOpen() again
+opens = 0 or busy → CTA disabled (packs remain pickable while idle)</code></pre>
+<h4>Art (verbatim)</h4><pre><code class="lang-tsx">/* ----------------------------------------------------------------------------
+ * The stadium. Drawn, not photographed — it themes with the season and costs
+ * nothing to ship.
+ * --------------------------------------------------------------------------*/
+
+function Stadium() {
+  return (
+    &lt;svg className={styles.stadium} viewBox="0 0 390 460" preserveAspectRatio="xMidYMid slice" aria-hidden&gt;
+      &lt;defs&gt;
+        &lt;linearGradient id="st-sky" x1="0" y1="0" x2="0" y2="1"&gt;
+          &lt;stop offset="0%" stopColor="hsl(214 52% 16%)" /&gt;
+          &lt;stop offset="70%" stopColor="hsl(210 46% 22%)" /&gt;
+          &lt;stop offset="100%" stopColor="hsl(206 40% 28%)" /&gt;
+        &lt;/linearGradient&gt;
+        &lt;linearGradient id="st-grass" x1="0" y1="0" x2="0" y2="1"&gt;
+          &lt;stop offset="0%" stopColor="hsl(122 34% 30%)" /&gt;
+          &lt;stop offset="100%" stopColor="hsl(128 40% 20%)" /&gt;
+        &lt;/linearGradient&gt;
+        &lt;radialGradient id="st-flood" cx="0.5" cy="0" r="0.8"&gt;
+          &lt;stop offset="0%" stopColor="#fff" stopOpacity="0.34" /&gt;
+          &lt;stop offset="100%" stopColor="#fff" stopOpacity="0" /&gt;
+        &lt;/radialGradient&gt;
+      &lt;/defs&gt;
+
+      &lt;rect width="390" height="460" fill="url(#st-sky)" /&gt;
+
+      {/* stands */}
+      &lt;path d="M0 0 h390 v150 l-90 26 h-210 l-90 -26 z" fill="hsl(218 40% 13%)" /&gt;
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((r) =&gt;
+        Array.from({ length: 26 }).map((_, c) =&gt; (
+          &lt;circle
+            key={`${r}-${c}`}
+            cx={8 + c * 15 + (r % 2) * 7}
+            cy={22 + r * 16}
+            r="2.6"
+            fill="#fff"
+            opacity={0.05 + ((r * 7 + c) % 5) * 0.02}
+          /&gt;
+        )),
+      )}
+
+      {/* floodlights */}
+      {[58, 195, 332].map((x) =&gt; (
+        &lt;g key={x}&gt;
+          &lt;ellipse cx={x} cy="8" rx="46" ry="18" fill="url(#st-flood)" /&gt;
+          &lt;rect x={x - 22} y="2" width="44" height="12" rx="3" fill="hsl(48 90% 78%)" opacity="0.85" /&gt;
+        &lt;/g&gt;
+      ))}
+
+      {/* pitch */}
+      &lt;path d="M0 176 h390 v284 h-390 z" fill="url(#st-grass)" /&gt;
+      {Array.from({ length: 9 }).map((_, i) =&gt; (
+        &lt;path
+          key={i}
+          d={`M${-60 + i * 62} 176 L${-160 + i * 118} 460 L${-60 + i * 118} 460 L${-28 + i * 62} 176 z`}
+          fill="#fff"
+          opacity={i % 2 ? 0.05 : 0}
+        /&gt;
+      ))}
+      &lt;path d="M0 176 h390" stroke="#fff" strokeOpacity="0.22" strokeWidth="2" /&gt;
+
+      {/* goal */}
+      &lt;g stroke="#fff" strokeOpacity="0.5" strokeWidth="3" fill="none"&gt;
+        &lt;path d="M118 300 h154 v66 h-154 z" /&gt;
+        &lt;path d="M118 300 l-16 -14 h186 l-16 14" /&gt;
+      &lt;/g&gt;
+      &lt;path d="M118 300 h154 v66 h-154 z" fill="#fff" opacity="0.04" /&gt;
+    &lt;/svg&gt;
+  );
+}
+
+/** A foil pack face. Drawn, so it costs nothing and themes with the season. */
+function Foil() {
+  return (
+    &lt;svg viewBox="0 0 120 168" className={styles.foil} aria-hidden&gt;
+      &lt;defs&gt;
+        &lt;linearGradient id="pk" x1="0" y1="0" x2="1" y2="1"&gt;
+          &lt;stop offset="0%" stopColor="hsl(268 78% 62%)" /&gt;
+          &lt;stop offset="45%" stopColor="hsl(282 72% 52%)" /&gt;
+          &lt;stop offset="100%" stopColor="hsl(258 70% 42%)" /&gt;
+        &lt;/linearGradient&gt;
+        &lt;linearGradient id="pkSheen" x1="0" y1="0" x2="1" y2="0"&gt;
+          &lt;stop offset="0%" stopColor="#fff" stopOpacity="0" /&gt;
+          &lt;stop offset="50%" stopColor="#fff" stopOpacity="0.42" /&gt;
+          &lt;stop offset="100%" stopColor="#fff" stopOpacity="0" /&gt;
+        &lt;/linearGradient&gt;
+      &lt;/defs&gt;
+      &lt;rect x="4" y="2" width="112" height="164" rx="8" fill="url(#pk)" /&gt;
+      &lt;rect className={styles.sheen} x="4" y="2" width="112" height="164" rx="8" fill="url(#pkSheen)" /&gt;
+      &lt;circle cx="60" cy="78" r="34" fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="2.5" /&gt;
+      &lt;circle cx="60" cy="78" r="26" fill="#fff" fillOpacity="0.12" /&gt;
+      {/* trophy mark */}
+      &lt;g transform="translate(60 78)" fill="#fff" fillOpacity="0.9"&gt;
+        &lt;path d="M-11 -16 h22 v9 a11 11 0 0 1 -22 0 z" /&gt;
+        &lt;path d="M-11 -14 h-6 v5 a7 7 0 0 0 7 7 M11 -14 h6 v5 a7 7 0 0 1 -7 7" fill="none" stroke="#fff" strokeWidth="2.4" strokeOpacity="0.9" /&gt;
+        &lt;path d="M-4 2 h8 v6 h5 v4 h-18 v-4 h5 z" /&gt;
+      &lt;/g&gt;
+      &lt;path d="M4 26 h112 M4 142 h112" stroke="#fff" strokeOpacity="0.22" strokeWidth="1.5" strokeDasharray="4 5" /&gt;
+    &lt;/svg&gt;
+  );
+}</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>opens</td><td>number</td><td>CTA enable + counter</td></tr><tr><td>last</td><td>OpenOutcome | null</td><td>drives tear → reveal</td></tr><tr><td>busy</td><td>boolean</td><td>disables CTA</td></tr><tr><td>onOpen</td><td>() =&gt; void | Promise</td><td>draw</td></tr><tr><td>onOpenInfo / onOpenHistory</td><td>() =&gt; void</td><td>zero-arg overlay requests</td></tr></tbody></table>
+<h4>5. Styles &amp; keyframes (verbatim)</h4>
+<pre><code class="lang-css">/* ============================================================================
+ * Yaobet — pack-opening stage.
+ * Big, lit, animated. No money figure exists on this surface by construction.
+ * ==========================================================================*/
+
+.stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  /* full-bleed: break out of the page gutter so the stage owns the screen */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: var(--space-3) var(--gutter) var(--space-5);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  min-height: 500px;
+  align-content: space-between;
+}
+
+/* every child sits in one centred column, whatever the viewport — except the
+   two out-of-flow layers: the backdrop and the terms button */
+.stage &gt; *:not(.stadium):not(.chrome) {
+  width: 100%;
+  max-width: 620px;
+}
+
+.stadium {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── the terms button ───────────────────────────────────────────────────────
+   Sits in the sky, above the stands and clear of both the packs on the floor
+   and the CTA. An OPAQUE chip, not a bare glyph: the backdrop behind it runs
+   from a dark sky gradient to a bright floodlight ellipse, so a translucent
+   treatment fails contrast at one of the two ends. */
+
+/* The reference cluster: history + terms, paired top-right. Positioning moved
+   to the wrapper so the two buttons stay a unit and the stage keeps exactly one
+   piece of chrome rather than two floating chips. */
+.chrome {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  z-index: 2;
+}
+
+/* FLAT: a square-cornered control, not a pill. Pills are reserved for tags and
+   badges now; a control that is round for decoration reads as a chip. The gold
+   hairline is what separates it from the sky behind it — there is no shadow to
+   do that job. */
+.info {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-accent-hairline);
+  background: var(--surface);
+  color: var(--text-hi);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* Icons inside a hovered control step up 1.10 while the control steps 1.05 —
+   the group-hover idiom, applied identically to every icon-bearing control. */
+.info svg { transition: transform var(--dur-fast) var(--ease-standard); }
+
+.info:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent);
+  transform: scale(1.05);
+}
+
+.info:hover svg { transform: scale(1.1); }
+
+.info:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+
+
+/* ── the floor ──────────────────────────────────────────────────────────── */
+
+.floor {
+  display: grid;
+  place-items: center;
+  min-height: 322px;
+}
+
+.packs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  perspective: 900px;
+}
+
+.packSlot { width: 66px; display: grid; place-items: center; }
+
+.pack {
+  width: 172px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform: translateX(calc(var(--i) * 8px)) rotate(calc(var(--i) * 3deg)) scale(0.8);
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 320ms ease, opacity 320ms ease;
+  filter: brightness(0.72) saturate(0.85);
+  animation: bob 3.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 180ms);
+}
+
+@keyframes bob {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -7px; }
+}
+
+.pack:disabled { cursor: default; }
+
+/* The pick reads through SIZE and LIGHT, not through a glow. A drop-shadow is
+   a shadow wearing a different property name, and the system has none. */
+.picked {
+  transform: translateX(calc(var(--i) * 8px)) rotate(0deg) scale(1.22);
+  filter: brightness(1.14) saturate(1.14);
+  z-index: 2;
+}
+
+.pack:not(:disabled):hover { filter: brightness(1) saturate(1); }
+
+.pack:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.foil { display: block; width: 100%; height: auto; }
+
+.sheen { animation: sheen 3.6s ease-in-out infinite; }
+
+@keyframes sheen {
+  0%, 100% { opacity: 0.25; transform: translateX(-16%); }
+  50%      { opacity: 0.7;  transform: translateX(16%); }
+}
+
+/* the tear */
+.tear { animation: tear 620ms cubic-bezier(0.3, 0, 0.2, 1) forwards; }
+
+@keyframes tear {
+  0%   { transform: translateX(calc(var(--i) * 8px)) scale(1.22) rotate(0deg); }
+  18%  { transform: translateX(calc(var(--i) * 8px)) scale(1.26) rotate(-3deg); }
+  34%  { transform: translateX(calc(var(--i) * 8px)) scale(1.26) rotate(3deg); }
+  100% { transform: translateX(calc(var(--i) * 8px)) scale(1.7) rotate(0deg); opacity: 0; }
+}
+
+.dim { opacity: 0; transform: translateY(24px) scale(0.7); }
+
+/* ── the prize ──────────────────────────────────────────────────────────── */
+
+.prize {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  animation: rise 420ms cubic-bezier(0.2, 0.9, 0.2, 1) backwards;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: scale(0.72) translateY(18px); }
+  60%  { transform: scale(1.05); }
+  to   { opacity: 1; transform: none; }
+}
+
+.prizeCard { width: 200px; }
+
+/* The rare card USED to breathe inside a looping gold glow. Both halves of that
+   are now banned: the glow is a shadow, and a looping animation that only rare
+   cards get is rarity-differentiated motion — the same inducement B1 rejects on
+   the rails. Rarity still reads, and reads honestly: `CardArt` draws a gold
+   stroke and a foil sweep on the face itself, and the line under it says
+   `Thẻ hiếm!`. The reveal is now one duration for every card. */
+
+.prizeLine {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+
+/* The duplicate subline. Deliberately NOT a gain treatment — no `+`, no win
+   colour, no number. It states what happened and stops. */
+.prizeSub {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: center;
+}
+
+/* ── the action ─────────────────────────────────────────────────────────── */
+
+.actionWrap { display: grid; justify-items: center; gap: var(--space-2); }
+
+.turns {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: center;
+}
+
+.turns strong { color: var(--brand-accent); font-variant-numeric: tabular-nums; }
+
+/* THE `MỞ` CTA — flat.
+   Was a 180° gold gradient plus a coloured drop-shadow plus an infinite
+   shadow-pulse. All three are gone: gradients are permitted only as background
+   decoration, and the system has no shadows at all, so a pulse built out of
+   `box-shadow` has nothing left to animate. The button is now a SOLID accent
+   plate whose hover is a COLOUR SHIFT (`--brand-accent` → `--brand-accent-2`)
+   plus the uniform 1.05 scale every button in this feature gets. */
+.cta {
+  width: min(300px, 82%);
+  min-height: 60px;
+  border-radius: var(--radius-lg);
+  border: 0;
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.cta:hover:not(:disabled) {
+  background: var(--brand-accent-2);
+  transform: scale(1.05);
+}
+
+.cta:disabled {
+  background: var(--surface-disabled);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.cta:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+/* ── reduced motion: keep the state changes, drop the theatre ───────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .pack, .sheen, .cta, .prize { animation: none; }
+  .tear { animation: none; opacity: 0; }
+  .pack, .info, .info svg, .cta { transition: none; }
+
+  /* The hover scale is not merely un-animated here, it is ABSENT. Snapping a
+     control 5% larger with a zero-length transition is the same jolt the query
+     was set to avoid; the hover still answers, in colour. */
+  .cta:hover:not(:disabled),
+  .info:hover,
+  .info:hover svg { transform: none; }
+}
+
+/* desktop: more room, so the packs can be bigger still */
+@media (min-width: 900px) {
+  .stage &gt; *:not(.stadium):not(.info) { max-width: 780px; }
+  /* keep the button on the content column's right edge, not the viewport's —
+     the stage is full-bleed, the column is not */
+  .info { right: max(var(--space-3), calc(50% - 390px)); }
+  .stage { min-height: 560px; }
+  .floor { min-height: 372px; }
+  .packSlot { width: 84px; }
+  .pack { width: 210px; }
+  .prizeCard { width: 240px; }
+}</code></pre>
+<p>Key resolved values: stage full-bleed 100vw, padding 12px 16px 24px, grid centred gap 8px, min-height 500px (≥900: 560), align-content space-between; children max-width 620px (≥900: 780). .chrome absolute top/right 12px, gap 8px, z 2. .info 44×44 radius 8px border rgba(212,175,55,.55) #141414 #f2f0e4 (hover #262626, border #d4af37, scale 1.05, svg 1.1; focus offset 3px). .floor min-height 322px (≥900: 372). .packSlot 66px (≥900: 84). .pack 172px (≥900: 210), resting transform translateX(i·8px) rotate(i·3deg) scale(.8), filter brightness(.72) saturate(.85), bob 3.4s ease-in-out infinite, delay i·180ms; .picked rotate 0 scale 1.22, brightness 1.14 saturate 1.14, z 2; hover (enabled) brightness 1 saturate 1. .cta width min(300px, 82%), min-height 60px, radius 12px, #d4af37 / #0a0a0a, 20px 700 ls .06em (hover #b4952f, scale 1.05; disabled #303030 / #6f6f6f). .turns 14px #d6d3c7, strong #d4af37. .prizeCard 200px (≥900: 240). .prizeLine 16px 600 #f2f0e4; .prizeSub 14px #d6d3c7.</p>
+<table><thead><tr><th>Keyframe</th><th>Timing</th><th>Frames</th></tr></thead><tbody>
+<tr><td>bob</td><td>3.4s ease-in-out infinite, delay (i−2)·180ms</td><td>translate 0 0 → 0 −7px → 0 0</td></tr>
+<tr><td>sheen (foil overlay rect)</td><td>3.6s ease-in-out infinite</td><td>opacity .25 translateX(−16%) → .7 translateX(16%) → back</td></tr>
+<tr><td>tear (picked pack)</td><td>620ms cubic-bezier(0.3, 0, 0.2, 1) forwards</td><td>0% scale 1.22 rot 0 → 18% 1.26 −3deg → 34% 1.26 3deg → 100% scale 1.7 opacity 0</td></tr>
+<tr><td>.dim (other packs)</td><td>transition 320ms cubic-bezier(0.2,0.8,0.2,1)</td><td>opacity 0; translateY(24px) scale(.7)</td></tr>
+<tr><td>rise (prize)</td><td>420ms cubic-bezier(0.2, 0.9, 0.2, 1) backwards</td><td>from opacity 0 scale .72 translateY 18px → 60% scale 1.05 → none</td></tr>
+</tbody></table>
+<h4>6. States</h4><p>idle (picked pack enlarged/bright), tearing (packs disabled), revealed (card, "MỞ TIẾP"), disabled CTA when no opens. Reduced motion: no bob/sheen/rise/tear (tear → opacity 0 instantly), no hover scale.</p>
+<h4>7. Motion</h4><p>See table; .info/.cta transitions 200ms ease-standard; .pack transitions transform/filter/opacity 320ms.</p>
+<h4>8. Copy</h4><p>"Mở thẻ" (section label), "Lịch sử", "Điều khoản", "Túi 1…5" (pack aria-labels), "MỞ" / "MỞ TIẾP" (Open / Open next), "Lượt mở còn lại: N" (Opens left), "Thẻ mới" (New card), "Thẻ hiếm!" (Rare card!), "Trùng thẻ" (Duplicate), "Bạn đã có thẻ này." (You already have this card).</p>
+<h4>9. Data</h4><p>last.cardId → cardById; rare = tierId "rare"; duplicate flag.</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Packs are toggle buttons (aria-pressed). The reveal is not announced (no live region).</p>
+<div class="callout warn">Packs use <code>filter: brightness()/saturate()</code> and CardArt ghosts use <code>filter: grayscale()</code>, while other modules (store, lottery) state a house-wide ban on any non-none filter. The ≥900 rule <code>.info { right: max(...) }</code> is dead (the buttons live in the positioned <code>.chrome</code> wrapper now), and its selector <code>:not(.info)</code> lets <code>.chrome</code> pick up max-width 780px. Five Foil SVGs repeat the ids <code>pk</code>/<code>pkSheen</code>. Stadium/foil colours are raw HSL/hex literals outside the token layer.</div>
+</section>
+

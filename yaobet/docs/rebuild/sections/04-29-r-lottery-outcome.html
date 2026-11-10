@@ -1,0 +1,249 @@
+<section>
+<h2 id="r-lottery-outcome">OutcomeFrame (+ useCountUp)</h2>
+<h4>1. Purpose</h4><p>The settled result panel: win (count-up total), partial (small real win), or lose (biggest prize on the card and the consolation).</p>
+<h4>2. Source</h4><p><code>src/components/lottery/_internal/OutcomeFrame.tsx</code>, <code>OutcomeFrame.module.css</code>, <code>useCountUp.ts</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">section.frame data-outcome=win|partial|lose role=status aria-live=polite
+  win:     p.headWin  Icon check 20 .headIcon + "Bạn trúng {hits} ô."
+           p.totalLabel "Tổng thưởng"
+           p.totalWin   formatVnd(countUp)
+           p.note       "Đã cộng vào số dư của bạn."
+  partial: p.headPartial "Thẻ này có thưởng."
+           p.totalPartial formatVnd(total)
+           p.note  "Không lớn, nhưng là thưởng thật — đã cộng vào số dư của bạn."
+           p.noteQuiet "Bạn có thể mở thẻ khác khi nào bạn muốn, hoặc dừng ở đây."
+  lose:    div.loseBlock
+             p.headLose "Thẻ này không trúng."
+             div.loseSplit
+               div.loseCell  p.cellLabel "Giải lớn nhất trên thẻ" · p.nearAmount formatVnd(top.prize) · p.cellNote (near-miss sentence)
+               dust&gt;0 &amp;&amp; div.loseCell  p.cellLabel "Bù thẻ không trúng" · p.dustAmount formatVnd(dust) · p.cellNote "Khoản bù, không phải tiền thưởng. Đã cộng ngay cùng lúc."
+  !lose &amp;&amp; dust&gt;0: p.noteQuiet "Kèm {dust} tiền bù — khoản bù, không phải tiền thưởng."</code></pre>
+<p>Near-miss sentence: top = highest-prize panel; missedBy = winning number at distance 1 (or 99 wrap). If none: "Nằm ở ô số {nn}, và số đó không nằm trong bốn số trúng thưởng của thẻ." else "Nằm ở ô số {nn} — lệch đúng một số so với {mm}."</p>
+<h4>4. Props</h4><p>card: ScratchCard; reduced: boolean.</p>
+<h4>5. Styles (verbatim)</h4><pre><code class="lang-css">/* OutcomeFrame — three registers at three volumes.
+ * Semantic vars only: --win / --loss / --brand-accent / --dur-* (lint A2).
+ * Flat: no box-shadows; a border-colour + surface step carries every state. */
+
+.frame {
+  margin-top: var(--space-5);
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  text-align: center;
+  animation: frame-in var(--dur-slow) var(--ease-entrance) backwards;
+}
+
+/* ---------- WIN — gold, restrained. No confetti, one ring, one count-up ---- */
+.frame[data-outcome="win"] {
+  border-color: var(--brand-accent);
+  background: color-mix(in srgb, var(--brand-accent) 8%, var(--surface-2));
+}
+
+.headWin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  font-size: var(--t-h3);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-body);
+  color: var(--text-hi);
+}
+
+.headIcon {
+  color: var(--win);
+}
+
+.totalLabel {
+  margin-top: var(--space-3);
+  font-size: var(--t-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+
+.totalWin {
+  margin-top: var(--space-1);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-num-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  color: var(--win);
+  animation: total-settle var(--dur-slow) var(--ease-entrance) backwards;
+}
+
+/* ---------- PARTIAL — a real win, said quietly. Smaller type, no ring,
+ * no count-up, no pulse. It must not borrow the win frame's volume. -------- */
+.frame[data-outcome="partial"] {
+  border-color: color-mix(in srgb, var(--win) 40%, transparent);
+}
+
+.headPartial {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-body);
+  color: var(--text-hi);
+}
+
+.totalPartial {
+  margin-top: var(--space-2);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-h1); /* deliberately BELOW the win figure's --t-num-lg */
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  color: var(--win);
+}
+
+/* ---------- LOSE — near-miss + dust, one container, one animation --------- */
+.frame[data-outcome="lose"] {
+  border-color: color-mix(in srgb, var(--loss) 42%, transparent);
+}
+
+.loseBlock {
+  /* the SINGLE animation the near-miss and the dust share, so the two land
+   * in the same frame — never staggered, never sequenced. */
+  animation: frame-in var(--dur-slow) var(--ease-entrance) backwards;
+}
+
+.headLose {
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-body);
+  color: var(--loss);
+}
+
+.loseSplit {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  text-align: left;
+}
+
+.loseCell {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.cellLabel {
+  font-size: var(--t-micro);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+
+/* the prize the card really held — stated plainly, in neutral text */
+.nearAmount {
+  margin-top: var(--space-1);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+}
+
+/* DUST — neutral, NEVER --win. A return/compensation is not a win and is not
+ * typeset as one (the copy says so too). */
+.dustAmount {
+  margin-top: var(--space-1);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-semi);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+}
+
+.cellNote {
+  margin-top: var(--space-2);
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+/* ---------- shared notes ---------- */
+.note {
+  margin-top: var(--space-3);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--text-mid);
+}
+
+.noteQuiet {
+  margin-top: var(--space-2);
+  font-size: var(--t-micro);
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+
+@media (min-width: 480px) {
+  .loseSplit {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@keyframes frame-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes total-settle {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* REDUCED MOTION — the frame appears in its final state, no movement at all.
+ * (The count-up is separately disabled in JS via usePrefersReducedMotion.) */
+@media (prefers-reduced-motion: reduce) {
+  .frame,
+  .loseBlock,
+  .totalWin {
+    animation: none;
+    transform: none;
+  }
+}
+
+:global([data-motion="off"]) .frame,
+:global([data-motion="off"]) .loseBlock,
+:global([data-motion="off"]) .totalWin {
+  animation: none;
+  transform: none;
+}</code></pre>
+<p>Resolved: frame margin-top 24px, padding 24px 16px, border rgba(212,175,55,.55), radius 16px, #1a1a1a, centred. Win: border #d4af37, background color-mix(#d4af37 8%, #1a1a1a) = #29261c; head 18px 600 #f2f0e4 with #45c9a5 icon; total 32px 700 #45c9a5. Partial: border rgba(69,201,165,.40); total 24px 600 #45c9a5. Lose: border rgba(245,63,85,.42); head 16px 600 #f53f55; cells #141414 radius 8px padding 12px; amounts 20px 600 #f2f0e4. Cells side by side ≥480px.</p>
+<h4>6–7. States / Motion</h4><p>frame-in (from opacity 0, translateY 6px) 300ms ease-entrance backwards on .frame and again on .loseBlock; total-settle (from opacity 0, scale .94) 300ms on .totalWin. useCountUp: 0 → total over 900ms, eased 1 − (1 − t)³, rAF; win only; reduced → final figure immediately.</p>
+<pre><code class="lang-tsx">/** ms — JS-side only; the CSS motion contract owns the --dur-* tokens. */
+const COUNT_MS = 900;
+
+export function useCountUp(target: number, active: boolean, reduced: boolean): number {
+  const [tween, setTween] = useState(0);
+
+  useEffect(() =&gt; {
+    if (!active || reduced) return; // nothing to run — the value is derived below
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) =&gt; {
+      const t = Math.min(1, (now - start) / COUNT_MS);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic — decelerates in
+      // setState from inside the rAF callback, never from the effect body
+      setTween(t &lt; 1 ? Math.round(target * eased) : target);
+      if (t &lt; 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () =&gt; cancelAnimationFrame(raf);
+  }, [target, active, reduced]);
+
+  // reduced motion / inactive → the truthful figure straight away, no movement.
+  // Clamped so a stale tween can never read above the real total.
+  return active &amp;&amp; !reduced ? Math.min(tween, target) : target;
+}</code></pre>
+<h4>8. Copy</h4><p>All strings in the structure above (EN: "You hit N cells." / "Total prize" / "Added to your balance." / "This card has a prize." / "Not big, but a real prize — added to your balance." / "You can open another whenever you like, or stop here." / "This card didn't win." / "Biggest prize on the card" / "Consolation for a non-winning card" / "A consolation, not prize money. Added at the same time." / "Plus {x} consolation — a consolation, not prize money.").</p>
+<h4>9–10</h4><p>Announced once via role=status. Dust uses neutral #f2f0e4 (never --win).</p>
+</section>
+

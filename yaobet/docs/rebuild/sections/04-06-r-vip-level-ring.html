@@ -1,0 +1,134 @@
+<section>
+<h2 id="r-vip-level-ring">LevelRing</h2>
+<h4>1. Purpose</h4><p>Circular gold progress ring with "CẤP" over the level numeral.</p>
+<h4>2. Source</h4><p><code>src/components/vip/LevelRing.tsx</code>, <code>LevelRing.module.css</code></p>
+<h4>3. Structure (verbatim)</h4>
+<pre><code class="lang-tsx">export function LevelRing({
+  level,
+  percent,
+  size = 108,
+  levelWord = "CẤP",
+}: {
+  level: number;
+  percent: number;
+  size?: number;
+  /** i18n level word ("CẤP" / "LEVEL"). Optional; defaults to VI. */
+  levelWord?: string;
+}) {
+  const stroke = 7;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = (Math.max(0, Math.min(100, percent)) / 100) * c;
+  const mid = size / 2;
+
+  return (
+    &lt;svg
+      className={styles.ring}
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label={`${levelWord} ${level}`}
+    &gt;
+      &lt;defs&gt;
+        &lt;linearGradient id="vipRingGrad" x1="0" y1="0" x2="1" y2="1"&gt;
+          &lt;stop offset="0%" className={styles.gradStart} /&gt;
+          &lt;stop offset="52%" className={styles.gradMid} /&gt;
+          &lt;stop offset="100%" className={styles.gradEnd} /&gt;
+        &lt;/linearGradient&gt;
+      &lt;/defs&gt;
+
+      &lt;circle
+        className={styles.track}
+        cx={mid}
+        cy={mid}
+        r={r}
+        strokeWidth={stroke}
+      /&gt;
+      &lt;circle
+        className={styles.arc}
+        cx={mid}
+        cy={mid}
+        r={r}
+        strokeWidth={stroke}
+        strokeDasharray={`${dash} ${c}`}
+        transform={`rotate(-90 ${mid} ${mid})`}
+      /&gt;
+
+      &lt;text
+        className={styles.word}
+        x="50%"
+        y="40%"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={size * 0.13}
+      &gt;
+        {levelWord}
+      &lt;/text&gt;
+      &lt;text
+        className={styles.num}
+        x="50%"
+        y="60%"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={size * 0.3}
+      &gt;
+        {level}
+      &lt;/text&gt;
+    &lt;/svg&gt;
+  );
+}</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>default</th><th>effect</th></tr></thead><tbody>
+<tr><td>level</td><td>number</td><td>—</td><td>numeral</td></tr>
+<tr><td>percent</td><td>number</td><td>—</td><td>arc fraction (clamped 0–100)</td></tr>
+<tr><td>size</td><td>number</td><td>108</td><td>svg width/height; text sizes scale (0.13 / 0.3)</td></tr>
+<tr><td>levelWord</td><td>string</td><td>"CẤP"</td><td>word + aria-label</td></tr></tbody></table>
+<h4>5. Styles (verbatim)</h4><pre><code class="lang-css">/* SVG luxury-gold level ring. */
+.ring {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.track {
+  stroke: var(--vip-hairline);
+  fill: none;
+}
+
+.arc {
+  stroke: url(#vipRingGrad);
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--dur-slow) var(--ease-entrance);
+}
+
+/* gradient stops (token-referenced, no literals) */
+.gradStart {
+  stop-color: var(--vip-gold-start);
+}
+.gradMid {
+  stop-color: var(--vip-gold-mid);
+}
+.gradEnd {
+  stop-color: var(--vip-gold-end);
+}
+
+.word {
+  fill: var(--vip-text-muted);
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.num {
+  fill: var(--vip-gold-mid);
+  font-family: var(--brand-font-display);
+  font-weight: var(--weight-bold);
+}</code></pre>
+<p>Resolved: track stroke rgba(255,255,255,.07); arc gradient stops #9a7b1e (0%) → #e3c15a (52%) → #f6e39a (100%), diagonal (x1 0,y1 0 → x2 1,y2 1); word fill #8b96ad Be Vietnam 600 letter-spacing .18em uppercase 14.04px at y 40%; numeral fill #e3c15a Montserrat 700 32.4px at y 60%. Arc starts at 12 o'clock (rotate −90).</p>
+<h4>6–7. States / Motion</h4><p>stroke-dasharray transition 300ms ease-entrance (values static).</p>
+<h4>8. Copy</h4><p>"CẤP"/"LEVEL" + number.</p>
+<h4>9–10. Data / a11y</h4><p>role=img, aria-label "CẤP 7". The gradient id <code>vipRingGrad</code> is a fixed document id (only one ring on the page).</p>
+</section>
+

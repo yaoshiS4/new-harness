@@ -1,0 +1,135 @@
+<section>
+<h2 id="r-vip-privilege-table">PrivilegeTable (/tier)</h2>
+<h4>1. Purpose</h4><p>Column-per-tier matrix of rebate rate and perks with a frozen label column.</p>
+<h4>2. Source</h4><p><code>src/components/vip/PrivilegeTable.tsx</code>, <code>PrivilegeTable.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">Scroller(freezeFirstColumn snap=false peek=false label="Bảng quyền lợi").scroller
+  div.col.labelCol
+    div.cell.headCell  "Hạng"
+    div.cell.rowLabel  "Hoàn trả"
+    per perkRow: div.cell.rowLabel  perk
+  per tier: div.col[.currentCol]
+    div.cell.headCell.tierHead: span.tierName name · span.tierLevel "Hạng {n}"
+    div.cell.rateCell  "Hoàn trả {x}%"
+    per perkRow: div.cell → Icon check 18 .yes label="Có"  |  span.no aria-label="Không" "—"</code></pre>
+<p>perkRows = union of all tier perks, in order: Hoàn trả cơ bản, Hoàn trả 0,8%, Quà sinh nhật, Hoàn trả 1,0%, Rút nhanh, Hoàn trả 1,2%, Quản lý riêng, Hoàn trả 1,5%, Sự kiện VIP (9 rows). A tier gets ✓ only on its own two perks (non-cumulative).</p>
+<h4>5. Styles</h4><p>.scroller radius 16px, border 1px rgba(212,175,55,.55), overflow hidden. .col flex column, flex 0 0 auto, min-width 132px, transparent 1px side borders; .labelCol min-width 148px (≥768: 180px, flex 0 0 auto); ≥768 tier cols flex 1 1 0 min-width 0, rail width 100%. .currentCol background rgba(242,240,228,.05), side borders rgba(212,175,55,.55). .cell flex centred, min-height 52px, padding 8px 12px, border-bottom 1px rgba(212,175,55,.55), 14px #d6d3c7. .headCell min-height 56px, #212121, 700, #f2f0e4. .tierHead column gap 2px; .tierName 14px #d4af37; .tierLevel 12px #888888 400. .labelCol .cell left-aligned #888888 (head #f2f0e4). .rateCell 600 #d4af37. .yes #45c9a5. .no #6f6f6f tabular.</p>
+<details><summary>Verbatim PrivilegeTable.module.css</summary><pre><code class="lang-css">/* PrivilegeTable — column-per-tier matrix; first column pinned by Scroller
+ * freezeFirstColumn. Tokens only. */
+
+.scroller {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* each column is a vertical stack of cells; rows align by equal cell heights.
+ * @375 the columns keep their min-width and the Scroller scrolls horizontally
+ * (frozen first column). On desktop the table fills the 1424 container instead
+ * of leaving dead space to its right — see the min-width:768px block below. */
+/* Every column reserves the same 1px side rules and the same min-width, so the
+ * current-tier column is marked by COLOUR alone and all tier columns stay
+ * geometrically identical (ruling B1: no size-ranking by tier). */
+.col {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 132px;
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+}
+.labelCol {
+  min-width: 148px;
+}
+
+/* Desktop: stretch the tier columns to share the full container width so the
+ * table has no empty area to its right. The label column keeps a fixed basis;
+ * the tier columns grow equally (flex: 1) past their mobile min-width. The rail
+ * (Scroller) is forced to 100% so there IS leftover space to distribute. */
+@media (min-width: 768px) {
+  /* the Scroller renders &lt;outer&gt;&lt;rail/&gt;&lt;/outer&gt;; .scroller is on outer, so the
+   * direct child div is the scroll rail. Force it full-width so flex-grow has
+   * room to distribute across the tier columns. */
+  .scroller &gt; div {
+    width: 100%;
+  }
+  .labelCol {
+    flex: 0 0 auto;
+    min-width: 180px;
+  }
+  .col:not(.labelCol) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+.currentCol {
+  background: var(--tint);
+  /* the inset 1px "ring" was a box-shadow; it is a real gold hairline now */
+  border-left-color: var(--brand-accent-hairline);
+  border-right-color: var(--brand-accent-hairline);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--t-sm);
+  color: var(--text);
+  text-align: center;
+}
+.col:last-child .cell {
+  /* keep grid lines; nothing special */
+}
+
+.headCell {
+  min-height: 56px;
+  background: var(--surface-3);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+.tierHead {
+  flex-direction: column;
+  gap: 2px;
+}
+.tierName {
+  font-size: var(--t-sm);
+  color: var(--brand-accent);
+}
+.tierLevel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  font-weight: var(--weight-reg);
+}
+
+/* row labels sit left-aligned in the pinned column */
+.labelCol .cell {
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--text-mid);
+}
+.labelCol .headCell {
+  color: var(--text-hi);
+}
+.rowLabel {
+  font-size: var(--t-sm);
+}
+
+.rateCell {
+  font-weight: var(--weight-semi);
+  color: var(--brand-accent);
+}
+
+.yes {
+  color: var(--win);
+}
+.no {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}</code></pre></details>
+<h4>6–10</h4><p>Member current column (vipLevel match) highlighted; guest none. No motion. Copy: "Hạng", "Hoàn trả", "Có"/"Không" (aria), "—". Data from getVipTiers().</p>
+<div class="callout warn">Perks are listed per tier, not cumulatively, so Kim Cương shows "—" for "Quà sinh nhật" and "Rút nhanh" — reads as higher tiers losing perks. <code>vipCopy.colPerks</code> ("Quyền lợi nổi bật") is unused.</div>
+</section>
+

@@ -1,0 +1,2 @@
+src/components/layout/_internal/**
+src/styles/areas/shell.css

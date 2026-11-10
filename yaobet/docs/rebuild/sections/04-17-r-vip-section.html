@@ -1,0 +1,40 @@
+<section>
+<h2 id="r-vip-section">VipSection (/tier)</h2>
+<h4>1–3. Purpose / Source / Structure</h4><p>Titled section wrapper. <code>src/components/vip/VipSection.tsx</code>, <code>VipSection.module.css</code>.</p>
+<pre><code class="lang-txt">section.section aria-label={title}
+  div.head
+    h2.title  (icon &amp;&amp; Icon name size 20 .icon) title
+    {action}
+  {children}</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>title</td><td>string</td><td>heading + aria-label</td></tr><tr><td>icon</td><td>IconName?</td><td>leading 20px icon, colour #d4af37</td></tr><tr><td>action</td><td>ReactNode?</td><td>right slot (never used)</td></tr><tr><td>children</td><td>ReactNode</td><td>body</td></tr></tbody></table>
+<h4>5. Styles</h4><p>.section column gap 16px; .head flex centre space-between gap 12px; .title inline-flex gap 8px, 20px 700 #f2f0e4; .icon #d4af37.</p>
+<details><summary>Verbatim VipSection.module.css</summary><pre><code class="lang-css">/* VipSection — titled section wrapper. Tokens only. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-h2);
+  font-weight: var(--weight-bold);
+  color: var(--text-hi);
+}
+.icon {
+  color: var(--brand-accent);
+}</code></pre></details>
+<p>No states, motion or data.</p>
+</section>
+

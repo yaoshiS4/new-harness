@@ -1,0 +1,729 @@
+<section>
+<h2 id="r-collection-lib">src/lib/collection — data, rates and state machines</h2>
+<h4>Sets (fixtures/epl.ts, DEMO_SETS)</h4>
+<table><thead><tr><th>id</th><th>name</th><th>classId</th><th>size</th><th>reward (DEMO)</th><th>cards</th></tr></thead><tbody>
+<tr><td>set-defenders</td><td>5 Trung vệ thép</td><td>light</td><td>5</td><td>688.000 ₫</td><td>vandijk★, konate, robertson, gabriel, saliba</td></tr>
+<tr><td>set-team</td><td>Đội hình Liverpool</td><td>standard</td><td>8</td><td>1.888.000 ₫</td><td>salah★, vandijk★, konate, elliott, robertson, szoboszlai, macallister, gakpo</td></tr>
+<tr><td>set-stars</td><td>11 Siêu sao</td><td>wide</td><td>11</td><td>6.888.000 ₫</td><td>salah★, vandijk★, gabriel, saka★, gyokeres★, rice, dowman, haaland★, palmer, son, bruno</td></tr>
+</tbody></table>
+<h4>Cards (18) — art, club, derived shirt number / rating</h4>
+<table><thead><tr><th>id</th><th>name</th><th>club</th><th>position</th><th>tier</th><th>sets</th><th>artSrc</th><th>#</th><th>POWER</th></tr></thead><tbody>
+<tr><td>salah</td><td>Mohamed Salah</td><td>Liverpool</td><td>Tiền đạo</td><td>rare</td><td>team, stars</td><td>/assets/players/salah.jpeg (201×251)</td><td>6</td><td>89</td></tr>
+<tr><td>vandijk</td><td>Virgil van Dijk</td><td>Liverpool</td><td>Trung vệ</td><td>rare</td><td>team, defenders, stars</td><td>/assets/players/vandijk.jpeg (683×449)</td><td>10</td><td>95</td></tr>
+<tr><td>konate</td><td>Ibrahima Konaté</td><td>Liverpool</td><td>Trung vệ</td><td>common</td><td>team, defenders</td><td>/assets/players/konate.jpeg (739×415)</td><td>9</td><td>84</td></tr>
+<tr><td>elliott</td><td>Harvey Elliott</td><td>Liverpool</td><td>Tiền vệ</td><td>common</td><td>team</td><td>/assets/players/elliott.jpeg (554×554)</td><td>12</td><td>83</td></tr>
+<tr><td>robertson</td><td>Andrew Robertson</td><td>Liverpool</td><td>Hậu vệ</td><td>common</td><td>team, defenders</td><td>— (drawn)</td><td>17</td><td>82</td></tr>
+<tr><td>szoboszlai</td><td>Dominik Szoboszlai</td><td>Liverpool</td><td>Tiền vệ</td><td>common</td><td>team</td><td>—</td><td>25</td><td>80</td></tr>
+<tr><td>macallister</td><td>Alexis Mac Allister</td><td>Liverpool</td><td>Tiền vệ</td><td>common</td><td>team</td><td>—</td><td>6</td><td>85</td></tr>
+<tr><td>gakpo</td><td>Cody Gakpo</td><td>Liverpool</td><td>Tiền đạo</td><td>common</td><td>team</td><td>—</td><td>17</td><td>80</td></tr>
+<tr><td>gabriel</td><td>Gabriel Magalhães</td><td>Arsenal</td><td>Trung vệ</td><td>common</td><td>defenders, stars</td><td>/assets/players/gabriel.jpeg (399×501)</td><td>7</td><td>84</td></tr>
+<tr><td>saliba</td><td>William Saliba</td><td>Arsenal</td><td>Trung vệ</td><td>common</td><td>defenders</td><td>—</td><td>11</td><td>82</td></tr>
+<tr><td>saka</td><td>Bukayo Saka</td><td>Arsenal</td><td>Tiền đạo</td><td>rare</td><td>stars</td><td>/assets/players/saka.jpeg (400×500)</td><td>5</td><td>88</td></tr>
+<tr><td>gyokeres</td><td>Viktor Gyökeres</td><td>Arsenal</td><td>Tiền đạo</td><td>rare</td><td>stars</td><td>/assets/players/gyokeres.jpeg (399×501)</td><td>10</td><td>89</td></tr>
+<tr><td>rice</td><td>Declan Rice</td><td>Arsenal</td><td>Tiền vệ</td><td>common</td><td>stars</td><td>/assets/players/rice.jpeg (399×501)</td><td>26</td><td>79</td></tr>
+<tr><td>dowman</td><td>Max Dowman</td><td>Arsenal</td><td>Tiền vệ</td><td>common</td><td>stars</td><td>/assets/players/dowman.jpeg (399×501)</td><td>15</td><td>86</td></tr>
+<tr><td>haaland</td><td>Erling Haaland</td><td>Man City</td><td>Tiền đạo</td><td>rare</td><td>stars</td><td>—</td><td>20</td><td>89</td></tr>
+<tr><td>palmer</td><td>Cole Palmer</td><td>Chelsea</td><td>Tiền vệ</td><td>common</td><td>stars</td><td>—</td><td>32</td><td>85</td></tr>
+<tr><td>son</td><td>Son Heung-min</td><td>Tottenham</td><td>Tiền đạo</td><td>common</td><td>stars</td><td>—</td><td>19</td><td>80</td></tr>
+<tr><td>bruno</td><td>Bruno Fernandes</td><td>Man Utd</td><td>Tiền vệ</td><td>common</td><td>stars</td><td>—</td><td>7</td><td>82</td></tr>
+</tbody></table>
+<p>Shirt number = (h % 32) + 1 with h = fold(h·31 + charCode) &gt;&gt;&gt; 0 over the id; rating = rare ? 88 + (h17 % 8) : 78 + (h17 % 10) with multiplier 17 (only drawn cards show the shirt number; every card shows the rating). Club accents (HSL components, used as <code>hsl(var / α)</code>): Liverpool "0 74% 46%", Arsenal "355 80% 50%", Man City "199 72% 52%", Chelsea "222 74% 48%", Tottenham "220 22% 42%", Man Utd "4 76% 48%"; fallback "40 10% 60%".</p>
+<h4>Rates</h4>
+<p>RARE_RATE 0.035 (authored); COMMON_RATE = (1 − 5·0.035)/13 = 0.0634615 (derived so the whole pool sums to 1; dev-time throw if not). Tier table: common {cardCount 13, drawRate 0.06346, shardYield 5, craftPrice 15}, rare {cardCount 5, drawRate 0.035, shardYield 15, craftPrice 100}. DEMO_PITY_BACKSTOP = 12. Set-scoped rates (what CardDetail shows, VN 2-decimal):</p>
+<table><thead><tr><th>Set</th><th>Rare card</th><th>Common card</th></tr></thead><tbody>
+<tr><td>5 Trung vệ thép</td><td>van Dijk 12,12%</td><td>21,97% each (Konaté, Robertson, Gabriel, Saliba)</td></tr>
+<tr><td>Đội hình Liverpool</td><td>7,76% (Salah, van Dijk)</td><td>14,08% each (6 cards)</td></tr>
+<tr><td>11 Siêu sao</td><td>6,30% (Salah, van Dijk, Saka, Gyökeres, Haaland)</td><td>11,42% each (6 cards)</td></tr>
+</tbody></table>
+<p>Terms ratio: (COMMON/RARE).toFixed(1) = "1.8".</p>
+<h4>Arithmetic (math.ts) used by the UI</h4>
+<ul>
+<li><code>meanOpensForRemaining(rates)</code> = Σ 1/p — rail ordering uses WHOLE-POOL drawRate per missing card; from empty: defenders 92, team 152, stars 238 → order defenders, team, stars (ceil).</li>
+<li><code>exchangeImpact(setCardIds, heldCounts, otherSets)</code>: lost = cards held ≤ 1; covered = held ≥ 2; collateral = other sets that lose ≥ 1 currently held lost card.</li>
+<li><code>resolveAllocationTarget(live, priority, complete, earmark)</code>: earmark → priority order → live order, skipping complete sets; null → fixture uses DEMO_SETS[0].</li>
+<li><code>nextPityPosition(current, drewRare, 12)</code>: 0 on rare, else min(current + 1, 12).</li>
+<li><code>opensFromProgress(accumulated, M)</code>: earnedOpens = floor(acc/M); M = 1 in the demo session.</li></ul>
+<h4>Open (draw) state machine — fixture <code>outcome.draw</code></h4>
+<pre><code class="lang-txt">entitlement states: pending | unvested | vested | opened | lapsed   (demo mints "vested" only)
+draw(ent):
+  not found        → rejected "Không tìm thấy lượt mở."
+  state ≠ vested   → rejected + audit "draw.refused" (reason by state:
+                     unvested "Lượt mở này chưa hợp lệ: cần một cược đã kết toán mới được mở."
+                     pending  "Lượt mở đang chờ kết toán."
+                     opened   "Lượt mở này đã được sử dụng."
+                     lapsed   "Lượt mở đã hết hạn mà không được mở.")
+  latency 220ms; idempotency key "draw-{entId}" (duplicate → same result)
+  target set = resolveAllocationTarget(...)   ← before the roll
+  roll = drawRng() × Σweights over the target set's cards (seeded mulberry32, seed 20260813 ^ 0x5eed)
+  duplicate? count+1 and +shardYield shards (shards never shown) : new HeldCard count 1
+  entitlement → opened; pity updated; progress recomputed; audit "draw.new" | "draw.duplicate" (reason "Bạn đã có thẻ này.")</code></pre>
+<h4>Exchange state machine — <code>wallet.credit</code></h4>
+<pre><code class="lang-txt">forced walletFailure → rejected "Ví tạm thời không khả dụng." (retryable)
+mutate(key "claim-{setId}-{exchangeCount}"):
+  every card of the set: count − 1; count 0 → removed
+  set.exchangeCount + 1, lastExchangedAt = now; progress recomputed (set drops to 0/size unless spares)
+  audit "reward.exchanged"; returns { setId, kind "cash-like", transactionId "txn-{seq}", grantedAt } (no amount)</code></pre>
+<div class="callout warn"><strong>The published pity guarantee is not enforced.</strong> CollectionTerms states "after 12 consecutive opens without a rare, the next is guaranteed rare", and <code>pityPosition</code> is tracked, but <code>outcome.draw</code> never checks <code>backstopDue()</code> — the roll ignores the pity counter. <code>backstopDue</code>, <code>opensToBackstop</code>, <code>guaranteedOpensCeiling</code>, <code>craftToComplete</code> and <code>setPriorityOrder</code> have no UI caller.</div>
+<div class="callout warn"><strong>Re-entry bugs (from code).</strong> <code>session.accumulated</code> and the id counter <code>seq</code> live in adapter memory and reset on every construction, while entitlements persist. After leaving /bo-suu-tap and returning: (1) "+1 lượt mở" mints nothing until accumulated exceeds the TOTAL number of stored entitlements (opened included), because <code>toMint = earnedOpens − entitlements.length</code>; (2) once it mints, new ids restart at "ent-1", colliding with persisted opened entitlements, and <code>draw</code> finds the old opened one first → "Lượt mở này đã được sử dụng.".</div>
+<details><summary>Verbatim fixtures/epl.ts (content, rates, rate-in-set)</summary><pre><code class="lang-tsx">/* ============================================================================
+ * Yaobet — COLLECTION demo content: EPL player cards.
+ * ----------------------------------------------------------------------------
+ * DEMO CONTENT ONLY. Every number in this file is PROVISIONAL and exists so
+ * the loop can be seen working. None of it is the shipped economy:
+ *   · the pool model is BR-03,
+ *   · the universe size is BR-04,
+ *   · the rate-derivation source is BR-05.
+ * When those land, this file changes and NOTHING else does — that is the point
+ * of the ports seam. Card art, names and club marks are CONTENT, swappable
+ * with the theme; there is a licensing gate on real likenesses before
+ * production.
+ *
+ * The three sets are the owner's: 8 same-team, 5 super defenders, 11 super
+ * stars — on three overlapping axes, so one card serves several sets.
+ * ==========================================================================*/
+
+import type { Card, CollectionSet } from "../types";
+import type { MoneyValue } from "@/lib/types";
+import type { TierConfig } from "../math";
+
+/**
+ * Provisional tier shape. The RARE rate is the authored dial; the COMMON rate
+ * is DERIVED from the pool so the published rates always sum to exactly 100%.
+ *
+ * This is not a style preference. A published rate that does not sum to 1 is a
+ * false statement to the player: an earlier draft authored both rates by hand
+ * and they summed to 163.5%, so the screen advertised 11.5% on a card whose
+ * real probability was 7.03%. The whole trust posture of this feature rests on
+ * the published table being the table the engine actually rolls, so the number
+ * is computed from the pool rather than typed next to it.
+ *
+ * `DEMO_TIERS` is defined AFTER the card pool for this reason — see below.
+ */
+const RARE_RATE = 0.035;
+
+export const SET_TEAM = "set-team";
+export const SET_DEFENDERS = "set-defenders";
+export const SET_STARS = "set-stars";
+
+/**
+ * DEMO reward values. `R` is an owner parameter and has NOT been set — these
+ * exist only so the surface can render and be compared, and every screen that
+ * shows them also carries the provisional label.
+ *
+ * They ascend with set size deliberately. Random ordering would make the
+ * 5-card set — the fastest to finish — the most valuable, which is the
+ * cheapest completion in the catalogue and therefore the one a ring farms.
+ * Lucky-number amounts follow the house convention.
+ */
+const DEMO_REWARD = (amount: number): MoneyValue =&gt; ({ amount, currency: "VND" });
+
+export const DEMO_SETS: CollectionSet[] = [
+  {
+    id: SET_DEFENDERS,
+    name: "5 Trung vệ thép",
+    classId: "light",
+    size: 5,
+    endsAt: null,
+    reward: DEMO_REWARD(688_000),
+  },
+  {
+    id: SET_TEAM,
+    name: "Đội hình Liverpool",
+    classId: "standard",
+    size: 8,
+    endsAt: null,
+    reward: DEMO_REWARD(1_888_000),
+  },
+  {
+    id: SET_STARS,
+    name: "11 Siêu sao",
+    classId: "wide",
+    size: 11,
+    endsAt: null,
+    reward: DEMO_REWARD(6_888_000),
+  },
+];
+
+interface Seed {
+  id: string;
+  name: string;
+  club: string;
+  pos: string;
+  tier: "common" | "rare";
+  sets: string[];
+  /** filename stem under /assets/players. Absent = drawn art. */
+  photo?: string;
+}
+
+/**
+ * The card universe. Membership is a LIST of set ids, which is representable
+ * under both readings of BR-03 and commits to neither.
+ */
+const SEEDS: Seed[] = [
+  // — Liverpool (8) — four carry supplied photography —
+  { id: "salah", name: "Mohamed Salah", club: "Liverpool", pos: "Tiền đạo", tier: "rare", sets: [SET_TEAM, SET_STARS], photo: "salah" },
+  { id: "vandijk", name: "Virgil van Dijk", club: "Liverpool", pos: "Trung vệ", tier: "rare", sets: [SET_TEAM, SET_DEFENDERS, SET_STARS], photo: "vandijk" },
+  { id: "konate", name: "Ibrahima Konaté", club: "Liverpool", pos: "Trung vệ", tier: "common", sets: [SET_TEAM, SET_DEFENDERS], photo: "konate" },
+  { id: "elliott", name: "Harvey Elliott", club: "Liverpool", pos: "Tiền vệ", tier: "common", sets: [SET_TEAM], photo: "elliott" },
+  { id: "robertson", name: "Andrew Robertson", club: "Liverpool", pos: "Hậu vệ", tier: "common", sets: [SET_TEAM, SET_DEFENDERS] },
+  { id: "szoboszlai", name: "Dominik Szoboszlai", club: "Liverpool", pos: "Tiền vệ", tier: "common", sets: [SET_TEAM] },
+  { id: "macallister", name: "Alexis Mac Allister", club: "Liverpool", pos: "Tiền vệ", tier: "common", sets: [SET_TEAM] },
+  { id: "gakpo", name: "Cody Gakpo", club: "Liverpool", pos: "Tiền đạo", tier: "common", sets: [SET_TEAM] },
+
+  // — Defenders (5): van Dijk, Konaté and Robertson above, plus two Arsenal —
+  { id: "gabriel", name: "Gabriel Magalhães", club: "Arsenal", pos: "Trung vệ", tier: "common", sets: [SET_DEFENDERS, SET_STARS], photo: "gabriel" },
+  { id: "saliba", name: "William Saliba", club: "Arsenal", pos: "Trung vệ", tier: "common", sets: [SET_DEFENDERS] },
+
+  // — Stars (11): salah, vandijk, gabriel above + eight —
+  { id: "saka", name: "Bukayo Saka", club: "Arsenal", pos: "Tiền đạo", tier: "rare", sets: [SET_STARS], photo: "saka" },
+  { id: "gyokeres", name: "Viktor Gyökeres", club: "Arsenal", pos: "Tiền đạo", tier: "rare", sets: [SET_STARS], photo: "gyokeres" },
+  { id: "rice", name: "Declan Rice", club: "Arsenal", pos: "Tiền vệ", tier: "common", sets: [SET_STARS], photo: "rice" },
+  { id: "dowman", name: "Max Dowman", club: "Arsenal", pos: "Tiền vệ", tier: "common", sets: [SET_STARS], photo: "dowman" },
+  { id: "haaland", name: "Erling Haaland", club: "Man City", pos: "Tiền đạo", tier: "rare", sets: [SET_STARS] },
+  { id: "palmer", name: "Cole Palmer", club: "Chelsea", pos: "Tiền vệ", tier: "common", sets: [SET_STARS] },
+  { id: "son", name: "Son Heung-min", club: "Tottenham", pos: "Tiền đạo", tier: "common", sets: [SET_STARS] },
+  { id: "bruno", name: "Bruno Fernandes", club: "Man Utd", pos: "Tiền vệ", tier: "common", sets: [SET_STARS] },
+];
+
+/**
+ * Club accent, as SPACE-separated HSL components so it composes with modern
+ * slash-alpha: `hsl(var(--accent) / 0.5)`. Comma syntax cannot take a slash
+ * alpha and silently renders nothing — art is a SLOT, but it still has to
+ * actually paint.
+ */
+export const CLUB_ACCENT: Record&lt;string, string&gt; = {
+  Liverpool: "0 74% 46%",
+  Arsenal: "355 80% 50%",
+  "Man City": "199 72% 52%",
+  Chelsea: "222 74% 48%",
+  Tottenham: "220 22% 42%",
+  "Man Utd": "4 76% 48%",
+};
+
+export interface DemoCard extends Card {
+  club: string;
+  position: string;
+}
+
+export const DEMO_CARDS: DemoCard[] = SEEDS.map((s) =&gt; ({
+  id: s.id,
+  name: s.name,
+  /**
+   * Art is a SLOT. A card with a photo renders it; a card without one renders
+   * the drawn face. Both use the identical frame, badge and nameplate, so a
+   * mixed pool reads as one set rather than as a bug — and swapping the theme
+   * stays a data change.
+   */
+  artSrc: s.photo ? `/assets/players/${s.photo}.jpeg` : "",
+  tierId: s.tier,
+  setIds: s.sets,
+  club: s.club,
+  position: s.pos,
+}));
+
+/* ----------------------------------------------------------------------------
+ * Derived tier table — the published rates ARE the rolled rates
+ * --------------------------------------------------------------------------*/
+
+const RARE_COUNT = DEMO_CARDS.filter((c) =&gt; c.tierId === "rare").length;
+const COMMON_COUNT = DEMO_CARDS.length - RARE_COUNT;
+
+/** Derived so the whole table sums to exactly 1. Never authored by hand. */
+const COMMON_RATE = (1 - RARE_COUNT * RARE_RATE) / COMMON_COUNT;
+
+export const DEMO_TIERS: TierConfig[] = [
+  {
+    id: "common",
+    cardCount: COMMON_COUNT,
+    drawRate: COMMON_RATE,
+    shardYield: 5,
+    craftPrice: 15,
+  },
+  {
+    id: "rare",
+    cardCount: RARE_COUNT,
+    drawRate: RARE_RATE,
+    shardYield: 15,
+    craftPrice: 100,
+  },
+];
+
+/**
+ * The published table must sum to 1. If it ever does not, the screen is lying
+ * to the player, so fail loudly in development rather than ship a false rate.
+ */
+const RATE_SUM = COMMON_COUNT * COMMON_RATE + RARE_COUNT * RARE_RATE;
+if (process.env.NODE_ENV !== "production" &amp;&amp; Math.abs(RATE_SUM - 1) &gt; 1e-9) {
+  throw new Error(
+    `Published draw rates sum to ${(RATE_SUM * 100).toFixed(2)}%, not 100%. ` +
+      `A published rate that does not sum to 1 misstates every card's chance.`,
+  );
+}
+
+/**
+ * The rare-card guarantee, in opens. PROVISIONAL, like every number here.
+ *
+ * It lives with the content and not in the adapter because it is PUBLISHED:
+ * the terms state it and the engine honours it, and those two must be the same
+ * constant. A backstop the player is told about but the engine does not run —
+ * or runs at a different N — is a false statement with a prize attached, which
+ * is the exact failure the derived rate table above exists to prevent.
+ */
+export const DEMO_PITY_BACKSTOP = 12;
+
+/** Cards belonging to a set, in display order. */
+export function cardsInSet(setId: string): DemoCard[] {
+  return DEMO_CARDS.filter((c) =&gt; c.setIds.includes(setId));
+}
+
+/**
+ * Per-card draw weights. These already sum to 1 by construction, so no
+ * normalisation happens here — normalising after publishing is exactly how the
+ * displayed rate and the rolled rate drift apart.
+ */
+export function drawTable(): { cardId: string; weight: number }[] {
+  return DEMO_CARDS.map((c) =&gt; ({
+    cardId: c.id,
+    weight: c.tierId === "rare" ? RARE_RATE : COMMON_RATE,
+  }));
+}
+
+/**
+ * The TRUE probability of drawing `cardId` on an open allocated to `setId`.
+ *
+ * `drawTable()` publishes WHOLE-POOL weights, but the engine does not roll the
+ * whole pool: it resolves an allocation first, then restricts the pool to that
+ * set and renormalises (`adapters/fixtures.ts`). So a whole-pool weight is the
+ * probability of NO open a player actually receives — publishing it repeats,
+ * through allocation rather than through hand-authoring, precisely the defect
+ * the derived table above was built to prevent.
+ *
+ * There is therefore no single "draw rate" per card. There is one rate per set
+ * the card belongs to, and which one applies depends on the allocation. Any
+ * surface that publishes a rate must publish it SET-SCOPED.
+ *
+ * Returns null when the card is not reachable from that set.
+ */
+export function rateInSet(cardId: string, setId: string): number | null {
+  const card = cardById(cardId);
+  if (!card?.setIds.includes(setId)) return null;
+
+  const pool = drawTable().filter((t) =&gt; cardById(t.cardId)?.setIds.includes(setId));
+  const total = pool.reduce((s, t) =&gt; s + t.weight, 0);
+  if (total &lt;= 0) return null;
+
+  return (pool.find((t) =&gt; t.cardId === cardId)?.weight ?? 0) / total;
+}
+
+/** Every set the card can be drawn from, with the rate that applies there. */
+export function ratesBySet(cardId: string): { setId: string; name: string; rate: number }[] {
+  const card = cardById(cardId);
+  if (!card) return [];
+  return card.setIds.flatMap((setId) =&gt; {
+    const rate = rateInSet(cardId, setId);
+    const set = setById(setId);
+    return rate === null || !set ? [] : [{ setId, name: set.name, rate }];
+  });
+}
+
+/**
+ * Same contract as the whole-pool check above, applied per set: the rates a
+ * player is shown for one set must sum to exactly 1, or the screen misstates
+ * every card in it. Fail loudly in development rather than ship a false rate.
+ */
+if (process.env.NODE_ENV !== "production") {
+  for (const set of DEMO_SETS) {
+    const sum = cardsInSet(set.id).reduce((s, c) =&gt; s + (rateInSet(c.id, set.id) ?? 0), 0);
+    if (Math.abs(sum - 1) &gt; 1e-9) {
+      throw new Error(
+        `Set "${set.id}" publishes rates summing to ${(sum * 100).toFixed(2)}%, not 100%.`,
+      );
+    }
+  }
+}
+
+export function tierOf(cardId: string): TierConfig {
+  const card = DEMO_CARDS.find((c) =&gt; c.id === cardId);
+  return card?.tierId === "rare" ? DEMO_TIERS[1] : DEMO_TIERS[0];
+}
+
+export function cardById(cardId: string): DemoCard | undefined {
+  return DEMO_CARDS.find((c) =&gt; c.id === cardId);
+}
+
+export function setById(setId: string): CollectionSet | undefined {
+  return DEMO_SETS.find((s) =&gt; s.id === setId);
+}</code></pre></details>
+<details><summary>Verbatim adapters/store.ts (persistence)</summary><pre><code class="lang-tsx">import type { CollectionState } from "../types";
+
+const NAMESPACE = "yaobet.collection.v1";
+
+const memory = new Map&lt;string, string&gt;();
+
+function hasWindow(): boolean {
+  return typeof window !== "undefined" &amp;&amp; typeof window.localStorage !== "undefined";
+}
+
+function keyFor(accountId: string): string {
+  return `${NAMESPACE}.${accountId}`;
+}
+
+/** The known seed a demo reset returns to. Empty, not fabricated progress. */
+export function seedState(): CollectionState {
+  return {
+    heldCards: [],
+    progress: [],
+    shards: { pooled: 0, locked: {} },
+    entitlements: [],
+    pityPosition: 0,
+    priorityOrder: [],
+    earmarkSetId: null,
+    audit: [],
+    auditSeq: 0,
+  };
+}
+
+/**
+ * The record is capped so one browser cannot grow the blob without bound. The
+ * cap is generous, and the UI pages at 50, so a player never reaches it in a
+ * session — but a stored array with no ceiling is the defect that only ever
+ * appears on the heaviest accounts, which is the worst place to find it.
+ */
+const AUDIT_CAP = 500;
+
+export function capAudit(state: CollectionState): CollectionState {
+  return state.audit.length &lt;= AUDIT_CAP
+    ? state
+    : { ...state, audit: state.audit.slice(0, AUDIT_CAP) };
+}
+
+export class CollectionStore {
+  private accountId: string;
+
+  constructor(accountId: string) {
+    this.accountId = accountId;
+  }
+
+  /** Switch the account view without a login (GC-113 depends on this). */
+  setAccount(accountId: string): void {
+    this.accountId = accountId;
+  }
+
+  getAccount(): string {
+    return this.accountId;
+  }
+
+  read(): CollectionState {
+    const key = keyFor(this.accountId);
+    const raw = hasWindow() ? window.localStorage.getItem(key) : memory.get(key);
+    if (!raw) return seedState();
+    try {
+      /* Merged over the seed, not cast onto it. A blob written before a field
+         existed is otherwise missing that field at runtime while the type says
+         it is present — `audit` was added after accounts already had state, and
+         `state.audit.slice()` on such a blob throws. */
+      return { ...seedState(), ...(JSON.parse(raw) as Partial&lt;CollectionState&gt;) };
+    } catch {
+      // A corrupt blob is a demo-reset condition, never a crash.
+      return seedState();
+    }
+  }
+
+  write(state: CollectionState): void {
+    const key = keyFor(this.accountId);
+    const raw = JSON.stringify(state);
+    if (hasWindow()) window.localStorage.setItem(key, raw);
+    else memory.set(key, raw);
+  }
+
+  /** Read, transform, persist — the only mutation path. */
+  update(fn: (prev: CollectionState) =&gt; CollectionState): CollectionState {
+    const next = fn(this.read());
+    this.write(next);
+    return next;
+  }
+
+  /** The single dev action that returns this account to the known seed. */
+  reset(): CollectionState {
+    const seed = seedState();
+    this.write(seed);
+    return seed;
+  }
+
+  /** Every demo account this browser has state for — powers side-by-side. */
+  static listAccounts(): string[] {
+    if (!hasWindow()) return [...memory.keys()].map(stripNamespace);
+    const out: string[] = [];
+    for (let i = 0; i &lt; window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i);
+      if (k &amp;&amp; k.startsWith(`${NAMESPACE}.`)) out.push(stripNamespace(k));
+    }
+    return out;
+  }
+}
+
+function stripNamespace(key: string): string {
+  return key.slice(NAMESPACE.length + 1);
+}</code></pre></details>
+<details><summary>Verbatim adapters/fixtures.ts — draw, credit, seed (lines 268–426, 611–710)</summary><pre><code class="lang-tsx">  /* --------------------------------------------------------------------------
+   * 3 · Outcome — BLOCKED on BR-03 / BR-04 / BR-05 (GC-105)
+   * ------------------------------------------------------------------------*/
+
+  outcome: OutcomePort = {
+    draw: async (
+      _playerId: string,
+      entitlementId: string,
+      key: IdempotencyKey,
+    ): Promise&lt;MutationResult&lt;OpenOutcome&gt;&gt; =&gt; {
+      const before = this.store.read();
+      const ent = before.entitlements.find((e) =&gt; e.id === entitlementId);
+
+      if (!ent) return this.runtime.reject("Không tìm thấy lượt mở.");
+      if (ent.state !== "vested") {
+        this.log("draw.refused", entitlementId, unvestedReason(ent.state));
+        return this.runtime.reject(unvestedReason(ent.state));
+      }
+
+      return this.runtime.mutate(key, () =&gt; {
+        // Allocation is resolved BEFORE the draw — earmark, then priority.
+        const complete = before.progress.filter((p) =&gt; p.complete).map((p) =&gt; p.setId);
+        const target =
+          resolveAllocationTarget(
+            DEMO_SETS.map((s) =&gt; s.id),
+            before.priorityOrder,
+            complete,
+            before.earmarkSetId,
+          ) ?? DEMO_SETS[0].id;
+
+        // Seeded draw against the published table, restricted to the target set.
+        const pool = drawTable().filter((t) =&gt;
+          cardById(t.cardId)?.setIds.includes(target),
+        );
+        const total = pool.reduce((s, t) =&gt; s + t.weight, 0);
+        let roll = this.drawRng() * total;
+        let picked = pool[pool.length - 1].cardId;
+        for (const t of pool) {
+          roll -= t.weight;
+          if (roll &lt;= 0) {
+            picked = t.cardId;
+            break;
+          }
+        }
+
+        const already = before.heldCards.find((h) =&gt; h.cardId === picked);
+        const duplicate = Boolean(already);
+        const tier = tierOf(picked);
+        const shards = duplicate ? tier.shardYield : 0;
+        const drewRare = tier.id === "rare";
+
+        const next = this.store.update((prev) =&gt; {
+          const heldCards = duplicate
+            ? prev.heldCards.map((h) =&gt;
+                h.cardId === picked ? { ...h, count: h.count + 1 } : h,
+              )
+            : [
+                ...prev.heldCards,
+                { cardId: picked, count: 1, firstAcquiredAt: this.clock.now() },
+              ];
+
+          return {
+            ...prev,
+            heldCards,
+            shards: { ...prev.shards, pooled: prev.shards.pooled + shards },
+            entitlements: prev.entitlements.map((e) =&gt;
+              e.id === entitlementId ? { ...e, state: "opened" as const } : e,
+            ),
+            pityPosition: nextPityPosition(prev.pityPosition, drewRare, PITY_BACKSTOP),
+            progress: recomputeProgress(heldCards.map((h) =&gt; h.cardId), prev.progress),
+          };
+        });
+
+        // The reason string is the PLAYER-FACING sentence, verbatim. It used to
+        // read `+N mảnh` — a credit the player cannot spend anywhere, which
+        // would keep leaking the word into the history long after the stage
+        // stopped saying it. Shards still accrue in state; nothing is lost.
+        this.log(
+          duplicate ? "draw.duplicate" : "draw.new",
+          picked,
+          duplicate ? "Bạn đã có thẻ này." : undefined,
+        );
+
+        const outcome: OpenOutcome = {
+          entitlementId,
+          cardId: picked,
+          allocatedSetId: target,
+          duplicate,
+          shardsMinted: shards,
+          pityPosition: next.pityPosition,
+          drawnAt: this.clock.now(),
+        };
+        return outcome;
+      });
+    },
+  };
+
+  /* --------------------------------------------------------------------------
+   * 4 · Wallet
+   * ------------------------------------------------------------------------*/
+
+  wallet: WalletPort = {
+    credit: async (
+      _playerId: string,
+      setId: string,
+      kind: RewardKind,
+      key: IdempotencyKey,
+    ): Promise&lt;MutationResult&lt;RewardGrant&gt;&gt; =&gt; {
+      if (this.session.forced.walletFailure) {
+        return this.runtime.reject("Ví tạm thời không khả dụng.", true);
+      }
+      return this.runtime.mutate(key, () =&gt; {
+        const grantedAt = this.clock.now();
+        const grant: RewardGrant = {
+          setId,
+          kind,
+          // No amount: `R` is an owner parameter and is not set in code.
+          transactionId: this.nextId("txn"),
+          grantedAt,
+        };
+        /* THE SET IS SPENT, NOT STAMPED.
+           Exchanging consumes one copy of each of the set's cards, so the set
+           drops back to empty and has to be collected again. A player holding a
+           spare keeps it — which is the first thing in this feature that gives
+           a duplicate a purpose. */
+        const setCardIds = cardsInSet(setId).map((c) =&gt; c.id);
+        this.store.update((prev) =&gt; {
+          const heldCards = prev.heldCards
+            .map((h) =&gt;
+              setCardIds.includes(h.cardId) ? { ...h, count: h.count - 1 } : h,
+            )
+            // A card at zero copies is not held. It leaves the inventory rather
+            // than lingering as `×0`, which is not a state this product has.
+            .filter((h) =&gt; h.count &gt; 0);
+
+          const spentProgress = prev.progress.map((p) =&gt;
+            p.setId === setId
+              ? {
+                  ...p,
+                  exchangeCount: p.exchangeCount + 1,
+                  lastExchangedAt: grantedAt,
+                }
+              : p,
+          );
+
+          return {
+            ...prev,
+            heldCards,
+            progress: recomputeProgress(
+              heldCards.map((h) =&gt; h.cardId),
+              spentProgress,
+            ),
+          };
+        });
+        this.log("reward.exchanged", setId);
+        return grant;
+      });
+    },
+  };
+…
+  /* --------------------------------------------------------------------------
+   * Dev controls (GC-106) — fire simulated qualifying activity
+   * ------------------------------------------------------------------------*/
+
+  /** Append synthetic qualifying activity. Every surface labels it simulated. */
+  fireActivity(amount: number): void {
+    this.session.accumulated += amount;
+    this.log("activity.simulated", `+${amount}`);
+  }
+
+  /**
+   * DEV ONLY — grant every card in a set so the completed/claimable case is
+   * reachable in one click instead of ~60 opens.
+   *
+   * It grants cards, it does NOT grant the reward: the set becomes complete and
+   * the player still has to exchange it. Short-circuiting to "claimed" would
+   * mock up a screen nobody can reach by playing, which is the failure mode a
+   * demo is supposed to rule out rather than reproduce.
+   */
+  completeSet(setId: string): void {
+    const ids = cardsInSet(setId).map((c) =&gt; c.id);
+    this.store.update((prev) =&gt; {
+      const heldCards = [...prev.heldCards];
+      for (const cardId of ids) {
+        const at = heldCards.findIndex((h) =&gt; h.cardId === cardId);
+        if (at &lt; 0) {
+          heldCards.push({ cardId, count: 1, firstAcquiredAt: this.clock.now() });
+        }
+      }
+      return {
+        ...prev,
+        heldCards,
+        progress: recomputeProgress(heldCards.map((h) =&gt; h.cardId), prev.progress),
+      };
+    });
+    this.log("collection.completed", setId, "Mô phỏng — hoàn thành bộ");
+  }
+
+  /** Mint the opens the accumulator has earned but not yet issued. */
+  mintEarnedOpens(): number {
+    const { earnedOpens } = opensFromProgress(
+      this.session.accumulated,
+      this.session.thresholdM,
+    );
+    const existing = this.store.read().entitlements.length;
+    const toMint = Math.max(0, earnedOpens - existing);
+    if (toMint === 0) return 0;
+
+    this.store.update((prev) =&gt; ({
+      ...prev,
+      entitlements: [
+        ...prev.entitlements,
+        ...Array.from({ length: toMint }, () =&gt; {
+          const id = this.nextId("ent");
+          return {
+            id,
+            state: "vested" as const,
+            sourceActivityId: "simulated",
+            mintedAt: this.clock.now(),
+            vestedAt: this.clock.now(),
+          };
+        }),
+      ],
+    }));
+    this.log("entitlement.earned", `${toMint}`);
+    return toMint;
+  }
+
+  /**
+   * Seed the demo account ONCE, and only against an untouched store.
+   *
+   * Mounting a route is not a qualifying event. State is persisted per account
+   * key and therefore shared across routes, so every composition root must go
+   * through this — an unguarded `fireActivity(); mintEarnedOpens();` in a
+   * second root turns a `/bo-suu-tap` → `/cua-toi` → back round trip into a
+   * source of free opens. Returns whether it seeded, for the caller's logs.
+   */
+  ensureSeeded(opens: number): boolean {
+    const s = this.store.read();
+    const untouched =
+      s.entitlements.length === 0 &amp;&amp;
+      s.heldCards.length === 0 &amp;&amp;
+      s.shards.pooled === 0;
+    if (!untouched) return false;
+    this.fireActivity(opens);
+    this.mintEarnedOpens();
+    return true;
+  }
+
+  /** Reset the demo account to the known seed. */
+  resetDemo(): void {
+    this.store.reset();
+    this.runtime.resetLedger();
+    this.session = defaultSession();
+    this.clock.reset();
+    // The trace resets with the store — `store.reset()` above returns the seed,
+    // whose `audit` is empty and whose `auditSeq` is 0.
+    this.seq = 0;
+  }
+</code></pre></details>
+</section>
+

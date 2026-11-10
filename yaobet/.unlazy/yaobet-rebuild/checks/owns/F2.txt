@@ -1,0 +1,6 @@
+src/lib/format.ts
+src/lib/i18n.ts
+src/lib/rg.ts
+src/lib/types.ts
+src/lib/auth/**
+src/app/providers.tsx

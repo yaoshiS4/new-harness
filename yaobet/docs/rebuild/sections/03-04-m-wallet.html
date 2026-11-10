@@ -1,0 +1,1159 @@
+<section>
+<h2 id="m-wallet">m-wallet — /vi-tien and the wallet components</h2>
+
+<h3 id="m-route-vi-tien">Route /vi-tien</h3>
+<dl>
+<dt>URL</dt><dd><code>/vi-tien</code>; hashes <code>#deposit</code>, <code>#withdraw</code>, <code>#history</code>, <code>#transfer</code> select the tab.</dd>
+<dt>Page file</dt><dd><code>src/app/(member)/vi-tien/page.tsx</code> (async Server Component), <code>vi-tien.module.css</code>, <code>loading.tsx</code></dd>
+<dt>Metadata</dt><dd><code>title: "Ví tiền — Yaobet"</code></dd>
+<dt>Auth gating</dt><dd>Client-side per panel (each panel has its own guest prompt; the balance header too).</dd>
+<dt>Data</dt><dd>Parallel <code>getWallet()</code>, <code>getBalance()</code>, <code>getRecords()</code>, <code>getDepositOffer()</code>, <code>getBankTransferMemo()</code>. Derived: <code>isFirstDeposit = wallet.balance.amount === 0</code>; <code>withdrawDestination = bankMemo ? { bank: bankMemo.bank, account: bankMemo.account } : null</code>; <code>available = { amount: wallet.balance.amount, currency: "VND" }</code>.</dd>
+</dl>
+<pre><code class="lang-txt">section.page aria-label="Ví tiền"
+└─ WalletTabs balance available products records bankMemo offer isFirstDeposit withdrawDestination
+   ├─ WalletBalanceHeader
+   ├─ div.strip role=tablist (4 tabs)
+   └─ div.panel role=tabpanel → DepositPanel | WithdrawPanel | WalletHistory(limit=50) | FundTransferPanel</code></pre>
+<table>
+<thead><tr><th>Selector</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.page</td><td>flex column; gap 24px; min-width 0</td></tr>
+<tr><td>.heading (loading only)</td><td>24px; #f2f0e4; 700</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/app/(member)/vi-tien/vi-tien.module.css</code></summary>
+<pre><code class="lang-css">/* Ví / wallet page. Tokens only; mobile-first @375. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+</code></pre>
+</details>
+<p><strong>Composition</strong>: 375 / 768 — sidebar stack, then balance card, tab strip (4 equal tabs; at ≤420px tabs get 8px side padding and 14px text), panel. ≥992 — same column content to the right of the rail. FundTransferPanel switches from/to to a row at ≥768px.</p>
+<p><strong>Loading</strong> (<code>loading.tsx</code>): <code>section.page aria-busy="true" aria-label="Đang tải ví"</code> → <code>h1.heading "Ví tiền"</code> → Skeleton block 100%×168 → 100%×280 → 100%×180 → 100%×220.</p>
+<div class="callout warn">The live page has no h1 while the loading state renders "Ví tiền" as h1. The offer block is effectively unreachable: <code>isFirstDeposit</code> is true only when the balance is 0, which only happens under DEMO_EMPTY, where <code>getDepositOffer()</code> returns null. The withdraw "destination" is the HOUSE deposit account (<code>getBankTransferMemo()</code>: "Vietcombank — CT YAOBET · 060 1234 56789"), not the member's linked card.</div>
+
+<h3 id="m-wallet-tabs">WalletTabs — wallet orchestrator and card-style tab strip</h3>
+<p><strong>Purpose</strong> — balance card on top, then a 4-tab strip (Nạp tiền / Rút tiền / Lịch sử / Chuyển quỹ) and the active panel. <strong>Source</strong> — <code>src/components/wallet/WalletTabs.tsx</code>, <code>WalletTabs.module.css</code>.</p>
+<pre><code class="lang-txt">div.surface
+├─ WalletBalanceHeader balance
+├─ div.strip role=tablist aria-label="Mục ví tiền"
+│  └─ button.tab[.active] ×4  role=tab id="wallet-tab-{id}" aria-selected aria-controls="wallet-panel-{id}"
+│                             tabIndex={selected?0:-1} onClick=setTab
+│     ├─ Icon {icon} 18
+│     └─ span.tabLabel {label}
+└─ div.panel role=tabpanel id="wallet-panel-{tab}" aria-labelledby="wallet-tab-{tab}"
+   ├─ deposit  → DepositPanel bankMemo offer isFirstDeposit
+   ├─ withdraw → WithdrawPanel available destination=withdrawDestination
+   ├─ history  → WalletHistory records limit=50
+   └─ transfer → FundTransferPanel available products</code></pre>
+<table>
+<thead><tr><th>Tab id</th><th>Label</th><th>Gloss</th><th>Icon</th></tr></thead>
+<tbody>
+<tr><td>deposit (default)</td><td>Nạp tiền</td><td>Deposit</td><td>deposit</td></tr>
+<tr><td>withdraw</td><td>Rút tiền</td><td>Withdraw (hard-coded string)</td><td>wallet</td></tr>
+<tr><td>history</td><td>Lịch sử</td><td>History</td><td>history</td></tr>
+<tr><td>transfer</td><td>Chuyển quỹ</td><td>Fund transfer</td><td>chip</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>balance</td><td><code>Envelope&lt;LiveMoney&gt;</code></td><td>→ WalletBalanceHeader</td></tr>
+<tr><td>available</td><td><code>MoneyValue | null</code></td><td>→ Withdraw / Transfer ceilings</td></tr>
+<tr><td>products</td><td><code>ProductWallet[]</code></td><td>→ Transfer</td></tr>
+<tr><td>records</td><td><code>Transaction[]</code></td><td>→ History</td></tr>
+<tr><td>bankMemo</td><td><code>{ account; bank; memo }</code></td><td>→ Deposit bank rail</td></tr>
+<tr><td>offer</td><td><code>DepositOffer | null</code></td><td>→ Deposit first-deposit block</td></tr>
+<tr><td>isFirstDeposit</td><td>boolean</td><td>→ Deposit</td></tr>
+<tr><td>withdrawDestination</td><td><code>{ bank; account } | null</code></td><td>→ Withdraw</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.surface</td><td>flex column; gap 16px; min-width 0</td><td>base</td></tr>
+<tr><td>.strip</td><td>flex; gap 8px; padding 4px; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; overflow-x auto; scrollbar hidden (<code>scrollbar-width: none</code> + <code>::-webkit-scrollbar{display:none}</code>)</td><td>base</td></tr>
+<tr><td>.tab</td><td>flex 1 1 0; inline-flex center; gap 8px; min-height 44px; padding 0 12px; nowrap; transparent; no border; radius 4px; color #888888; body font; 16px; 600; pointer; transition transform/color/background 200ms ease-standard</td><td>base</td></tr>
+<tr><td>.tab:hover</td><td>scale(1.05); if not active also color #f2f0e4, bg #262626</td><td>base</td></tr>
+<tr><td>.tab:focus-visible</td><td>outline 2px solid #6ea8ff; offset −2px</td><td>base</td></tr>
+<tr><td>.active</td><td>color <span class="tok">--brand-on-accent</span> #0a0a0a; bg <span class="tok">--brand-accent-grad</span> #d4af37 (becomes a gradient under the emerald brand, the same defect flagged for Button)</td><td>base</td></tr>
+<tr><td>.tabLabel</td><td>min-width 0</td><td>base</td></tr>
+<tr><td>.tab</td><td>padding 0 8px; 14px</td><td>max-width: 420px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/wallet/WalletTabs.module.css</code></summary>
+<pre><code class="lang-css">/* WalletTabs — /vi-tien tabbed layout. Tokens only; mobile-first @375.
+ * Strip mirrors J9 el-tabs--card: card-bg tabs, gold-active, 8px radius. */
+
+.surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* card-style tab strip */
+.strip {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.strip::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-mid);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+/* every tab is flex:1 1 0 — identical width — and hovers identically */
+.tab:hover {
+  transform: scale(1.05);
+}
+
+.tab:hover:not(.active) {
+  color: var(--text-hi);
+  background: var(--surface-hover);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* SELECTED, not focused: a solid brand fill with the system's dark on-gold ink
+ * (white here would be 2.11:1). --brand-accent-grad resolves to a solid colour
+ * at the token layer — the flat ban is enforced there. */
+.active {
+  color: var(--brand-on-accent);
+  background: var(--brand-accent-grad);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .tab:hover {
+    transform: none;
+  }
+}
+
+.tabLabel {
+  /* @375 the four labels can crowd — let the icon carry while keeping the word */
+  min-width: 0;
+}
+
+.panel {
+  min-width: 0;
+}
+
+@media (max-width: 420px) {
+  .tab {
+    padding: 0 var(--space-2);
+    font-size: var(--t-sm);
+  }
+}
+</code></pre>
+</details>
+<p><strong>Behaviour</strong>: initial tab "deposit"; <code>useEffect</code> maps <code>location.hash</code> to a tab (only if it matches an id) and follows <code>hashchange</code>. Clicking a tab does NOT update the hash. Panels unmount on switch (their internal state, e.g. pending, resets). Reduced motion → no hover scale.</p>
+<div class="callout warn">Roving <code>tabIndex</code> (−1 on non-selected tabs) is implemented WITHOUT any arrow-key handler, so keyboard users can only reach the selected tab; the other three are unreachable by keyboard. The <code>ui/Tabs</code> primitive (which has arrow/Home/End handling) is not used here. Header comment promises a "fund-password gate" in WithdrawPanel — none exists.</div>
+
+<h3 id="m-wallet-balance-header">WalletBalanceHeader</h3>
+<p><strong>Purpose</strong> — the balance card: a "Số dư" label above the large live balance. <strong>Source</strong> — <code>src/components/wallet/WalletBalanceHeader.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">Card variant=vip className=.card
+└─ div.balanceRow
+   ├─ span.label "Số dư"
+   └─ one of:
+      !allowed            → div.guest → p.guestText "Đăng nhập để xem số dư của bạn." + Button gold md "Đăng nhập" (promptAuth())
+      status "loading"    → Skeleton width="11ch" height="1.2em" .balanceSkel
+      status "error"      → ErrorState title="Không tải được số dư" onRetry=router.refresh() .errorState
+      status "absent"     → p.absent "Tạm chưa có số dư."
+      status "live"       → MoneyValue value kind="balance" size="num-lg" freshnessMs .balanceValue</code></pre>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.card</td><td>flex column; gap 24px; padding 24px (Card vip also 24px)</td></tr>
+<tr><td>.balanceRow</td><td>flex column; gap 8px; min-width 0</td></tr>
+<tr><td>.label</td><td>14px; #888888; 600; letter-spacing 0.02em</td></tr>
+<tr><td>.balanceValue</td><td>color #f2f0e4 (size from MoneyValue num-lg → 32px, track F)</td></tr>
+<tr><td>.balanceSkel</td><td>display inline-block</td></tr>
+<tr><td>.errorState</td><td>align-items flex-start; text-align left</td></tr>
+<tr><td>.absent</td><td>16px #888888</td></tr>
+<tr><td>.guest / .guestText</td><td>flex column, align flex-start, gap 12px / 14px #888888</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/wallet/WalletBalanceHeader.module.css</code></summary>
+<pre><code class="lang-css">/* WalletBalanceHeader — balance hero + UT-1 chips. Tokens only; @375 first. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+.balanceRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+  letter-spacing: 0.02em;
+}
+
+.balanceValue {
+  color: var(--text-hi);
+}
+
+.balanceSkel {
+  display: inline-block;
+}
+
+.errorState {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.absent {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+}
+
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+</code></pre>
+</details>
+<p>Live fixture → "6.886.000 ₫" (MoneyValue handles stale after 20000ms freshness: per its comment it switches to a "tạm dừng" marker — see <a href="#f-ui-money-value">#f-ui-money-value</a>). ErrorState default message "Đã xảy ra lỗi. Vui lòng thử lại." and retry "Thử lại" come from the primitive.</p>
+<div class="callout warn">CSS header comment says "balance hero + UT-1 chips" — the chips were removed.</div>
+
+<h3 id="m-deposit-panel">DepositPanel — Nạp tiền</h3>
+<p><strong>1. Purpose</strong> — choose a rail (Ngân hàng / Momo / ViettelPay / Thẻ cào), type an amount or tap a preset chip, then complete the rail-specific step; submitting shows an "awaiting confirmation" state. <strong>2. Source</strong> — <code>src/components/wallet/DepositPanel.tsx</code>, <code>DepositPanel.module.css</code>.</p>
+<pre><code class="lang-txt">!allowed:
+Card default .card → h2.title "Nạp tiền" + div.guest → p.guestText "Đăng nhập để nạp tiền." + Button gold md "Đăng nhập"
+                     (promptAuth({action:"deposit", isFirstDeposit}))
+phase "pending":
+Card default .card
+├─ h2.title "Nạp tiền"
+└─ div.pending role=status
+   ├─ span.pendingIcon aria-hidden → Icon history 28
+   ├─ p.pendingTitle "Đang chờ xác nhận"
+   ├─ p.pendingBody  "Yêu cầu nạp đang chờ hệ thống xác nhận. Số dư sẽ được cập nhật sau khi xác nhận — bạn có thể quay lại màn hình nạp bất cứ lúc nào."
+   └─ Button ghost md "Quay lại" → phase idle
+phase "idle":
+Card default .card
+├─ h2.title "Nạp tiền"
+├─ [isFirstDeposit &amp;&amp; offer] div.offer → p.offerTitle {offer.title} + p.offerBody {offer.body}
+│     + p.offerMin "Tối thiểu để đủ điều kiện: " MoneyValue{minToQualify}.offerMinVal
+├─ Tabs items=[bank "Ngân hàng", momo "Momo", viettelpay "ViettelPay", card "Thẻ cào"] active=rail label="Chọn hình thức nạp"
+├─ div.amountBlock
+│  ├─ label.fieldLabel for="deposit-amount" "Số tiền"
+│  ├─ input#deposit-amount.amountInput inputMode=numeric autoComplete=off placeholder="0 ₫" value={amountText}
+│  └─ div.presets role=group aria-label="Số tiền gợi ý" → Pill active={amount===p} ×8 {formatPresetChip(p)}
+└─ rail surface (div.railSurface), one of:
+   bank:
+     div.bankRow → span.bankLabel "Ngân hàng"     + span.bankValue {bankMemo.bank}
+     div.bankRow → span.bankLabel "Số tài khoản"  + span.bankValue {bankMemo.account}
+     div.bankRow → span.bankLabel "Nội dung chuyển khoản"
+                   + span.memoRow → span.memo {bankMemo.memo} + Button ghost sm icon=copy {copied?"Đã sao chép":"Sao chép nội dung"}
+     p.hint "Chuyển khoản đúng nội dung trên để hệ thống tự động đối soát."
+     Button gold lg fullWidth "Tôi đã chuyển" → submit
+   momo | viettelpay:
+     div.qrSlot aria-hidden → Icon grid 40
+     p.hint "Quét mã QR hoặc mở ứng dụng {Momo|ViettelPay} để hoàn tất. Mã sẽ hiển thị tại đây khi sẵn sàng."
+     Button gold lg fullWidth "Tôi đã chuyển" → submit
+   card:
+     label.fieldLabel for=card-serial "Số seri" + input#card-serial.amountInput numeric placeholder="Nhập số seri"
+     label.fieldLabel for=card-pin    "Mã thẻ"  + input#card-pin.amountInput numeric placeholder="Nhập mã thẻ"
+     Button gold lg fullWidth disabled={!serial || !pin} "Nạp thẻ cào" → submit</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>bankMemo</td><td><code>{ account: string; bank: string; memo: string }</code></td><td>required</td><td>bank-rail rows</td></tr>
+<tr><td>offer</td><td><code>DepositOffer | null</code></td><td>required</td><td>first-deposit block (only with isFirstDeposit)</td></tr>
+<tr><td>isFirstDeposit</td><td>boolean</td><td>undefined (falsy)</td><td>shows offer; forwarded into resume intent</td></tr>
+</tbody>
+</table>
+<p><strong>Amount chips</strong> (<code>LUCKY_DEPOSIT_PRESETS</code>, label via <code>formatPresetChip</code> = thousands grouped + "K"):</p>
+<table>
+<thead><tr><th>Value</th><th>100000</th><th>188000</th><th>288000</th><th>588000</th><th>688000</th><th>888000</th><th>1688000</th><th>6888000</th></tr></thead>
+<tbody><tr><td>Chip label</td><td>100K</td><td>188K</td><td>288K</td><td>588K</td><td>688K</td><td>888K</td><td>1.688K</td><td>6.888K</td></tr></tbody>
+</table>
+<p><strong>Amount input behaviour</strong>: on change, strip all non-digits; if any digits, <code>amountText = formatVnd(Number(digits))</code> (e.g. typing "150000" shows "150.000 ₫") and <code>amount = Number(digits)</code>; else both cleared. Tapping a chip sets both. A chip is active (Pill <code>active</code>) only when <code>amount</code> exactly equals its value. Serial/PIN inputs keep digits only.</p>
+<p><strong>Validation</strong>: NONE on the amount for any rail — "Tôi đã chuyển" works with an empty amount; the card rail requires only non-empty serial and PIN. Submit when <code>!allowed</code> calls <code>promptAuth({ action: "deposit", isFirstDeposit })</code> (cannot happen in practice because the guest branch hides the form).</p>
+<p><strong>Status states</strong>: idle → pending (any rail). Pending "Quay lại" returns to idle with rail/amount state preserved (same component instance). Copy memo: clipboard success → button label "Đã sao chép" for 2000ms.</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.card</td><td>flex column; gap 16px; padding 16px</td></tr>
+<tr><td>.title</td><td>18px; #f2f0e4; 600</td></tr>
+<tr><td>.guest / .guestText</td><td>flex column, flex-start, gap 12px / 14px #888888</td></tr>
+<tr><td>.offer</td><td>flex column; gap 4px; padding 12px; border 1px solid rgba(212,175,55,0.55); radius 8px; bg <span class="tok">--tint</span></td></tr>
+<tr><td>.offerTitle / .offerBody</td><td>16px #d4af37 600 / 14px #888888 lh 1.5</td></tr>
+<tr><td>.offerMin / .offerMinVal</td><td>14px #d6d3c7 inline-flex gap 4px baseline / #f2f0e4</td></tr>
+<tr><td>.amountBlock</td><td>flex column; gap 12px</td></tr>
+<tr><td>.fieldLabel</td><td>14px; #888888; 600</td></tr>
+<tr><td>.amountInput</td><td>width 100%; min-height 44px; padding 12px 16px; num font; 18px; #f2f0e4; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; placeholder #6f6f6f</td></tr>
+<tr><td>.amountInput:focus-visible</td><td>outline 2px solid #6ea8ff; offset 2px; border-color #6ea8ff</td></tr>
+<tr><td>.presets</td><td>flex; wrap; gap 8px</td></tr>
+<tr><td>.railSurface</td><td>flex column; gap 12px; padding-top 8px; border-top 1px solid rgba(212,175,55,0.55)</td></tr>
+<tr><td>.bankRow / .bankLabel / .bankValue</td><td>flex column gap 4px / 12px #888888 / 16px #f2f0e4 600 num font</td></tr>
+<tr><td>.memoRow</td><td>flex; align center; gap 12px; wrap</td></tr>
+<tr><td>.memo</td><td>18px; #d4af37; 700; num font; letter-spacing 0.04em</td></tr>
+<tr><td>.hint</td><td>12px; #888888; lh 1.5</td></tr>
+<tr><td>.qrSlot</td><td>flex center; 160×160px; align-self center; border 1px dashed rgba(212,175,55,0.55); radius 8px; bg #1a1a1a; color #888888</td></tr>
+<tr><td>.pending</td><td>flex column; align center; centered text; gap 12px; padding 24px 12px</td></tr>
+<tr><td>.pendingIcon</td><td>inline-flex center; 56×56px; radius pill; bg #212121; color #d4af37</td></tr>
+<tr><td>.pendingTitle / .pendingBody</td><td>20px #f2f0e4 600 / 14px #888888 lh 1.5 max-width 36ch</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/wallet/DepositPanel.module.css</code></summary>
+<pre><code class="lang-css">/* DepositPanel — VN-rail deposit. Tokens only; mobile-first @375. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* first-deposit offer */
+.offer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-md);
+  background: var(--tint);
+}
+
+.offerTitle {
+  font-size: var(--t-body);
+  color: var(--brand-accent);
+  font-weight: var(--weight-semi);
+}
+
+.offerBody {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+.offerMin {
+  font-size: var(--t-sm);
+  color: var(--text);
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.offerMinVal {
+  color: var(--text-hi);
+}
+
+/* amount entry */
+.amountBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.fieldLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+
+.amountInput {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.amountInput::placeholder {
+  color: var(--text-dim);
+}
+
+.amountInput:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* rail-specific surfaces */
+.railSurface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.bankRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.bankLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.bankValue {
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  font-family: var(--brand-font-num);
+}
+
+.memoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.memo {
+  font-size: var(--t-h3);
+  color: var(--brand-accent);
+  font-weight: var(--weight-bold);
+  font-family: var(--brand-font-num);
+  letter-spacing: 0.04em;
+}
+
+.hint {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+.qrSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 160px;
+  align-self: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-mid);
+}
+
+/* PENDING — honest awaiting-confirmation; never a client "success" */
+.pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-3);
+}
+
+.pendingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--brand-accent);
+}
+
+.pendingTitle {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.pendingBody {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+  max-width: 36ch;
+}
+</code></pre>
+</details>
+<p><strong>Data</strong>: <code>getBankTransferMemo()</code> → account "060 1234 56789", bank "Vietcombank — CT YAOBET", memo "YB668812". <code>getDepositOffer()</code> → title "Ưu đãi lần nạp đầu", body "Nạp lần đầu để nhận ưu đãi chào mừng. Xem điều khoản chi tiết trước khi tham gia.", minToQualify 100.000 ₫.</p>
+<p><strong>Copy</strong>: Nạp tiền (Deposit) · Đăng nhập để nạp tiền. (Log in to deposit.) · Chọn hình thức nạp (Choose deposit method, tablist label) · Ngân hàng / Momo / ViettelPay / Thẻ cào (Bank / Momo / ViettelPay / Scratch card) · Số tiền (Amount) · Số tiền gợi ý (Suggested amounts, group label) · Số tài khoản (Account number) · Nội dung chuyển khoản (Transfer memo) · Sao chép nội dung / Đã sao chép (Copy memo / Copied) · Chuyển khoản đúng nội dung trên để hệ thống tự động đối soát. (Transfer with exactly this memo so the system reconciles automatically.) · Tôi đã chuyển (I have transferred) · Quét mã QR hoặc mở ứng dụng … để hoàn tất. Mã sẽ hiển thị tại đây khi sẵn sàng. (Scan the QR or open the … app to finish. The code will show here when ready.) · Số seri / Nhập số seri (Serial / Enter serial) · Mã thẻ / Nhập mã thẻ (Card code / Enter card code) · Nạp thẻ cào (Top up scratch card) · Đang chờ xác nhận (Awaiting confirmation) · pending body · Quay lại (Back) · Tối thiểu để đủ điều kiện: (Minimum to qualify:).</p>
+<div class="callout warn">Header comment promises a card-rail "provider/denomination" picker — not implemented (serial + PIN only). Amount is never validated or used. <code>ui/Tabs</code> emits <code>aria-controls="panel-bank"</code> etc. but no element with those ids exists. Many strings are hard-coded (labels, hints, pending copy). The QR slot is a placeholder icon, never a real QR.</div>
+
+<h3 id="m-withdraw-panel">WithdrawPanel — Rút tiền</h3>
+<p><strong>Purpose</strong> — enter an amount up to the available balance, see the payout destination, request withdrawal → pending. <strong>Source</strong> — <code>src/components/wallet/WithdrawPanel.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">!allowed → Card .card → h2.title "Rút" + div.guest → p "Đăng nhập để rút tiền." + Button primary md "Đăng nhập" (promptAuth({action:"withdraw"}))
+pending  → Card .card → h2.title "Rút" + div.pending role=status
+            → span.pendingIcon (Icon history 28) + p.pendingTitle "Đang chờ xử lý"
+            + p.pendingBody "Yêu cầu rút tiền đã được ghi nhận và đang chờ hệ thống xử lý. Bạn sẽ nhận được thông báo khi hoàn tất."
+            + Button ghost md "Quay lại"
+idle →
+Card default .card
+├─ h2.title "Rút"
+├─ p.available "Số dư khả dụng: " {available ? MoneyValue.availableVal : span.availableVal "—"}
+├─ div.field
+│  ├─ label.fieldLabel for=withdraw-amount "Số tiền rút"
+│  ├─ input#withdraw-amount.amountInput numeric placeholder="0 ₫" aria-invalid={overBalance || undefined}
+│  └─ [overBalance] p.errorMsg role=alert "Số tiền vượt quá số dư khả dụng."
+├─ div.dest → span.destLabel "Tài khoản nhận"
+│            + {destination ? span.destValue "{bank} · {account}" : span.destEmpty "Chưa có tài khoản nhận — thêm trong mục Bảo mật trước khi rút."}
+└─ Button primary lg fullWidth disabled={!canSubmit || !destination} "Yêu cầu rút tiền" → submit</code></pre>
+<p>Validation: <code>max = available?.amount ?? 0</code>; <code>overBalance = amount != null &amp;&amp; amount &gt; max</code>; <code>canSubmit = amount != null &amp;&amp; amount &gt; 0 &amp;&amp; !overBalance</code>. Error border via <code>[aria-invalid="true"] { border-color: var(--error) }</code> → #e42946. Fixture: available "6.886.000 ₫"; destination "Vietcombank — CT YAOBET · 060 1234 56789".</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.card / .title / .guest / .guestText</td><td>as DepositPanel</td></tr>
+<tr><td>.available / .availableVal</td><td>14px #888888 inline-flex gap 4px baseline / #f2f0e4 600</td></tr>
+<tr><td>.field / .fieldLabel</td><td>flex column gap 8px / 14px #888888 600</td></tr>
+<tr><td>.amountInput</td><td>as DepositPanel; invalid → border #e42946</td></tr>
+<tr><td>.errorMsg</td><td>12px; color <span class="tok">--error</span> #e42946</td></tr>
+<tr><td>.dest</td><td>flex column; gap 4px; padding 12px; bg #1a1a1a; radius 8px</td></tr>
+<tr><td>.destLabel / .destValue / .destEmpty</td><td>12px #888888 / 16px #f2f0e4 600 num font / 14px #888888 lh 1.5</td></tr>
+<tr><td>.pendingIcon</td><td>56×56 pill bg #212121 color <span class="tok">--text</span> #d6d3c7 (not gold, unlike Deposit)</td></tr>
+<tr><td>.pending / .pendingTitle / .pendingBody</td><td>as DepositPanel</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/wallet/WithdrawPanel.module.css</code></summary>
+<pre><code class="lang-css">/* WithdrawPanel — VND withdrawal request. Tokens only; mobile-first @375. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.available {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.availableVal {
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+
+.amountInput {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.amountInput::placeholder {
+  color: var(--text-dim);
+}
+
+.amountInput:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+}
+
+.amountInput[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+.errorMsg {
+  font-size: var(--t-micro);
+  color: var(--error);
+}
+
+.dest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.destLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+
+.destValue {
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+  font-family: var(--brand-font-num);
+}
+
+.destEmpty {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+/* PENDING — honest awaiting-processing; never a client "success" */
+.pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-3);
+}
+
+.pendingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.pendingTitle {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.pendingBody {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+  max-width: 36ch;
+}
+</code></pre>
+</details>
+<div class="callout warn">Panel title is "Rút" while its tab says "Rút tiền". Withdraw and its guest button use <code>variant="primary"</code> (navy CTA, track F) while every other wallet CTA is gold. The empty-destination copy points to "mục Bảo mật" but bank cards live at <code>/tai-khoan#ngan-hang</code>. No fund-password step despite <code>WalletTabs</code> comment.</div>
+
+<h3 id="m-fund-transfer-panel">FundTransferPanel — Chuyển quỹ</h3>
+<p><strong>Purpose</strong> — move money between the main wallet and product sub-wallets. <strong>Source</strong> — <code>src/components/wallet/FundTransferPanel.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">!allowed → Card .card → h2.title "Chuyển quỹ" + div.guest → p "Đăng nhập để chuyển quỹ." + Button gold md "Đăng nhập"
+pending  → Card .card → h2.title + div.pending (Icon history 28, "Đang chờ xử lý",
+            "Yêu cầu chuyển quỹ đã được ghi nhận và đang chờ hệ thống xử lý. Số dư từng quỹ sẽ được cập nhật sau khi hoàn tất.", Button ghost md "Quay lại")
+idle →
+Card default .card
+├─ h2.title "Chuyển quỹ"
+├─ [products.length===0] EmptyState icon=wallet title="Chưa có quỹ sản phẩm"
+│      message="Khi bạn chơi ở các sản phẩm, số dư từng quỹ sẽ hiển thị tại đây để chuyển."
+└─ [else]
+   ├─ div.route
+   │  ├─ div.field → label.fieldLabel for=transfer-from "Từ quỹ"
+   │  │             + select#transfer-from.select → option ×funds "{name} — {formatVnd(amount)} ₫"
+   │  ├─ button.swap type=button aria-label="Đổi chiều chuyển" → Icon retry 18
+   │  └─ div.field → label.fieldLabel for=transfer-to "Đến quỹ" + select#transfer-to.select → option ×funds "{name}"
+   ├─ div.field → label "Số tiền chuyển" + input#transfer-amount.amountInput numeric placeholder="0 ₫" aria-invalid
+   │     + [overBalance] p.errorMsg role=alert "Số tiền vượt quá số dư khả dụng của quỹ nguồn."
+   │     + [sameFund]    p.errorMsg role=alert "Quỹ nguồn và quỹ đích phải khác nhau."
+   ├─ Button gold lg fullWidth disabled={!canSubmit} "Chuyển quỹ"
+   └─ div.balances → p.balancesHead "Số dư theo quỹ" + ul.list → li.row ×funds → span.name {name} + MoneyValue.balance</code></pre>
+<p>Funds list = <code>[{ id: "__main__", name: "Số dư", amount: available.amount }, ...products]</code>. Fixture: Số dư 6.886.000 ₫; Casino 2.886.000 ₫; Thể thao 1.680.000 ₫; Nổ hũ 2.320.000 ₫. Defaults: from "__main__", to first product ("casino"). Swap exchanges from/to. <code>canSubmit = amount &gt; 0 &amp;&amp; amount ≤ source balance &amp;&amp; from ≠ to</code>.</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.route</td><td>flex column; gap 8px</td><td>base</td></tr>
+<tr><td>.route</td><td>flex-direction row; align-items flex-end; each .field flex 1 1 0</td><td>min-width: 768px</td></tr>
+<tr><td>.field / .fieldLabel</td><td>flex column gap 8px min-width 0 / 14px #888888 600</td><td>base</td></tr>
+<tr><td>.select</td><td>width 100%; min-height 44px; padding 12px 16px; body font; 16px; #f2f0e4; bg #1a1a1a; border 1px solid rgba(212,175,55,0.55); radius 8px; appearance none; focus = 2px #6ea8ff outline offset 2px + border #6ea8ff</td><td>base</td></tr>
+<tr><td>.swap</td><td>align-self center; inline-flex center; 40×40px; radius pill; bg #212121; border 1px solid rgba(212,175,55,0.55); color #d4af37; pointer; transition transform/background/border-color 200ms</td><td>base</td></tr>
+<tr><td>.swap:hover</td><td>bg #262626; border-color #d4af37; scale(1.05)</td><td>base</td></tr>
+<tr><td>.swap</td><td>margin-bottom 8px</td><td>min-width: 768px</td></tr>
+<tr><td>.amountInput / .errorMsg</td><td>as WithdrawPanel</td><td>base</td></tr>
+<tr><td>.balances</td><td>flex column; gap 8px; padding-top 12px; border-top 1px solid rgba(212,175,55,0.55)</td><td>base</td></tr>
+<tr><td>.balancesHead</td><td>14px #888888 600</td><td>base</td></tr>
+<tr><td>.list / .row</td><td>flex column gap 4px / flex space-between center gap 12px, padding 12px 0, border-bottom hairline, min-height 44px, last no border</td><td>base</td></tr>
+<tr><td>.name / .balance</td><td>16px #f2f0e4 600 / #d6d3c7</td><td>base</td></tr>
+<tr><td>.pendingIcon</td><td>bg #212121; color #d6d3c7</td><td>base</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/wallet/FundTransferPanel.module.css</code></summary>
+<pre><code class="lang-css">/* FundTransferPanel — "Chuyển quỹ" tab. Tokens only; mobile-first @375. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+/* from / swap / to */
+.route {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+
+.select {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  appearance: none;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+}
+
+.swap {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--brand-accent);
+  cursor: pointer;
+  /* uniform button motion: scale(1.05) + a colour shift */
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.swap:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-accent);
+  transform: scale(1.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swap,
+  .swap:hover {
+    transform: none;
+  }
+}
+
+.swap:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.amountInput {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--brand-font-num);
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.amountInput::placeholder {
+  color: var(--text-dim);
+}
+
+.amountInput:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+}
+
+.amountInput[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+.errorMsg {
+  font-size: var(--t-micro);
+  color: var(--error);
+}
+
+/* per-product balance reference */
+.balances {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.balancesHead {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-semi);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+  min-height: var(--tap-min);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.name {
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.balance {
+  color: var(--text);
+}
+
+/* PENDING — honest awaiting-processing; never a client "success" */
+.pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-3);
+}
+
+.pendingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.pendingTitle {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.pendingBody {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+  max-width: 36ch;
+}
+
+/* desktop: from/to side by side with swap between */
+@media (min-width: 768px) {
+  .route {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .route .field {
+    flex: 1 1 0;
+  }
+
+  .swap {
+    margin-bottom: var(--space-2);
+  }
+}
+</code></pre>
+</details>
+<div class="callout warn"><strong>Bug</strong>: the "Từ quỹ" option text is <code>{f.name} — {formatVnd(f.amount)} ₫</code> and <code>formatVnd</code> already appends " ₫", so options read e.g. "Số dư — 6.886.000 ₫ ₫". The <code>.select</code> has <code>appearance: none</code> with no replacement chevron, so the dropdowns show no affordance. The swap uses the <code>retry</code> (circular arrow) icon. Initially from=main, to=casino; if products were empty the selects never render.</div>
+
+<h3 id="m-wallet-history">WalletHistory — Lịch sử (transaction history rows)</h3>
+<p><strong>Purpose</strong> — recent transactions with direction arrow, type word, date/time and a signed amount, filterable Tất cả / Tiền vào / Tiền ra. <strong>Source</strong> — <code>src/components/wallet/WalletHistory.tsx</code>, <code>.module.css</code>.</p>
+<pre><code class="lang-txt">Card default .card
+├─ div.head → h2.title "Lịch sử"
+└─ !allowed → div.guest → p.guestText "Đăng nhập để xem lịch sử giao dịch." + Button primary sm "Đăng nhập"
+   allowed →
+   ├─ Tabs items=[all "Tất cả", in "Tiền vào", out "Tiền ra"] active=scope label="Lọc giao dịch"
+   └─ records.length===0 → EmptyState icon=history title="Chưa có giao dịch" message="Các giao dịch nạp, rút và cược của bạn sẽ hiển thị tại đây."
+      shown.length===0   → EmptyState variant=filtered icon=history message="Không có giao dịch khớp với bộ lọc." onReset=scope→all
+      else ul.list → li.row ×shown
+         ├─ div.meta
+         │  ├─ span.type → span.arrow aria-hidden {amount≥0 ? "↑" : "↓"} + {TYPE_WORD[type]}
+         │  └─ span.when {formatWhen(at)}
+         └─ DeltaAmount value={amount} .amount</code></pre>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>records</td><td><code>Transaction[]</code></td><td>required</td><td>source rows</td></tr>
+<tr><td>limit</td><td>number</td><td>6</td><td>slice after filtering; WalletTabs passes 50</td></tr>
+</tbody>
+</table>
+<p>Filter: in = <code>amount.amount ≥ 0</code>, out = <code>&lt; 0</code>. <code>formatWhen(iso) = new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })</code> (inference: renders like "14:05 05/11"; exact separator depends on the runtime ICU).</p>
+<table>
+<thead><tr><th>id</th><th>type → word</th><th>amount</th><th>age</th><th>row reads</th></tr></thead>
+<tbody>
+<tr><td>tx1</td><td>deposit → Nạp tiền</td><td>+6.886.000 ₫</td><td>30 min ago</td><td>↑ Nạp tiền</td></tr>
+<tr><td>tx2</td><td>win → Thắng</td><td>+880.000 ₫</td><td>95 min</td><td>↑ Thắng</td></tr>
+<tr><td>tx3</td><td>loss → Thua</td><td>-560.000 ₫</td><td>110 min</td><td>↓ Thua</td></tr>
+<tr><td>tx4</td><td>cashback → Hoàn trả</td><td>+366.000 ₫</td><td>1500 min</td><td>↑ Hoàn trả</td></tr>
+<tr><td>tx5</td><td>withdraw → Rút tiền</td><td>-2.000.000 ₫</td><td>2880 min</td><td>↓ Rút tiền</td></tr>
+<tr><td>tx6</td><td>transfer → Chuyển quỹ</td><td>-500.000 ₫</td><td>3000 min</td><td>↓ Chuyển quỹ</td></tr>
+</tbody>
+</table>
+<p>Signed amount formatting and win/loss colours are DeltaAmount's (FACT from <code>ui/MoneyValue/MoneyValue.tsx</code>: text = <code>formatSignedVnd</code>, i.e. "+6.886.000 ₫" / "-560.000 ₫"; amount ≥ 0 → class <code>.win</code> color <span class="tok">--win</span> #45c9a5, else <code>.loss</code> color <span class="tok">--loss</span> #f53f55; <code>data-outcome</code> attribute set. So deposits/cashback render green and withdrawals/transfers red, same as wins/losses). Full spec: <a href="#f-ui-money-value">#f-ui-money-value</a>.</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.card</td><td>flex column; gap 16px; padding 16px</td></tr>
+<tr><td>.head</td><td>flex; align center; justify space-between</td></tr>
+<tr><td>.title</td><td>18px #f2f0e4 600</td></tr>
+<tr><td>.list</td><td>flex column; gap 4px; no list styling</td></tr>
+<tr><td>.row</td><td>flex; center; space-between; gap 12px; padding 12px 0; border-bottom 1px solid rgba(212,175,55,0.55); min-height 44px; last no border</td></tr>
+<tr><td>.meta</td><td>flex column; gap 4px; min-width 0</td></tr>
+<tr><td>.type</td><td>inline-flex; center; gap 8px; 16px; #f2f0e4; 600</td></tr>
+<tr><td>.arrow</td><td>14px; #888888; 700</td></tr>
+<tr><td>.when</td><td>12px; #888888; num font</td></tr>
+<tr><td>.amount</td><td>flex-shrink 0</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/wallet/WalletHistory.module.css</code></summary>
+<pre><code class="lang-css">/* WalletHistory — transaction rows, equal win/loss salience. Tokens only. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: var(--t-h3);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+  min-height: var(--tap-min);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--t-body);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}
+
+/* arrow carries the in/out direction WITHOUT relying on hue (RG) */
+.arrow {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  font-weight: var(--weight-bold);
+}
+
+.when {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+  font-family: var(--brand-font-num);
+}
+
+.amount {
+  flex-shrink: 0;
+}
+</code></pre>
+</details>
+<p>Copy: Lịch sử (History) · Đăng nhập để xem lịch sử giao dịch. (Log in to see transaction history.) · Lọc giao dịch (Filter transactions) · Tất cả / Tiền vào / Tiền ra (All / Money in / Money out) · Nạp tiền / Rút tiền / Thắng / Thua / Chuyển quỹ / Hoàn trả (Deposit / Withdrawal / Win / Loss / Transfer / Cashback) · Chưa có giao dịch (No transactions yet) · Các giao dịch nạp, rút và cược của bạn sẽ hiển thị tại đây. (Your deposits, withdrawals and bets will show here.) · filtered: title "Không có kết quả" (EmptyState default), message "Không có giao dịch khớp với bộ lọc.", reset "Đặt lại bộ lọc" (EmptyState default).</p>
+<div class="callout warn"><code>Transaction.note</code> ("Nạp qua ngân hàng", "Hoàn trả tuần", "Chuyển sang Thể thao") is never rendered. The filter is a <code>role="tablist"</code> (ui/Tabs) with no matching tabpanels. All strings hard-coded except the title.</div>
+</section>
+

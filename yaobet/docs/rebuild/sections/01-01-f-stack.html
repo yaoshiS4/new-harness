@@ -1,0 +1,609 @@
+<section>
+<h2 id="f-stack">Stack &amp; project setup</h2>
+<p>The app lives at <code>apps/web/</code>. It is a Next.js App Router project in TypeScript. Styling is plain CSS Modules (one <code>*.module.css</code> per component) on top of one global token sheet. There is no CSS framework, no Tailwind, no CSS-in-JS, no icon font, no UI library, and no state library. Data comes from in-repo mock modules under <code>src/lib/mock</code>. There is no network layer and no API route.</p>
+
+<h3 id="f-stack-packages">package.json</h3>
+<table><thead><tr><th>package</th><th>version (exact as declared)</th><th>kind</th></tr></thead><tbody><tr><td><code>next</code></td><td><code>16.2.9</code></td><td>runtime</td></tr><tr><td><code>react</code></td><td><code>19.2.4</code></td><td>runtime</td></tr><tr><td><code>react-dom</code></td><td><code>19.2.4</code></td><td>runtime</td></tr><tr><td><code>@types/node</code></td><td><code>^20</code></td><td>dev</td></tr><tr><td><code>@types/react</code></td><td><code>^19</code></td><td>dev</td></tr><tr><td><code>@types/react-dom</code></td><td><code>^19</code></td><td>dev</td></tr><tr><td><code>eslint</code></td><td><code>^9</code></td><td>dev</td></tr><tr><td><code>eslint-config-next</code></td><td><code>16.2.9</code></td><td>dev</td></tr><tr><td><code>playwright</code></td><td><code>^1.61.1</code></td><td>dev</td></tr><tr><td><code>typescript</code></td><td><code>^5</code></td><td>dev</td></tr></tbody></table>
+<p>Package name <code>web</code>, version <code>0.1.0</code>, <code>"private": true</code>. There is no <code>"type"</code> field, so <code>.mjs</code> is used for ESM scripts. A <code>package-lock.json</code> is present, so the package manager is npm. <code>playwright</code> is a devDependency only because the two root scripts <code>_shots.mjs</code> and <code>verify-app-ds.mjs</code> drive Chromium. No test runner is installed: there is no jest, vitest or @playwright/test.</p>
+<table><thead><tr><th>script</th><th>command</th></tr></thead><tbody><tr><td><code>npm run dev</code></td><td><code>next dev</code></td></tr><tr><td><code>npm run build</code></td><td><code>next build</code></td></tr><tr><td><code>npm run start</code></td><td><code>next start</code></td></tr><tr><td><code>npm run lint</code></td><td><code>eslint</code></td></tr><tr><td><code>npm run lint:tokens</code></td><td><code>node scripts/token-lint.mjs</code></td></tr><tr><td><code>npm run lint:tokens:self-test</code></td><td><code>node scripts/token-lint.mjs --self-test</code></td></tr></tbody></table>
+<details><summary>Verbatim package.json</summary><pre><code class="lang-txt">{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "lint:tokens": "node scripts/token-lint.mjs",
+    "lint:tokens:self-test": "node scripts/token-lint.mjs --self-test"
+  },
+  "dependencies": {
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "playwright": "^1.61.1",
+    "typescript": "^5"
+  }
+}
+</code></pre></details>
+
+<h3 id="f-stack-next-config">next.config.ts</h3>
+<p>The file is empty (the create-next-app default). No <code>images</code> config, redirects, headers, i18n, <code>basePath</code>, <code>output</code> or experimental flags are set. Redirects are done inside pages with <code>redirect()</code> instead (see App Router conventions below).</p>
+<pre><code class="lang-tsx">import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</code></pre>
+
+<h3 id="f-stack-tsconfig">tsconfig.json — paths &amp; aliases</h3>
+<ul>
+<li>One alias: <code>"@/*": ["./src/*"]</code>. Every app import uses <code>@/ui</code>, <code>@/lib/...</code> or <code>@/components/...</code>.</li>
+<li><code>strict: true</code>, <code>target: ES2017</code>, <code>module: esnext</code>, <code>moduleResolution: bundler</code>, <code>jsx: react-jsx</code>, <code>noEmit</code>, <code>isolatedModules</code>, <code>allowJs</code>, <code>incremental</code>, plugin <code>next</code>.</li>
+<li>Includes <code>next-env.d.ts</code>, <code>**/*.ts</code>, <code>**/*.tsx</code>, <code>.next/types/**/*.ts</code>, <code>.next/dev/types/**/*.ts</code>, <code>**/*.mts</code>. Excludes <code>node_modules</code>.</li>
+</ul>
+<details><summary>Verbatim tsconfig.json</summary><pre><code class="lang-txt">{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</code></pre></details>
+
+<h3 id="f-stack-eslint">eslint.config.mjs</h3>
+<p>This is a flat config. It spreads <code>eslint-config-next/core-web-vitals</code> and <code>eslint-config-next/typescript</code>, and re-declares the default global ignores (<code>.next/**</code>, <code>out/**</code>, <code>build/**</code>, <code>next-env.d.ts</code>). It adds one custom rule block, scoped to <code>src/components/collection/**/*.{ts,tsx}</code>: <code>no-restricted-imports</code> at <code>error</code> level, which bans two import groups.</p>
+<table><thead><tr><th>banned import pattern</th><th>error message (verbatim)</th></tr></thead><tbody><tr><td><code>"@/lib/collection/adapters", "@/lib/collection/adapters/*", "**/adapters/*"</code></td><td>Collection components import the ports barrel (@/lib/collection), never an adapter. Adapters are wired at the composition root.</td></tr><tr><td><code>"@/lib/mock", "@/lib/mock/*"</code></td><td>Collection code goes through its own ports (@/lib/collection), not the app-wide fixture layer.</td></tr></tbody></table>
+<p>Run it with <code>npm run lint</code>, which is <code>eslint</code> with no path, so it lints the whole project.</p>
+<details><summary>Verbatim eslint.config.mjs</summary><pre><code class="lang-txt">import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+
+  /* ==========================================================================
+   * COLLECTION SEAM (GC-101 / GC-102).
+   * --------------------------------------------------------------------------
+   * Feature code talks to the ports and nothing else. Two bans:
+   *
+   *   1. `@/lib/collection/adapters/*` — a component that can import a fixture
+   *      can ship one, and can learn whether it is talking to a fixture or a
+   *      backend. Adapters are wired once, at the composition root.
+   *   2. `@/lib/mock` — the collection feature has its own seam. Reaching past
+   *      it into the app-wide fixture layer reintroduces exactly the coupling
+   *      the ports exist to remove.
+   *
+   * The harness page is the single declared exception: its whole job is to
+   * construct the adapters and prove the four envelope states render.
+   * ========================================================================*/
+  {
+    files: ["src/components/collection/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/collection/adapters", "@/lib/collection/adapters/*", "**/adapters/*"],
+              message:
+                "Collection components import the ports barrel (@/lib/collection), never an adapter. Adapters are wired at the composition root.",
+            },
+            {
+              group: ["@/lib/mock", "@/lib/mock/*"],
+              message:
+                "Collection code goes through its own ports (@/lib/collection), not the app-wide fixture layer.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+]);
+
+export default eslintConfig;
+</code></pre></details>
+
+<h3 id="f-stack-token-lint">scripts/token-lint.mjs — the token-contract gate (rebuild MUST reproduce)</h3>
+<p>This is a zero-dependency Node ESM script. It walks every <code>*.css</code> file under <code>src/</code> recursively, strips <code>/* */</code> comments, then applies three assertions. It exits <code>1</code> and prints <code>token-lint FAILED:</code> followed by one <code>  • &lt;violation&gt;</code> line per violation. On a clean tree it prints <code>token-lint OK: GROUP-A/GROUP-B contract (A1/A2/A3) holds.</code> and exits <code>0</code>. Fresh run on the current tree: <strong>OK, exit 0</strong>. The self-test (<code>--self-test</code>) also passes, exit 0.</p>
+<table><thead><tr><th>rule</th><th>applies to</th><th>exact check</th><th>violation text</th></tr></thead><tbody><tr><td>A1 (a)</td><td>files ending <code>brands.css</code>, <code>tokens.css</code>, <code>themes.css</code></td><td>For each top-level block whose selector matches <code>/\[data-brand/</code>: any declared custom property that is a GROUP-A token (exact list below or prefix <code>--t-</code> <code>--space-</code> <code>--dur-</code> <code>--ease-</code>) is a violation.</td><td><code>A1 &lt;file&gt;: GROUP-A token &lt;name&gt; inside [data-brand] block (&lt;selector&gt;)</code></td></tr><tr><td>A1 (b)</td><td>same files</td><td>Inside a <code>[data-brand…]</code> block, any declared custom property whose name does not start with <code>--brand-</code> is a violation.</td><td><code>A1 &lt;file&gt;: [data-brand] block may declare only --brand-* vars; found &lt;name&gt;</code></td></tr><tr><td>A2</td><td>every <code>*.module.css</code></td><td>The stylesheet must not contain <code>var(</code> + one of the RAW-RAMP names (case-insensitive, whole name). The names are <code>--gold-500 --gold-600 --gold-grad --gold-hairline --text-on-gold --cta-grad --cta-accent --cta --font-body --font-num</code>. The name boundary is <code>(?![a-z0-9-])</code>, so <code>--cta-grad</code> does not also count as <code>--cta</code>.</td><td><code>A2 &lt;file&gt;: component reads RAW-RAMP &lt;ramp&gt; via var() — use its --brand-* alias</code></td></tr><tr><td>A3 (a)</td><td>brands/tokens/themes files</td><td>In a block whose selector contains <code>:root</code> or matches <code>/\[data-theme/</code>, the PINNED tokens <code>--focus-ring --win --loss --error</code> must not have a value matching <code>var(\s*--brand-</code>.</td><td><code>A3 &lt;file&gt;: pinned &lt;name&gt; resolves to a --brand-* var (&lt;value&gt;)</code></td></tr><tr><td>A3 (b)</td><td>same</td><td>Those PINNED values must also not contain <code>var(</code> + any RAW-RAMP name.</td><td><code>A3 &lt;file&gt;: pinned &lt;name&gt; references RAW-RAMP &lt;ramp&gt; (&lt;value&gt;)</code></td></tr></tbody></table>
+<p><strong>GROUP-A exact denylist</strong> (verbatim from the script): <code>--canvas --shell --surface --surface-2 --surface-3 --surface-hover --surface-disabled --scrim --win --loss --error --info --focus-ring --text-hi --text --text-mid --text-dim --border --tint --lh-body --lh-tight --weight-reg --weight-semi --weight-bold --gutter --field-rhythm --radius-sm --radius-md --radius-lg --radius-card --radius-pill --glow-gold --halo --lift --z-content --z-sticky --z-dropdown --z-modal --z-toast --header-h --rail-w --frame-w --bottombar-h --tap-min --tap-bar</code>, plus the prefix families <code>--t-</code>, <code>--space-</code>, <code>--dur-</code>, <code>--ease-</code>.</p>
+<p><strong>Block parser behaviour (reproduce exactly).</strong> <code>topLevelBlocks()</code> reads the text from the last <code>}</code> before each <code>{</code> as the selector, then brace-matches to the closing <code>}</code>. A nested <code>@media{ :root{} }</code> is therefore one block with selector <code>@media (...)</code>. Custom properties declared inside it are read by the <code>/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi</code> regex, but the selector test does not see <code>:root</code>. So the reduced-motion <code>:root</code> override in <code>motion.css</code> is not linted at all. That file is also not one of the three names A1/A3 check.</p>
+<p><strong>Self-test</strong> (<code>--self-test</code>) seeds three violations and requires all three to fire:</p>
+<pre><code class="lang-txt">['[data-brand="x"]{--canvas:#000;--win:#0f0;}', "styles/brands.css", ["A1","A1"]]
+[".a{color:var(--gold-500);}",                 "ui/X/X.module.css",  ["A2"]]
+[":root{--focus-ring:var(--brand-accent);}",   "styles/tokens.css",  ["A3"]]</code></pre>
+<div class="callout note">Rebuild: copy <code>scripts/token-lint.mjs</code> byte-for-byte (verbatim below) and keep the npm scripts <code>lint:tokens</code> / <code>lint:tokens:self-test</code>. The gate only works if the rebuild keeps the same file names (<code>styles/tokens.css</code>, <code>styles/themes.css</code>, <code>styles/brands.css</code>) and the <code>.module.css</code> suffix for component styles.</div>
+<div class="callout warn">The gate is narrower than the header comment of <code>tokens.css</code> claims ("No component hardcodes a hex / px / duration"). The lint does not detect literal hex, px or ms values in modules; it only bans <code>var()</code> reads of the 10 RAW-RAMP names. Hard-coded literals do exist in <code>src/ui</code> (listed per primitive in <a href="#f-ui">f-ui</a> and summarised in <a href="#f-unused">f-unused</a>).</div>
+<details><summary>Verbatim scripts/token-lint.mjs</summary><pre><code class="lang-txt">#!/usr/bin/env node
+/* ============================================================================
+ * Yaobet — token-lint : the GROUP-A/GROUP-B split contract (SPEC-02 §0.3 /
+ * SPEC-04 §1.2 / Wave 1.3). Zero-dependency so it runs offline in CI.
+ *
+ * Implements the three authored assertions verbatim:
+ *   A1 — No GROUP-A LOCKED token inside a [data-brand] block (and a
+ *        [data-brand] block may declare ONLY --brand-* vars).
+ *   A2 — Components (*.module.css) read indirection/semantic vars only, never
+ *        raw ramp literals (--gold-*, --cta*, --font-body/-num, --text-on-gold).
+ *   A3 — --focus-ring/--win/--loss/--error :root (or [data-theme]) defs must be
+ *        standalone constants — never var(--brand-…) or a raw-ramp reference.
+ *
+ * Usage:  node scripts/token-lint.mjs             (lint the app)
+ *         node scripts/token-lint.mjs --self-test (seeded-violation Done-When)
+ * ==========================================================================*/
+
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, "..", "src");
+
+/* The closed GROUP-A LOCKED denylist (SPEC-02 §0.1). */
+const GROUP_A_EXACT = new Set([
+  "--canvas", "--shell", "--surface", "--surface-2", "--surface-3",
+  "--surface-hover", "--surface-disabled", "--scrim",
+  "--win", "--loss", "--error", "--info", "--focus-ring",
+  "--text-hi", "--text", "--text-mid", "--text-dim", "--border", "--tint",
+  "--lh-body", "--lh-tight", "--weight-reg", "--weight-semi", "--weight-bold",
+  "--gutter", "--field-rhythm",
+  "--radius-sm", "--radius-md", "--radius-lg", "--radius-card", "--radius-pill",
+  "--glow-gold", "--halo", "--lift",
+  "--z-content", "--z-sticky", "--z-dropdown", "--z-modal", "--z-toast",
+  "--header-h", "--rail-w", "--frame-w", "--bottombar-h",
+  "--tap-min", "--tap-bar",
+]);
+/* Prefix families also LOCKED. */
+const GROUP_A_PREFIX = ["--t-", "--space-", "--dur-", "--ease-"];
+
+function isGroupA(name) {
+  if (GROUP_A_EXACT.has(name)) return true;
+  return GROUP_A_PREFIX.some((p) =&gt; name.startsWith(p));
+}
+
+/* RAW-RAMP literals components must never read directly (A2). Longest-first so
+ * the var() check matches the full name (--cta-grad before --cta). */
+const RAW_RAMP = [
+  "--gold-500", "--gold-600", "--gold-grad", "--gold-hairline", "--text-on-gold",
+  "--cta-grad", "--cta-accent", "--cta", "--font-body", "--font-num",
+];
+
+/* The four PINNED-neutral tokens (A3). */
+const PINNED = ["--focus-ring", "--win", "--loss", "--error"];
+
+/** Strip /* … *​/ comments so selector/value matching never sees comment text. */
+function stripComments(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+function topLevelBlocks(css) {
+  const blocks = [];
+  let i = 0;
+  while (i &lt; css.length) {
+    const open = css.indexOf("{", i);
+    if (open === -1) break;
+    const selector = css.slice(i, open).trim().split("}").pop().trim();
+    let depth = 1;
+    let j = open + 1;
+    for (; j &lt; css.length &amp;&amp; depth &gt; 0; j++) {
+      if (css[j] === "{") depth++;
+      else if (css[j] === "}") depth--;
+    }
+    blocks.push({ selector, body: css.slice(open + 1, j - 1) });
+    i = j;
+  }
+  return blocks;
+}
+
+function declaredVars(body) {
+  const out = [];
+  const re = /(--[a-z0-9-]+)\s*:\s*([^;]+);/gi;
+  let m;
+  while ((m = re.exec(body))) out.push({ name: m[1], value: m[2].trim() });
+  return out;
+}
+
+/** Lint one stylesheet's CONTENT; returns an array of violation strings. */
+function lintContent(rawCss, rel) {
+  const css = stripComments(rawCss);
+  const out = [];
+  const isBrands = rel.endsWith("brands.css");
+  const isTokensOrTheme = rel.endsWith("tokens.css") || rel.endsWith("themes.css");
+  const isModule = rel.endsWith(".module.css");
+
+  if (isBrands || isTokensOrTheme) {
+    for (const { selector, body } of topLevelBlocks(css)) {
+      const isBrandBlock = /\[data-brand/.test(selector);
+      const isRootOrTheme = selector.includes(":root") || /\[data-theme/.test(selector);
+      for (const { name, value } of declaredVars(body)) {
+        if (isBrandBlock &amp;&amp; isGroupA(name)) {
+          out.push(`A1 ${rel}: GROUP-A token ${name} inside [data-brand] block (${selector})`);
+        }
+        if (isBrandBlock &amp;&amp; !name.startsWith("--brand-")) {
+          out.push(`A1 ${rel}: [data-brand] block may declare only --brand-* vars; found ${name}`);
+        }
+        if (isRootOrTheme &amp;&amp; PINNED.includes(name)) {
+          if (/var\(\s*--brand-/.test(value)) {
+            out.push(`A3 ${rel}: pinned ${name} resolves to a --brand-* var (${value})`);
+          }
+          for (const ramp of RAW_RAMP) {
+            if (new RegExp(`var\\(\\s*${ramp}(?![a-z0-9-])`).test(value)) {
+              out.push(`A3 ${rel}: pinned ${name} references RAW-RAMP ${ramp} (${value})`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (isModule) {
+    for (const ramp of RAW_RAMP) {
+      const re = new RegExp(`var\\(\\s*${ramp}(?![a-z0-9-])`, "i");
+      if (re.test(css)) {
+        out.push(`A2 ${rel}: component reads RAW-RAMP ${ramp} via var() — use its --brand-* alias`);
+      }
+    }
+  }
+
+  return out;
+}
+
+function walk(dir, out = []) {
+  for (const entry of readdirSync(dir)) {
+    const p = join(dir, entry);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (p.endsWith(".css")) out.push(p);
+  }
+  return out;
+}
+
+/* ---- run ---- */
+if (process.argv.includes("--self-test")) {
+  const seeded = [
+    ['[data-brand="x"]{--canvas:#000;--win:#0f0;}', "styles/brands.css", ["A1", "A1"]],
+    [".a{color:var(--gold-500);}", "ui/X/X.module.css", ["A2"]],
+    [":root{--focus-ring:var(--brand-accent);}", "styles/tokens.css", ["A3"]],
+  ];
+  let caught = 0;
+  for (const [content, rel] of seeded) {
+    const v = lintContent(content, rel);
+    if (v.length) caught += 1;
+    console.log(`  seed ${rel}: ${v.length ? v.join("; ") : "NO VIOLATION (unexpected)"}`);
+  }
+  if (caught &lt; 3) {
+    console.error(`SELF-TEST FAILED: expected all 3 seeds (A1/A2/A3) to fire, got ${caught}`);
+    process.exit(1);
+  }
+  console.log("SELF-TEST OK: A1/A2/A3 each fire on a seeded violation; a clean tree passes.");
+  process.exit(0);
+}
+
+const errors = [];
+for (const file of walk(ROOT)) {
+  errors.push(...lintContent(readFileSync(file, "utf8"), file.slice(ROOT.length + 1)));
+}
+
+if (errors.length) {
+  console.error("token-lint FAILED:\n" + errors.map((e) =&gt; "  • " + e).join("\n"));
+  process.exit(1);
+}
+console.log("token-lint OK: GROUP-A/GROUP-B contract (A1/A2/A3) holds.");
+</code></pre></details>
+
+<h3 id="f-stack-verify-ds">verify-app-ds.mjs — app-wide flat-design browser sweep</h3>
+<p>This is a root-level Playwright script, not wired to any npm script. Run it with <code>node verify-app-ds.mjs</code> against a running dev server on <code>http://localhost:3000</code>. It launches Chromium and sweeps 22 routes at two viewport widths, <strong>390px</strong> and <strong>1440px</strong> (height 900). For each route it calls <code>goto(…, {waitUntil:"networkidle", timeout:35000})</code>, waits 1200ms, then asserts:</p>
+<ol>
+<li><strong>renders</strong>: HTTP status &lt; 400 and <code>document.body.innerText.trim().length &gt; 60</code>.</li>
+<li><strong>zero depth</strong>: no element has a computed <code>box-shadow</code> other than <code>none</code>, a <code>filter</code> containing <code>drop-shadow</code>, or a <code>backdrop-filter</code> other than <code>none</code>.</li>
+<li><strong>no button gradient</strong>: no <code>button, a[role=button]</code> has a computed <code>background-image</code> matching <code>/gradient/</code>.</li>
+<li><strong>Vietnamese sets in one face</strong>: after <code>await document.fonts.ready</code>, every <code>h1,h2,h3,h4,button,a,span,p,li,td,th,label,div</code> whose own text nodes contain a toned vowel from <code>ạảấầẫậắằẵặẹẻếềểễệịọỏốồổộớờởợụủứừửữựỳỵỷ</code> is checked. The first family in its computed <code>font-family</code> must have a registered <code>FontFace</code> whose <code>unicodeRange</code> covers each such code point. A family with no registered webfont face is skipped.</li>
+<li><strong>no element wider than viewport</strong>: <code>getBoundingClientRect().width &gt; clientWidth + 1</code>, unless an ancestor has <code>overflow-x: auto|scroll</code> or the element is an SVG.</li>
+<li><strong>no h-scroll</strong>: <code>documentElement.scrollWidth &lt;= clientWidth</code>.</li>
+<li><strong>nothing bursts its container</strong>: an element with <code>overflow-x</code> and <code>overflow-y</code> both <code>visible</code> must not have <code>scrollWidth &gt; clientWidth + 8</code> (only when <code>clientWidth &gt; 8</code>).</li>
+</ol>
+<p>Routes swept (verbatim order): <code>/ /vip /tier /khuyen-mai /hoan-tra /cua-hang /cau-lac-bo /lich-su /bao-mat /ho-tro /tro-giup /phong-cach /tai-app /cuoc-hop-le /game-han-che /bo-suu-tap /bo-suu-tap/cua-toi /tai-khoan /vi-tien /tin-nhan /dai-ly /gioi-thieu</code>. It exits <code>1</code> if any check fails.</p>
+<div class="callout note">These seven checks are the visual invariants the rebuild must hold: zero shadows or backdrop blur anywhere, no gradient on any button, every Vietnamese glyph inside the loaded webfont, and no horizontal page scroll at 390px or 1440px.</div>
+<details><summary>Verbatim verify-app-ds.mjs</summary><pre><code class="lang-txt">/* ============================================================================
+ * App-wide Flat Design compliance sweep.
+ * ----------------------------------------------------------------------------
+ * Answers one question across EVERY route: did the design system actually land,
+ * or only where someone was looking?
+ *
+ * Every check is POSITIVE and measured. "No shadows found" is also what a page
+ * that failed to render says, so each route must first prove it rendered.
+ *
+ * THE OVERFLOW CHECK IS NOT THE SCROLL CHECK. An element can be 623px wide
+ * inside a 390px viewport and cause NO document h-scroll, because an ancestor
+ * clips it — and its right-hand contents are then simply unreachable. Two
+ * engineers reported opposite results on the header for exactly this reason.
+ * Both were right about what they measured; only one was measuring reachability.
+ * ==========================================================================*/
+import { chromium } from "playwright";
+
+const ROUTES = [
+  "/", "/vip", "/tier", "/khuyen-mai", "/hoan-tra", "/cua-hang", "/cau-lac-bo",
+  "/lich-su", "/bao-mat", "/ho-tro", "/tro-giup", "/phong-cach", "/tai-app",
+  "/cuoc-hop-le", "/game-han-che", "/bo-suu-tap", "/bo-suu-tap/cua-toi",
+  "/tai-khoan", "/vi-tien", "/tin-nhan", "/dai-ly", "/gioi-thieu",
+];
+
+/* U+1EA0–1EF1 — the toned Vietnamese vowels. The block Outfit and Cinzel skip.
+   A face that cannot set these cannot set this product's copy. */
+const VN = "ạảấầẫậắằẵặẹẻếềểễệịọỏốồổộớờởợụủứừửữựỳỵỷ";
+
+const fails = [];
+let pass = 0;
+const ok = (route, label, cond, detail = "") =&gt; {
+  if (cond) pass++; else fails.push({ route, label, detail });
+};
+
+const browser = await chromium.launch();
+
+async function sweep(width) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on("pageerror", (e) =&gt; errs.push(e.message));
+
+  console.log(`\n${"═".repeat(78)}\n  ${width}px\n${"═".repeat(78)}`);
+  console.log("route                    shadow  btnGrad  vnBreak  overflow  burst  hScroll");
+  console.log("─".repeat(78));
+
+  for (const route of ROUTES) {
+    try {
+      const res = await page.goto("http://localhost:3000" + route,
+        { waitUntil: "networkidle", timeout: 35000 });
+      await page.waitForTimeout(1200);
+      const rendered = (res?.status() ?? 0) &lt; 400 &amp;&amp;
+        (await page.evaluate(() =&gt; document.body.innerText.trim().length)) &gt; 60;
+      ok(route, `renders @${width}`, rendered, `HTTP ${res?.status()}`);
+      if (!rendered) { console.log(`${route.padEnd(24)} DID NOT RENDER`); continue; }
+    } catch {
+      ok(route, `renders @${width}`, false, "navigation timeout");
+      console.log(`${route.padEnd(24)} TIMEOUT`);
+      continue;
+    }
+
+    const s = await page.evaluate(async (vn) =&gt; {
+      /* FONTS MUST BE READY BEFORE ANY check(). `document.fonts.check()` returns
+         TRUE when no matching face is registered yet — so probing too early is a
+         silent FALSE PASS, not an error. This sweep reported 0 Vietnamese breaks
+         on /vip while Cinzel was demonstrably breaking two tier names, purely
+         because it asked 600ms in. Never trust check() before fonts.ready. */
+      await document.fonts.ready;
+      const registered = new Set([...document.fonts].map((f) =&gt; f.family));
+      const shadows = [], grads = [], vnBreaks = [], overflow = [], bursts = [];
+      const vw = document.documentElement.clientWidth;
+
+      for (const el of document.querySelectorAll("*")) {
+        const cs = getComputedStyle(el);
+        // Depth only. grayscale/brightness/saturate are colour transforms and
+        // are legitimate flat devices — the ban is on the Z-axis, not filters.
+        if ((cs.boxShadow &amp;&amp; cs.boxShadow !== "none") ||
+            /drop-shadow/.test(cs.filter || "") ||
+            (cs.backdropFilter &amp;&amp; cs.backdropFilter !== "none")) {
+          shadows.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 26)}`);
+        }
+        // Reachability, not scrollability.
+        /* Wider than the viewport is only a defect if the content is
+           UNREACHABLE. A wide table or tab strip inside an `overflow-x: auto`
+           scroller is the intended pattern, and a full-bleed decorative SVG is
+           clipped on purpose. Walk up for a scrollable ancestor first. */
+        const r = el.getBoundingClientRect();
+        if (r.width &gt; vw + 1 &amp;&amp; r.width &gt; 0 &amp;&amp; cs.display !== "none") {
+          let scrollable = false;
+          for (let a = el.parentElement; a; a = a.parentElement) {
+            const ox = getComputedStyle(a).overflowX;
+            if (ox === "auto" || ox === "scroll") { scrollable = true; break; }
+          }
+          if (!scrollable &amp;&amp; !(el instanceof SVGElement)) {
+            overflow.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 22)}=${Math.round(r.width)}px`);
+          }
+        }
+
+        /* CONTENT vs ITS OWN CONTAINER — not vs the viewport.
+           A 14-digit jackpot burst a 304px rail card inside a 1240px window:
+           no viewport overflow, no h-scroll, and this sweep called the route
+           clean.
+
+           The signal is the CONTAINER'S OWN scrollWidth, not a child's width
+           against the parent's content box. That first formulation produced
+           five false positives — flex children legitimately measure wider than
+           a parent's computed content box, and every one of them rendered
+           correctly inside its card. A parent whose scrollWidth exceeds its
+           clientWidth is genuinely holding content it cannot show. */
+        // 8px threshold: sub-pixel rounding and 1-2px text-metric slop are not
+        // defects, and reporting them buries the ones that are.
+        if (cs.overflowX === "visible" &amp;&amp; cs.overflowY === "visible" &amp;&amp;
+            el.scrollWidth &gt; el.clientWidth + 8 &amp;&amp; el.clientWidth &gt; 8) {
+          bursts.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 20)} ${el.scrollWidth}&gt;${el.clientWidth}`);
+        }
+      }
+
+      for (const el of document.querySelectorAll("button, a[role=button]")) {
+        if (/gradient/.test(getComputedStyle(el).backgroundImage)) {
+          grads.push((el.textContent || "").trim().slice(0, 18) || el.getAttribute("aria-label") || "?");
+        }
+      }
+
+      /* Generalised font check — by UNICODE-RANGE, not by fonts.check().
+         `document.fonts.check(font, text)` answers "must I load anything to draw
+         this?", NOT "can this family draw this?". A codepoint outside every
+         matching face's unicode-range needs no load, so check() returns TRUE.
+         Two earlier versions of this sweep reported 0 breaks on /vip while
+         Cinzel was demonstrably failing on "Đồng" and "Bạc". Read the ranges. */
+      const covers = (family, cp) =&gt; {
+        let sawFace = false;
+        for (const f of document.fonts) {
+          if (f.family !== family) continue;
+          sawFace = true;
+          for (const part of (f.unicodeRange || "U+0-10FFFF").split(",")) {
+            const m = part.trim().match(/^U\+([0-9A-Fa-f?]+)(?:-([0-9A-Fa-f]+))?$/);
+            if (!m) continue;
+            const lo = parseInt(m[1].replace(/\?/g, "0"), 16);
+            const hi = m[2] ? parseInt(m[2], 16)
+                            : parseInt(m[1].replace(/\?/g, "F"), 16);
+            if (cp &gt;= lo &amp;&amp; cp &lt;= hi) return true;
+          }
+        }
+        // No webfont face for this family at all → it is a system/stack name,
+        // which we cannot interrogate. Not a finding.
+        return !sawFace;
+      };
+
+      const re = new RegExp(`[${vn}]`);
+      for (const el of document.querySelectorAll("h1,h2,h3,h4,button,a,span,p,li,td,th,label,div")) {
+        const own = [...el.childNodes].filter((n) =&gt; n.nodeType === 3)
+          .map((n) =&gt; n.textContent).join("");
+        if (!re.test(own)) continue;
+        const first = getComputedStyle(el).fontFamily.split(",")[0].replace(/["']/g, "").trim();
+        if (!first) continue;
+        const missing = [...new Set(own.match(new RegExp(`[${vn}]`, "g")) || [])]
+          .filter((ch) =&gt; !covers(first, ch.codePointAt(0)));
+        if (missing.length) {
+          vnBreaks.push(`${first} ✗ ${missing.join("")} in "${own.trim().slice(0, 26)}"`);
+        }
+      }
+
+      return {
+        shadows: [...new Set(shadows)], grads: [...new Set(grads)],
+        vnBreaks: [...new Set(vnBreaks)], overflow: [...new Set(overflow)],
+        bursts: [...new Set(bursts)],
+        sw: document.documentElement.scrollWidth, cw: vw,
+      };
+    }, VN);
+
+    ok(route, `zero depth @${width}`, s.shadows.length === 0, s.shadows.slice(0, 4).join(" · "));
+    ok(route, `no button gradient @${width}`, s.grads.length === 0, s.grads.slice(0, 4).join(" · "));
+    ok(route, `Vietnamese sets in one face @${width}`, s.vnBreaks.length === 0, s.vnBreaks.slice(0, 3).join(" · "));
+    ok(route, `no element wider than viewport @${width}`, s.overflow.length === 0, s.overflow.slice(0, 3).join(" · "));
+    ok(route, `no h-scroll @${width}`, s.sw &lt;= s.cw, `${s.sw}/${s.cw}`);
+    ok(route, `nothing bursts its container @${width}`, s.bursts.length === 0, s.bursts.slice(0, 4).join(" · "));
+
+    const n = (a) =&gt; (a.length === 0 ? "·" : String(a.length));
+    console.log(
+      `${route.padEnd(24)} ${n(s.shadows).padEnd(7)} ${n(s.grads).padEnd(8)} ` +
+      `${n(s.vnBreaks).padEnd(8)} ${n(s.overflow).padEnd(9)} ${n(s.bursts).padEnd(6)} ${s.sw &lt;= s.cw ? "·" : "YES"}`);
+  }
+
+  if (errs.length) {
+    console.log(`\n  page errors @${width}: ${[...new Set(errs)].slice(0, 5).join(" | ")}`);
+  }
+  await ctx.close();
+}
+
+await sweep(390);
+await sweep(1440);
+
+console.log("\n" + "═".repeat(78));
+if (fails.length) {
+  console.log(`\n${fails.length} FAILURES\n`);
+  const byLabel = {};
+  for (const f of fails) (byLabel[f.label] ??= []).push(f);
+  for (const [label, list] of Object.entries(byLabel)) {
+    console.log(`  ${label}  (${list.length})`);
+    for (const f of list.slice(0, 8)) console.log(`      ${f.route}  ${f.detail}`);
+  }
+}
+console.log(`\n=== ${pass} passed, ${fails.length} failed · ${ROUTES.length} routes × 2 widths ===`);
+await browser.close();
+process.exit(fails.length ? 1 : 0);
+</code></pre></details>
+
+<h3 id="f-stack-other-root">Other root files</h3>
+<table><thead><tr><th>file</th><th>what it is</th></tr></thead><tbody><tr><td><code>_shots.mjs</code></td><td>Ad-hoc Playwright screenshot script. Viewport 1440×900 at DPR 2. Shoots <code>/</code> (top + full page), opens the first button named <code>Đăng ký</code> or <code>Đăng nhập</code> and shoots the modal, then shoots <code>/vip</code> full page. Writes to <code>../../.hc/j9-rebuild/build-shots/SW-*.png</code>. Not part of the build.</td></tr><tr><td><code>README.md</code></td><td>Unmodified create-next-app README. It mentions Geist, which the app does not use.</td></tr><tr><td><code>.gitignore</code></td><td>Standard create-next-app ignores. Note: it ignores <code>*.tsbuildinfo</code> and <code>next-env.d.ts</code>, yet both exist in the folder.</td></tr><tr><td><code>next-env.d.ts</code></td><td>Next-generated type references.</td></tr><tr><td><code>src/app/favicon.ico</code></td><td>MS Windows icon resource with 4 icons (16×16, 32×32, … — sips reports 256×256 for the largest). Served by App Router file convention as <code>/favicon.ico</code>.</td></tr></tbody></table>
+
+<h3 id="f-stack-layout">Folder layout of src/</h3>
+<pre><code class="lang-txt">src/
+├── app/                      App Router routes (see conventions below)
+│   ├── layout.tsx            root layout (html/body, fonts, Providers, AppShell, QuickActionRail)
+│   ├── providers.tsx         "use client" — MockAuthProvider + AuthModalProvider
+│   ├── globals.css           the ONLY global stylesheet; @imports src/styles/*
+│   ├── loading.tsx           root Suspense fallback (home skeleton)
+│   ├── stub.module.css       shared stub-page styles (5 stub routes)
+│   ├── favicon.ico
+│   ├── page.tsx              /  (home)
+│   ├── (member)/             route group — shared member layout (sidebar + column)
+│   │   ├── layout.tsx  member.module.css
+│   │   ├── tai-khoan/ vi-tien/ tin-nhan/ gioi-thieu/ dai-ly/
+│   ├── [vertical]/           dynamic game-vertical landing (page, loading, not-found)
+│   ├── khuyen-mai/ (+ [id]/) vip/ tier/ cua-hang/ cuoc-hop-le/ ve-so/
+│   ├── bo-suu-tap/ (+ cua-toi/)  dev/collection-ports/
+│   ├── bao-mat/ lich-su/ hoan-tra/ game-han-che/   (redirect-only pages)
+│   └── cau-lac-bo/ phong-cach/ tai-app/ ho-tro/ tro-giup/   (stub pages)
+├── components/&lt;feature&gt;/     feature components + their *.module.css, each with an index.ts barrel
+│   account auth category collection contribution home layout(+_internal)
+│   lottery(+_internal) messages promo referral restricted store vip wallet
+├── ui/&lt;Primitive&gt;/           17 primitive folders, barrel src/ui/index.ts  → this fragment §f-ui
+├── lib/
+│   ├── format.ts i18n.ts rg.ts types.ts                    → §f-lib
+│   ├── auth/  (fixtures guard index modal session)         → §f-lib
+│   ├── mock/  (19 fixture modules + index barrel)          → §f-lib
+│   ├── collection/ store/ vip/                             (feature libs — owned by other tracks)
+└── styles/  reset tokens themes brands typography motion   → §f-tokens … §f-reset</code></pre>
+
+<h3 id="f-stack-app-router">App Router conventions used</h3>
+<ul>
+<li><strong>Route group <code>(member)</code></strong>: <code>src/app/(member)/layout.tsx</code> is an <code>async</code> Server Component. It awaits <code>getBalance()</code>, <code>getAccountSummary()</code> and <code>getVipProgress()</code> in parallel, then renders <code>&lt;div class=area&gt;&lt;MemberSidebar …/&gt;&lt;div class=column&gt;{children}&lt;/div&gt;&lt;/div&gt;</code> around <code>/tai-khoan</code>, <code>/vi-tien</code>, <code>/tin-nhan</code>, <code>/gioi-thieu</code> and <code>/dai-ly</code>. The group name does not appear in the URL. Track M owns the specification.</li>
+<li><strong>Dynamic segment <code>[vertical]</code></strong>: <code>page.tsx</code> awaits <code>params: Promise&lt;{vertical:string}&gt;</code> (Next 16 async params), exports <code>generateMetadata</code>, and calls <code>notFound()</code> for an unknown slug. That renders the sibling <code>not-found.tsx</code> (a Client Component). Also contains <code>loading.tsx</code>.</li>
+<li><strong>Dynamic segment <code>khuyen-mai/[id]</code></strong>: awaits <code>params</code> and calls <code>notFound()</code> when no promo matches. There is no local not-found, so Next's default 404 renders.</li>
+<li><strong><code>loading.tsx</code> files</strong>: <code>app/loading.tsx</code> (root; applies to every route without a nearer one), <code>[vertical]/loading.tsx</code>, <code>cuoc-hop-le/loading.tsx</code>, <code>(member)/tai-khoan/loading.tsx</code>, <code>(member)/vi-tien/loading.tsx</code>, <code>(member)/tin-nhan/loading.tsx</code>, <code>(member)/gioi-thieu/loading.tsx</code>.</li>
+<li><strong>Redirect-only pages</strong> (server <code>redirect()</code> from <code>next/navigation</code>): <code>/bao-mat → /tai-khoan</code>, <code>/lich-su → /tai-khoan</code>, <code>/hoan-tra → /khuyen-mai</code>, <code>/game-han-che → /cuoc-hop-le?tab=han-che</code>.</li>
+<li><strong><code>searchParams</code></strong>: <code>/cuoc-hop-le</code> awaits <code>searchParams: Promise&lt;{tab?: string|string[]}&gt;</code>.</li>
+<li><strong>Metadata</strong>: the root exports <code>metadata</code> and <code>viewport</code>. Most routes export a static <code>metadata</code> object. <code>[vertical]</code> uses <code>generateMetadata</code>.</li>
+<li><strong><code>providers.tsx</code></strong>: a single <code>"use client"</code> island at the root that holds the two React contexts (see <a href="#f-root-layout">f-root-layout</a>).</li>
+<li>No <code>error.tsx</code>, <code>global-error.tsx</code>, <code>template.tsx</code>, <code>route.ts</code>, <code>middleware.ts</code>, <code>default.tsx</code> or parallel/intercepting routes exist (not found in source).</li>
+</ul>
+
+<h3 id="f-stack-rsc-split">Server vs Client component split</h3>
+<p>Server Components are the default. Every route <code>page.tsx</code> and <code>layout.tsx</code> is a Server Component, except <code>app/dev/collection-ports/page.tsx</code> and <code>app/[vertical]/not-found.tsx</code>. Data fetching happens there: <code>await getX()</code> from <code>@/lib/mock</code>. Results are passed as props into <code>"use client"</code> islands. <code>AppShell</code> is an async Server Component that fetches <code>getVerticals()</code> + <code>getBalance()</code> and renders the <code>ShellChrome</code> client island.</p>
+<table><thead><tr><th>layer</th><th>"use client" files</th></tr></thead><tbody><tr><td>src/ui</td><td>Countdown, Dropdown, ErrorState, Modal, Odometer, Scroller, Sheet, Tabs, Skeleton/useGridFill.ts. The rest are server-compatible: Badge, Button, Card, EmptyState, Icon, MoneyValue, Pill, Skeleton, TileSkeleton, Tile, ComingSoonTile.</td></tr><tr><td>src/lib</td><td>rg.ts, auth/guard.ts, auth/modal.tsx, auth/session.tsx</td></tr><tr><td>src/app</td><td>providers.tsx, [vertical]/not-found.tsx, bo-suu-tap/CollectionRoot.tsx, bo-suu-tap/cua-toi/MyCardsRoot.tsx, dev/collection-ports/page.tsx</td></tr><tr><td>src/components</td><td>79 files (every interactive feature component). Full list: run <code>rg -l '^"use client"' src/components</code>.</td></tr></tbody></table>
+<div class="callout note">The server-compatible primitives (Button, Card, Pill …) carry no <code>"use client"</code>. They still accept <code>onClick</code>, which only works when a Client Component renders them. Keep that rule: a Server Component may render <code>&lt;Button&gt;</code> without handlers.</div>
+</section>
+

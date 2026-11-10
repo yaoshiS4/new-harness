@@ -1,0 +1,35 @@
+<section id="s-nav-map">
+<h2 id="s-nav-map-h">S6 · Sitemap and nav surfaces</h2>
+<p>Surfaces: <strong>H</strong> = Header Tier-1 (logo, utility nav, identity, MemberMenu), <strong>T2</strong> = Header Tier-2, CategorySheet and home CategoryLauncher (all share the vertical hrefs), <strong>BT</strong> = BottomTabBar, <strong>F</strong> = Footer, <strong>QA</strong> = QuickActionRail, <strong>MS</strong> = MemberSidebar (member track; labels from <code>src/components/account/MemberSidebar.tsx</code>, 12-tile grid only), <strong>NB</strong> = notification rows.</p>
+<table><thead><tr><th>URL</th><th>Page file</th><th>Surfaces · label verbatim · icon</th><th>Notes</th></tr></thead><tbody>
+<tr><td>/</td><td>src/app/page.tsx</td><td>H logo (aria "Yaobet", /assets/logo.svg) · BT "Trang chủ" (home) · H MemberMenu "Hỗ trợ" (support)</td><td>T2 "/?v={id}" ×9, sports cards "/?v=sports&amp;…", match CTA "/?v=sports&amp;m={id}" and member game launch "/?game={id}" all land here, and the page ignores the query.</td></tr>
+<tr><td>/[vertical]</td><td>src/app/[vertical]/page.tsx</td><td>none</td><td>Slugs casino, slots, sports, fishing, card, lottery, cockfight, table, arcade. Unlinked (see <a href="#s-vertical-route">#s-vertical-route</a>).</td></tr>
+<tr><td>/khuyen-mai</td><td>src/app/khuyen-mai/page.tsx</td><td>H "Khuyến mãi" (gift) · BT "Khuyến mãi" (promo) · QA World-Cup thumb (aria "Khuyến mãi World Cup") and "Quay ngay" · F RG "Điều khoản &amp; Điều kiện" · MS "Khuyến mãi" (gift) · NB announcementEvent rows</td><td>/hoan-tra redirects here.</td></tr>
+<tr><td>/khuyen-mai/[id]</td><td>src/app/khuyen-mai/[id]/page.tsx</td><td>Home HeroBand slides (pr1, pr2, pr3, pr7, pr8) · PromoHero "Xem chi tiết" · PromoGrid tiles</td><td>ids pr1–pr8.</td></tr>
+<tr><td>/vip</td><td>src/app/vip/page.tsx</td><td>H "VIP" (vip, gold cell) · MS "Thăng hạng toàn dân" (vip) · NB profileLevelUp (f10 url)</td><td>Member/rewards track.</td></tr>
+<tr><td>/tier</td><td>src/app/tier/page.tsx</td><td>QA "Giải đấu" (inline trophy SVG; aria "Giải đấu")</td><td>Page h1 is the VIP ladder heading.</td></tr>
+<tr><td>/bo-suu-tap</td><td>src/app/bo-suu-tap/page.tsx</td><td>H "Bộ sưu tập" (card) · QA "Sưu tập" (inline cards SVG; aria "Bộ sưu tập")</td><td>title "Bộ sưu tập — Yaobet".</td></tr>
+<tr><td>/bo-suu-tap/cua-toi</td><td>src/app/bo-suu-tap/cua-toi/page.tsx</td><td>none in the shell</td><td>title "Thẻ của tôi — Yaobet".</td></tr>
+<tr><td>/cua-hang</td><td>src/app/cua-hang/page.tsx</td><td>H "Cửa hàng" (ticket) · MS "Bán xu" (card) · NB reward rows (ctaHref /cua-hang)</td><td>h1 "Cửa hàng điểm".</td></tr>
+<tr><td>/phong-cach</td><td>src/app/phong-cach/page.tsx</td><td>H "Phong cách" (trophy) · F "Phong cách Yaobet"</td><td>h1 "Phong cách".</td></tr>
+<tr><td>/dai-ly</td><td>src/app/(member)/dai-ly/page.tsx</td><td>H "CLB" (referral)</td><td>title "Đại lý — Yaobet"; member layout.</td></tr>
+<tr><td>/cau-lac-bo</td><td>src/app/cau-lac-bo/page.tsx</td><td>H MemberMenu "Đại lý/CLB" (trophy) · MS "Vinh danh" (trophy)</td><td>h1 "Câu lạc bộ đại lý".</td></tr>
+<tr><td>/vi-tien</td><td>src/app/(member)/vi-tien/page.tsx</td><td>H balance chip (wallet; aria "Ví tiền") and "Nạp" pill · H MemberMenu "Ví tiền" (wallet) · BT "Ví" (wallet) and "Nạp" (deposit, member) · MS "Ví của tôi" (wallet) · NB balance rows</td><td>Also the AuthModal deposit handoff target.</td></tr>
+<tr><td>/tai-khoan</td><td>src/app/(member)/tai-khoan/page.tsx</td><td>BT "Tài khoản" (account) · F RG "Tự loại trừ" · MS "Bảo mật" (shield, "/tai-khoan#bao-mat")</td><td>/bao-mat and /lich-su redirect here.</td></tr>
+<tr><td>/tin-nhan</td><td>src/app/(member)/tin-nhan/page.tsx</td><td>H MemberMenu "Tin nhắn" (message, unread badge) · MS "Tin nhắn" (message)</td><td></td></tr>
+<tr><td>/gioi-thieu</td><td>src/app/(member)/gioi-thieu/page.tsx</td><td>H MemberMenu "Giới thiệu" (referral) · F "Giới thiệu" · MS "Giới thiệu" (referral)</td><td>title "Giới thiệu bạn bè — Yaobet".</td></tr>
+<tr><td>/hoan-tra</td><td>src/app/hoan-tra/page.tsx</td><td>H MemberMenu "Hoàn trả" (cashback) · MS "Hoàn trả" (cashback) and "Sinh lời" (yield)</td><td><code>redirect("/khuyen-mai")</code></td></tr>
+<tr><td>/lich-su</td><td>src/app/lich-su/page.tsx</td><td>H MemberMenu "Lịch sử" (history) · MS "Lịch sử" (history)</td><td><code>redirect("/tai-khoan")</code></td></tr>
+<tr><td>/bao-mat</td><td>src/app/bao-mat/page.tsx</td><td>H MemberMenu "Bảo mật" (shield)</td><td><code>redirect("/tai-khoan")</code></td></tr>
+<tr><td>/ve-so</td><td>src/app/ve-so/page.tsx</td><td>QA "Vé số" (inline ticket SVG)</td><td>title "Vé số — Yaobet".</td></tr>
+<tr><td>/tai-app</td><td>src/app/tai-app/page.tsx</td><td>F "Tải ứng dụng"</td><td>The QA "Tải app" is a QR popover, not a link.</td></tr>
+<tr><td>/cuoc-hop-le</td><td>src/app/cuoc-hop-le/page.tsx</td><td>F "Tỷ lệ tính cược theo trò chơi" · F "Game hạn chế khuyến mãi" (?tab=han-che)</td><td>QuickActionRail suppressed.</td></tr>
+<tr><td>/game-han-che</td><td>src/app/game-han-che/page.tsx</td><td>none</td><td><code>redirect("/cuoc-hop-le?tab=han-che")</code>; QA suppressed.</td></tr>
+<tr><td>/tro-giup</td><td>src/app/tro-giup/page.tsx</td><td>F "Trung tâm trợ giúp" · MS "Hướng dẫn" (info)</td><td>h1 "Trung tâm trợ giúp".</td></tr>
+<tr><td>/ho-tro</td><td>src/app/ho-tro/page.tsx</td><td>none (the MemberMenu "Hỗ trợ" points to "/")</td><td>h1 "Hỗ trợ khách hàng".</td></tr>
+<tr><td>/dev/collection-ports</td><td>src/app/dev/collection-ports/page.tsx</td><td>none</td><td>Dev harness, h1 "Collection ports — harness".</td></tr>
+<tr><td>External</td><td>—</td><td>F socials: https://facebook.com/ · https://youtube.com/ · https://tiktok.com/ · https://instagram.com/ (new tab)</td><td></td></tr>
+</tbody></table>
+<div class="callout note">Rebuild order: tokens (F), then Overlay and focus trap, then Header, BottomTabBar and Footer, then AuthModal (it needs Overlay and the auth context), then the home bands. QuickActionRail and the content frame reservation (76px right padding at 1024–1599) must ship together.</div>
+</section>
+

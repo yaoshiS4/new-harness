@@ -1,0 +1,3 @@
+src/components/promo/**
+src/app/khuyen-mai/**
+src/styles/areas/promo.css

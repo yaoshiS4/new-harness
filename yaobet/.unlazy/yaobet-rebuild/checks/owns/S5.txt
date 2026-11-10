@@ -1,0 +1,5 @@
+src/components/home/HeroBand.tsx
+src/components/home/CategoryLauncher.tsx
+src/components/home/StatsBar.tsx
+src/components/home/DevAuthToggle.tsx
+src/styles/areas/home.css

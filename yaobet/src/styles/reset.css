@@ -1,0 +1,70 @@
+/* ============================================================================
+ * Yaobet — minimal reset/normalize (styles/reset.css)
+ * Note: the published Artifact skeleton ships a CSS reset; this is the app's
+ * own minimal reset for the Next build (the app is not an Artifact).
+ * ==========================================================================*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* base: html{font-size:14px}. All design tokens are absolute px, so this
+   * re-derives nothing — it only aligns any stray rem/em (line-heights, ch). */
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* AA focus indicator — the LOCKED neutral ring, applied globally so every
+ * interactive primitive inherits a ≥3:1 visible focus unless it opts out. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

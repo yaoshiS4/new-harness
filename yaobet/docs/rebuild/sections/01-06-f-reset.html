@@ -1,0 +1,217 @@
+<section>
+<h2 id="f-reset">reset.css, globals.css, stub.module.css, app/loading.tsx</h2>
+<h3 id="f-reset-order">Global import order (globals.css)</h3>
+<p><code>src/app/globals.css</code> is the only global sheet, and it is imported once by <code>layout.tsx</code> (<code>import "./globals.css"</code>). It <code>@import</code>s, in this order: <code>../styles/reset.css</code> → <code>tokens.css</code> → <code>themes.css</code> → <code>brands.css</code> → <code>typography.css</code> → <code>motion.css</code>. Its own rules follow.</p>
+<table><thead><tr><th>selector</th><th>declaration</th><th>resolved</th><th>source</th></tr></thead><tbody><tr><td><code>*, *::before, *::after</code></td><td><code>box-sizing: border-box</code></td><td></td><td>reset</td></tr><tr><td><code>*</code></td><td><code>margin: 0; padding: 0</code></td><td></td><td>reset</td></tr><tr><td><code>html</code></td><td><code>font-size: 14px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%</code></td><td></td><td>reset</td></tr><tr><td><code>body</code></td><td><code>-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility</code></td><td></td><td>reset</td></tr><tr><td><code>img, picture, video, canvas, svg</code></td><td><code>display: block; max-width: 100%</code></td><td></td><td>reset</td></tr><tr><td><code>input, button, textarea, select</code></td><td><code>font: inherit; color: inherit</code></td><td></td><td>reset</td></tr><tr><td><code>button</code></td><td><code>background: none; border: none; cursor: pointer</code></td><td></td><td>reset</td></tr><tr><td><code>a</code></td><td><code>color: inherit; text-decoration: none</code></td><td></td><td>reset</td></tr><tr><td><code>ul, ol</code></td><td><code>list-style: none</code></td><td></td><td>reset</td></tr><tr><td><code>:focus-visible</code></td><td><code>outline: 2px solid var(--focus-ring); outline-offset: 2px</code></td><td><code>#6ea8ff</code></td><td>reset</td></tr><tr><td><code>html</code></td><td><code>height: 100%; background: var(--shell); color-scheme: dark; overflow-x: hidden</code></td><td><code>#050505</code></td><td>globals</td></tr><tr><td><code>body</code></td><td><code>min-height: 100%; background: var(--canvas); color: var(--text-hi); font-family: var(--brand-font-body); font-size: var(--t-body); line-height: var(--lh-body); overflow-x: hidden</code></td><td><code>#0a0a0a; #f2f0e4; Be Vietnam Pro stack; 16px; 1.5</code></td><td>globals</td></tr><tr><td><code>h1, h2, h3, h4, h5, h6</code></td><td><code>font-weight: var(--weight-bold); line-height: var(--lh-tight)</code></td><td><code>700; 1.3</code></td><td>globals</td></tr><tr><td><code>small</code></td><td><code>font-size: var(--t-sm); color: var(--text-mid)</code></td><td><code>14px; #888888</code></td><td>globals</td></tr></tbody></table>
+<div class="callout note">Because the reset makes <code>svg</code> <code>display:block</code>, the Icon primitive's module class sets <code>display:inline-block</code> to get back to inline flow. A rebuild must keep that override, or every icon breaks onto its own line.</div>
+<details><summary>Verbatim src/styles/reset.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — minimal reset/normalize (SPEC-04 styles/reset.css)
+ * Note: the published Artifact skeleton ships a CSS reset; this is the app's
+ * own minimal reset for the Next build (the app is not an Artifact).
+ * ==========================================================================*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* J9 base: html{font-size:14px}. All design tokens are absolute px, so this
+   * re-derives nothing — it only aligns any stray rem/em (line-heights, ch). */
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* AA focus indicator — the LOCKED neutral ring, applied globally so every
+ * interactive primitive inherits a ≥3:1 visible focus unless it opts out. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+</code></pre></details>
+<details><summary>Verbatim src/app/globals.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Yaobet — globals.css : the ONLY global sheet (SPEC-04 PART 2)
+ * ----------------------------------------------------------------------------
+ * Imports the design-token layers in order, sets the dark canvas + base type,
+ * and wires the reduced-motion contract. Components ship their own scoped
+ * *.module.css and read var(--…) from the layers below — they never re-author
+ * tokens and never add to this global sheet.
+ * Import order matters: reset → tokens (defines vars) → themes/brands
+ * (re-point) → typography/motion (consume vars).
+ * ==========================================================================*/
+
+@import "../styles/reset.css";
+@import "../styles/tokens.css";
+@import "../styles/themes.css";
+@import "../styles/brands.css";
+@import "../styles/typography.css";
+@import "../styles/motion.css";
+
+html {
+  height: 100%;
+  background: var(--shell);
+  color-scheme: dark;
+  /* No horizontal page scroll, ever (SPEC-04 8.1). Wide content scrolls in
+   * its own Scroller, not the body. */
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  background: var(--canvas);
+  color: var(--text-hi);
+  font-family: var(--brand-font-body);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  overflow-x: hidden;
+}
+
+/* Headings inherit the body face; sizes are set per-component via --t-* tokens.
+ * Provide a sane default so unstyled headings are not browser-huge. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-tight);
+}
+
+/* Respect the AA muted floor for any raw secondary text. */
+small {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+}
+</code></pre></details>
+
+<h3 id="f-reset-stub">app/stub.module.css — shared stub-page styles</h3>
+<p>Used by 5 placeholder routes: <code>/cau-lac-bo</code>, <code>/phong-cach</code>, <code>/tai-app</code>, <code>/ho-tro</code>, <code>/tro-giup</code> (track S/M own those route specs).</p>
+<table><thead><tr><th>selector</th><th>property</th><th>authored value</th><th>resolved literal (default brand)</th><th>condition</th></tr></thead><tbody><tr><td><code>.page</code></td><td><code>display</code></td><td><code>flex</code></td><td>—</td><td>all</td></tr><tr><td><code>.page</code></td><td><code>flex-direction</code></td><td><code>column</code></td><td>—</td><td>all</td></tr><tr><td><code>.page</code></td><td><code>gap</code></td><td><code>var(--space-4)</code></td><td><code>16px</code></td><td>all</td></tr><tr><td><code>.page</code></td><td><code>min-width</code></td><td><code>0</code></td><td>—</td><td>all</td></tr><tr><td><code>.heading</code></td><td><code>font-size</code></td><td><code>var(--t-h1)</code></td><td><code>24px</code></td><td>all</td></tr><tr><td><code>.heading</code></td><td><code>color</code></td><td><code>var(--text-hi)</code></td><td><code>#f2f0e4</code></td><td>all</td></tr><tr><td><code>.heading</code></td><td><code>font-weight</code></td><td><code>var(--weight-bold)</code></td><td><code>700</code></td><td>all</td></tr><tr><td><code>.body</code></td><td><code>font-size</code></td><td><code>var(--t-body)</code></td><td><code>16px</code></td><td>all</td></tr><tr><td><code>.body</code></td><td><code>color</code></td><td><code>var(--text-mid)</code></td><td><code>#888888</code></td><td>all</td></tr><tr><td><code>.body</code></td><td><code>max-width</code></td><td><code>60ch</code></td><td>—</td><td>all</td></tr><tr><td><code>.body</code></td><td><code>line-height</code></td><td><code>1.6</code></td><td>—</td><td>all</td></tr></tbody></table>
+<details><summary>Verbatim src/app/stub.module.css</summary><pre><code class="lang-css">/* Shared minimal stub-page styling. Tokens only; mobile-first @375. Matches the
+ * existing route pages (heading uses --t-h1 / --text-hi). */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.body {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+  max-width: 60ch;
+  line-height: 1.6;
+}
+</code></pre></details>
+
+<h3 id="f-reset-loading">app/loading.tsx — root Suspense fallback</h3>
+<p>This is a Server Component, <code>HomeLoading</code>. App Router uses it for every route that has no nearer <code>loading.tsx</code>. It reuses classes from <code>src/components/home/Home.module.css</code> (<code>.page</code>, <code>.main</code>, <code>.skelRow</code>, <code>.skelGrid</code>; track S documents those rules). Structure:</p>
+<pre><code class="lang-txt">div.page  [aria-busy="true"] [aria-label="Đang tải trang chủ"]
+└── div.main
+    ├── Skeleton shape="block" width="100%" height={200}      (hero)
+    ├── div.skelRow
+    │   └── 5 × Skeleton shape="pill" width={64} height={64}   (category launcher)
+    ├── Skeleton shape="block" width="100%" height={140}      (live band)
+    ├── Skeleton shape="text"  width="40%"  height="1.6em"    (grid heading)
+    ├── div.skelGrid
+    │   └── 6 × Skeleton shape="block" width="100%" height={120}
+    └── Skeleton shape="block" width="100%" height={160}      (vip aisle)</code></pre>
+<table><thead><tr><th>copy</th><th>gloss</th><th>where</th></tr></thead><tbody><tr><td><code>Đang tải trang chủ</code></td><td>Loading home page</td><td>aria-label of the wrapper</td></tr><tr><td><code>Đang tải</code></td><td>Loading</td><td>aria-label of each Skeleton (default)</td></tr></tbody></table>
+<div class="callout warn">Because this is the ROOT <code>loading.tsx</code>, routes without their own loader show this home-shaped skeleton while their server fetches resolve. That includes <code>/vip</code>, <code>/khuyen-mai</code>, <code>/cua-hang</code> and <code>/tier</code> (inference from App Router semantics).</div>
+<details><summary>Verbatim src/app/loading.tsx</summary><pre><code class="lang-tsx">/* ============================================================================
+ * Yaobet — HOME route loading UI (App Router Suspense fallback).
+ * ----------------------------------------------------------------------------
+ * Shown while page.tsx's server fetches (jackpot/leaderboard/games/…) are in
+ * flight. Per the §F dynamic-data contract this is the MANDATORY loading state:
+ * branded Skeletons in each band's reserved footprint — NEVER a placeholder
+ * digit, a "0", or a last-known number dressed as live. Reduced-motion → the
+ * Skeleton sweep falls back to a static tint via motion.css.
+ * ==========================================================================*/
+
+import { Skeleton } from "@/ui";
+import styles from "@/components/home/Home.module.css";
+
+export default function HomeLoading() {
+  return (
+    &lt;div className={styles.page} aria-busy="true" aria-label="Đang tải trang chủ"&gt;
+      &lt;div className={styles.main}&gt;
+        {/* hero */}
+        &lt;Skeleton shape="block" width="100%" height={200} /&gt;
+        {/* category launcher row */}
+        &lt;div className={styles.skelRow}&gt;
+          {Array.from({ length: 5 }).map((_, i) =&gt; (
+            &lt;Skeleton key={i} shape="pill" width={64} height={64} /&gt;
+          ))}
+        &lt;/div&gt;
+        {/* live band */}
+        &lt;Skeleton shape="block" width="100%" height={140} /&gt;
+        {/* game grid */}
+        &lt;Skeleton shape="text" width="40%" height="1.6em" /&gt;
+        &lt;div className={styles.skelGrid}&gt;
+          {Array.from({ length: 6 }).map((_, i) =&gt; (
+            &lt;Skeleton key={i} shape="block" width="100%" height={120} /&gt;
+          ))}
+        &lt;/div&gt;
+        {/* vip aisle */}
+        &lt;Skeleton shape="block" width="100%" height={160} /&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+</code></pre></details>
+</section>
+

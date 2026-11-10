@@ -1,0 +1,72 @@
+{
+  "$description": "spacing tokens: primitive -> semantic -> component. Swap the semantic tier to add a theme.",
+  "primitive": {
+    "spacing": {
+      "scale": {
+        "12": {
+          "$value": "12px",
+          "$type": "dimension"
+        },
+        "128": {
+          "$value": "128px",
+          "$type": "dimension"
+        },
+        "16": {
+          "$value": "16px",
+          "$type": "dimension"
+        },
+        "24": {
+          "$value": "24px",
+          "$type": "dimension"
+        },
+        "32": {
+          "$value": "32px",
+          "$type": "dimension"
+        },
+        "4": {
+          "$value": "4px",
+          "$type": "dimension"
+        },
+        "48": {
+          "$value": "48px",
+          "$type": "dimension"
+        },
+        "64": {
+          "$value": "64px",
+          "$type": "dimension"
+        },
+        "8": {
+          "$value": "8px",
+          "$type": "dimension"
+        },
+        "96": {
+          "$value": "96px",
+          "$type": "dimension"
+        }
+      }
+    }
+  },
+  "semantic": {
+    "spacing": {
+      "control": {
+        "height": {
+          "$value": "48px",
+          "$type": "dimension"
+        }
+      },
+      "frame": {
+        "gap": {
+          "$value": "3px",
+          "$type": "dimension"
+        }
+      },
+      "touch": {
+        "min": {
+          "$value": "44px",
+          "$type": "dimension"
+        }
+      }
+    }
+  },
+  "component": {}
+}

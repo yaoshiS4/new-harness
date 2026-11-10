@@ -1,0 +1,5 @@
+{
+  "$description": "Generated gold and wine ramp steps not consumed by any component (orphan rule). Anchors are exact brief values.",
+  "gold": {},
+  "wine": {}
+}

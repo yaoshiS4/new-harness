@@ -1,0 +1,136 @@
+<section>
+<h2 id="r-store">R2 · Points store — route /cua-hang</h2>
+<table><tbody>
+<tr><th>URL</th><td><code>/cua-hang</code></td></tr>
+<tr><th>Page file</th><td><code>src/app/cua-hang/page.tsx</code> (async server component) + <code>cua-hang.module.css</code>. <code>metadata.title = "Cửa hàng điểm — Yaobet"</code>. Fetches <code>getProducts().catch(() =&gt; [])</code> and <code>getPointsBalance()</code> (3,250) from <code>src/lib/mock/store.ts</code>.</td></tr>
+<tr><th>Auth gating</th><td>Public. Guests see a login prompt instead of the balance, cards without timers and "Đăng nhập để đổi" CTAs that open the auth modal (login mode). Members see balance, cooldown chips, affordability.</td></tr>
+<tr><th>Section order</th><td><code>div.page</code>: 1 <code>h1.heading</code> "Cửa hàng điểm" → 2 <a href="#r-store-points-header">PointsHeader</a> → 3 <code>section.catalog</code> aria-label "Danh sách quà đổi điểm": <code>h2.subheading</code> "Quà đổi điểm" + <a href="#r-store-product-grid">ProductGrid</a> (filter tabs + grid + lazy <a href="#r-store-redeem-dialog">RedeemDialog</a>) → 4 <a href="#r-store-terms">StoreTerms</a>.</td></tr>
+<tr><th>Page styles</th><td>.page flex column gap 24px min-width 0; .heading 24px 700 #f2f0e4; .catalog column gap 16px; .subheading 20px 600 #f2f0e4.</td></tr>
+<tr><th>375px</th><td>Content 343px. Grid 2 columns, gap 16px → cards ≈163.5px wide; image 3:2 (≈109px tall). Tabs wrap if needed.</td></tr>
+<tr><th>768px</th><td>Grid 3 columns (content 736px → ≈234.7px cards).</td></tr>
+<tr><th>1024px</th><td>Grid 4 columns (content 932px → ≈221px cards).</td></tr>
+<tr><th>1440px</th><td>Grid 4 columns (content 1332px → ≈321px cards).</td></tr>
+<tr><th>Loading / empty / error</th><td>Server fetch failure → seeded <code>[]</code> → EmptyState (icon gift, "Cửa hàng trống", "Hiện chưa có sản phẩm nào để đổi điểm."). Client ErrorState/TileSkeleton paths exist but are unreachable (see warn in ProductGrid).</td></tr>
+</tbody></table>
+<details><summary>Verbatim cua-hang.module.css</summary><pre><code class="lang-css">/* Points store page — wide canvas. Tokens only; mobile-first @375. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+.catalog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.subheading {
+  font-size: var(--t-h2);
+  color: var(--text-hi);
+  font-weight: var(--weight-semi);
+}</code></pre></details>
+
+<h3 id="r-store-lib">src/lib/store/escalation.ts — the restart-cooldown math</h3>
+<pre><code class="lang-tsx">export const RG_UNLIMITED_WARN_STEP = 4;
+
+/**
+ * points_k = ceil( basePoints × (1/q)^(k-1) ), pinned at `maxSteps` when set.
+ * Step 1 = full rate = basePoints. PRD §4.3 · golden vectors (§4.4):
+ * base=1000 q=0.70 → 1000 · 1429 · 2041 · 2916 · 4165 · 5950.
+ */
+export function pointsAtStep(
+  base: number,
+  q: number,
+  step: number,
+  maxSteps: number | null,
+): number {
+  const effectiveStep = maxSteps != null ? Math.min(step, maxSteps) : step;
+  const k = Math.max(1, effectiveStep);
+  const cost = base * Math.pow(1 / q, k - 1);
+  return Math.ceil(cost);
+}
+
+/**
+ * Rate as a percentage of full value for the "{pct}% (bước {k})" disclosure:
+ * rate_k = r0 × q^(k-1) → pct = q^(k-1) × 100. Step 1 = 100%.
+ */
+export function ratePct(q: number, step: number): number {
+  const k = Math.max(1, step);
+  return Math.pow(q, k - 1) * 100;
+}
+
+/**
+ * Is a cooldown running against `nowMs`? Strict `now &lt; cooldownEndsAt`
+ * (PRD FR-2: the boundary `now == expiry` counts as NOT running → BASE/reset).
+ * `cooldownEndsAt == null` → not running (first-ever / clean).
+ */
+export function isCooldownRunning(p: Product, nowMs: number): boolean {
+  if (p.cooldownEndsAt == null) return false;
+  return nowMs &lt; new Date(p.cooldownEndsAt).getTime();
+}
+
+/** The claim branch resolved from the server clock (plan §1.1 · PRD §5 Gate 2). */
+export type ClaimBranch = "base" | "escalate" | "at_floor" | "unlimited_deep";
+
+/**
+ * Resolve which claim branch the NEXT claim lands on (plan §1.1):
+ *  - `base`            — cooldown not running (null OR now &gt;= expiry) → step 1, basePoints.
+ *  - `escalate`        — running, and (unlimited OR currentStep+1 ≤ maxSteps).
+ *  - `at_floor`        — running, maxSteps set, currentStep+1 &gt; maxSteps → pinned (FR-4).
+ *  - `unlimited_deep`  — unlimited, running, and step &gt; RG_UNLIMITED_WARN_STEP (FR-42).
+ */
+export function resolveBranch(p: Product, nowMs: number): ClaimBranch {
+  if (!isCooldownRunning(p, nowMs)) return "base";
+
+  const nextStep = p.currentStep + 1;
+
+  if (p.maxSteps == null) {
+    return nextStep &gt; RG_UNLIMITED_WARN_STEP ? "unlimited_deep" : "escalate";
+  }
+
+  return nextStep &gt; p.maxSteps ? "at_floor" : "escalate";
+}</code></pre>
+<ul>
+<li>points_k = ceil(basePoints · (1/q)^(k−1)), k = min(step, maxSteps) (≥1). q = repeatFraction (0.7 on every mock product).</li>
+<li>isCooldownRunning: <code>now &lt; cooldownEndsAt</code> (strict; null = not running).</li>
+<li>resolveBranch: not running → "base"; running and maxSteps null → nextStep &gt; 4 ? "unlimited_deep" : "escalate"; running with maxSteps → nextStep &gt; maxSteps ? "at_floor" : "escalate". nextStep = currentStep + 1.</li>
+<li>RG_UNLIMITED_WARN_STEP = 4. <code>ratePct(q, step)</code> = q^(step−1)·100 (unused by UI).</li>
+</ul>
+<table><thead><tr><th>basePoints (q 0.7, max 4)</th><th>step 1</th><th>step 2</th><th>step 3</th><th>step 4</th><th>step 5 (pinned)</th></tr></thead><tbody>
+<tr><td>100</td><td>100</td><td>143</td><td>205</td><td>292</td><td>292</td></tr>
+<tr><td>200</td><td>200</td><td>286</td><td>409</td><td>584</td><td>584</td></tr>
+<tr><td>300</td><td>300</td><td>429</td><td>613</td><td>875</td><td>875</td></tr>
+<tr><td>1,000</td><td>1,000</td><td>1,429</td><td>2,041</td><td>2,916</td><td>2,916</td></tr>
+<tr><td>2,000</td><td>2,000</td><td>2,858</td><td>4,082</td><td>5,831</td><td>5,831</td></tr>
+<tr><td>9,000</td><td>9,000</td><td>12,858</td><td>18,368</td><td>26,240</td><td>26,240</td></tr>
+</tbody></table>
+<p>Unlimited (maxSteps null), base 1,000: 1,000 · 1,429 · 2,041 · 2,916 · 4,165 · 5,950 (matches the golden vector in the source comment).</p>
+
+<h3 id="r-store-data">Mock catalogue (src/lib/mock/store.ts)</h3>
+<p>Defaults (mockProduct): imageSrc <code>/assets/store/reward-coins.jpg</code> (524×416 JPEG — the SAME image on every product), category "voucher", rollingRequired 3, stockTotal 200, stockRemaining 88, redeemedCount 0, faceValue 1,000,000 VND, basePoints 1,000, repeatFraction 0.7, cooldownMinutes 4,320, maxSteps 4, currentStep 1, cooldownEndsAt null, userRedeemedCount 0, cyclePointsBurned 0. Balance <code>getPointsBalance()</code> = 3,250 (0 if DEMO_EMPTY).</p>
+<table><thead><tr><th>#</th><th>name</th><th>category</th><th>face</th><th>base</th><th>rolling</th><th>stock left</th><th>cooldown</th><th>step</th><th>Member card face (3,250 pts)</th><th>Guest card face</th></tr></thead><tbody>
+<tr><td>1</td><td>Voucher 200K</td><td>voucher</td><td>200.000 ₫</td><td>200</td><td>5</td><td>286</td><td>—</td><td>1</td><td>Đổi ngay (gold)</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>2</td><td>Voucher 300K</td><td>voucher</td><td>300.000 ₫</td><td>300</td><td>3</td><td>210</td><td>—</td><td>1</td><td>Đổi ngay</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>3</td><td>Voucher 500K</td><td>voucher</td><td>500.000 ₫</td><td>500</td><td>3</td><td>0</td><td>—</td><td>1</td><td>SOLD OUT: tag "Tạm hết", image 40% opacity, "Tạm hết hàng" ghost disabled</td><td>same sold-out</td></tr>
+<tr><td>4</td><td>Voucher 1 triệu</td><td>voucher</td><td>1.000.000 ₫</td><td>1.000</td><td>3</td><td>168</td><td>—</td><td>1</td><td>Đổi ngay</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>5</td><td>Voucher 2 triệu</td><td>voucher</td><td>2.000.000 ₫</td><td>2.000</td><td>8</td><td>66</td><td>isoIn(13.25) ≈ 00:13:15</td><td>1</td><td>chip "Thời gian chờ 00:13:15" + Đổi ngay (EARLY dialog)</td><td>Đăng nhập để đổi, no chip</td></tr>
+<tr><td>5b</td><td>Voucher 100K</td><td>voucher</td><td>100.000 ₫</td><td>100</td><td>5</td><td>140</td><td>isoIn(720) = 12:00:00</td><td>4</td><td>LIMIT: chip shown + "Hết lượt đổi" ghost disabled</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>6</td><td>PlayStation 5 Slim</td><td>product</td><td>14.000.000 ₫</td><td>14.000</td><td>0</td><td>40</td><td>—</td><td>1</td><td>"Thiếu 10.750 điểm" ghost disabled</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>7</td><td>iPhone 15 Pro Max</td><td>product</td><td>30.000.000 ₫</td><td>30.000</td><td>0</td><td>22</td><td>—</td><td>1</td><td>"Thiếu 26.750 điểm"</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>8</td><td>AirPods Pro 2</td><td>product</td><td>5.500.000 ₫</td><td>5.500</td><td>0</td><td>74</td><td>—</td><td>1</td><td>"Thiếu 2.250 điểm"</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>9</td><td>Apple Watch Series 9</td><td>product</td><td>9.000.000 ₫</td><td>9.000</td><td>0</td><td>36</td><td>isoIn(119) ≈ 01:59:00</td><td>1</td><td>chip + "Thiếu 5.750 điểm"</td><td>Đăng nhập để đổi</td></tr>
+<tr><td>10</td><td>Steam Deck OLED</td><td>product</td><td>13.000.000 ₫</td><td>13.000</td><td>0</td><td>0</td><td>—</td><td>1</td><td>sold out</td><td>sold out</td></tr>
+</tbody></table>
+<div class="callout warn">Cooldown expiries are computed with <code>isoIn()</code> at MODULE LOAD on the server (<code>new Date(Date.now() + m·60000)</code>). They are fixed at server start, so after ~13 minutes of server uptime "Voucher 2 triệu" permanently loses its early state and after 12 h the limit-lock disappears, until the server restarts. A rebuild should reproduce the states by computing expiries per request (or document the drift).</div>
+<p>DEMO switches (all off): <code>DEMO_STATE</code> (null; one of full-rate / early / at-floor / unlimited-deep / insufficient / rolling-unmet / sold-out serves a single "[DEMO] …" fixture), <code>DEMO_ERROR</code> (false; getProducts throws), <code>DEMO_PAUSED</code> (false; paused dialog), <code>DEMO_EMPTY</code> (helpers, false; empty catalogue + 0 balance).</p>
+</section>
+

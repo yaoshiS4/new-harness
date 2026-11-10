@@ -1,0 +1,6 @@
+src/components/layout/Header.tsx
+src/components/layout/MemberMenu.tsx
+src/components/layout/NotificationBell.tsx
+src/components/layout/BottomTabBar.tsx
+src/components/layout/CategorySheet.tsx
+src/styles/areas/shell.css

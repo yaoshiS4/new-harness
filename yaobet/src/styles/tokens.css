@@ -1,0 +1,544 @@
+/* ============================================================================
+ * Yaobet — :root TOKEN CONTRACT
+ * ----------------------------------------------------------------------------
+ * Three tiers, Wine-Gold values (docs/design/wine-gold/):
+ *
+ *   PRIMITIVE  — --wg-* literals, declared once in the first :root block below.
+ *                Read ONLY by tokens.css, themes.css and brands.css; components
+ *                never read a --wg-* var.
+ *   SEMANTIC   — the existing names (--canvas, --surface*, --text-*, --t-*,
+ *                --space-*, --radius-*, --dur-* ...) re-pointed to var(--wg-*).
+ *   COMPONENT  — --header-bg, --progress-*, --input-*, --modal-* ... read the
+ *                semantic names.
+ *
+ * Inside the semantic tier there are two named groups:
+ *
+ *   GROUP A  — LOCKED base. Never per-brand overridable. Authored on :root only;
+ *              FORBIDDEN inside any [data-brand] block (lint A1).
+ *   GROUP B  — Brand-overridable indirection. Splits into:
+ *                (i)  RAW RAMP source values (--gold-*, --cta*, --font-body/-num,
+ *                     --text-on-gold) — default-brand source values; components must
+ *                     NOT read these directly (lint A2).
+ *                (ii) --brand-* INDIRECTION vars — the ONLY tokens a [data-brand]
+ *                     block re-points and the ONLY brand-tinted vars components read.
+ *
+ * PINNED-to-neutral (§0.2): --focus-ring, --win, --loss, --error are standalone
+ * LOCKED constants. They read a --wg-* primitive and MUST NOT reference any
+ * --brand-* or RAW-RAMP token (lint A3).
+ *
+ * Components read brand/semantic/locked vars — NEVER raw ramp literals.
+ * No component hardcodes a hex / px / duration; everything is var(--…).
+ * ==========================================================================*/
+
+/* ---- PRIMITIVE tier: Wine-Gold --wg-* values -------------------------------
+ * Copied verbatim from design-tokens.all.json and the approved overlay. A
+ * primitive is declared only when a semantic token (or a contrast pair) reads
+ * it. The font families read the next/font loader vars (layout.tsx), because
+ * next/font injects hashed family names. */
+:root {
+  /* colour: warm neutrals + ivory */
+  --wg-color-neutral-300: #B8B0A3;
+  --wg-color-neutral-400: #9A9387;
+  --wg-color-neutral-500: #857D70;
+  --wg-color-neutral-700: #3A352E;
+  --wg-color-neutral-750: #38332C;
+  --wg-color-neutral-800: #2E2A24;
+  --wg-color-neutral-850: #26221D;
+  --wg-color-neutral-900: #1C1A17;
+  --wg-color-ivory-100:   #F4EFE6;
+
+  /* colour: gold ramp */
+  --wg-color-gold-300:       #E8C877;
+  --wg-color-gold-400:       #E0BC6A;
+  --wg-color-gold-500:       #D4AF5A;
+  --wg-color-gold-600:       #C29A3A;
+  --wg-color-gold-800:       #6A5521;
+  --wg-color-gold-sheen-end: #C9A24B;
+
+  /* colour: wine ramp */
+  --wg-color-wine-500: #5A1A2E;
+  --wg-color-wine-600: #4A1424;
+  --wg-color-wine-700: #3A0F1C;
+
+  /* colour: feedback hues + tints (red-300 is the luminance-matched loss) */
+  --wg-color-green-400:  #4CC38F;
+  --wg-color-green-900:  #16372B;
+  --wg-color-red-300:    #F2968E;
+  --wg-color-red-400:    #EF7B71;
+  --wg-color-blue-400:   #6FA8E0;
+  --wg-color-blue-900:   #14283D;
+  --wg-color-orange-400: #F2894A;
+  --wg-color-orange-900: #3D2312;
+
+  /* colour: scrim */
+  --wg-color-scrim-modal: rgba(28, 26, 23, 0.72);
+
+  /* type: families, sizes, leading, weights */
+  --wg-type-family-body:    'Be Vietnam Pro', var(--font-be-vietnam), 'Noto Sans', 'Noto Sans Vietnamese', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --wg-type-family-display: 'Playfair Display', var(--font-playfair), 'Noto Serif', 'Noto Serif Vietnamese', Georgia, serif;
+  --wg-type-family-numeric: 'Inter', var(--font-inter), 'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --wg-type-size-display: clamp(36px, calc(27.24px + 2.247vw), 56px);
+  --wg-type-size-h1:      clamp(30px, calc(23.87px + 1.573vw), 44px);
+  --wg-type-size-h2:      clamp(26px, calc(21.62px + 1.124vw), 36px);
+  --wg-type-size-h3:      clamp(22px, calc(19.37px + 0.674vw), 28px);
+  --wg-type-size-h4:      clamp(19px, calc(17.69px + 0.337vw), 22px);
+  --wg-type-size-body-lg: clamp(18px, calc(17.56px + 0.112vw), 19px);
+  --wg-type-size-body:    16px;
+  --wg-type-size-body-sm: 14px;
+  --wg-type-size-caption: 12px;
+  --wg-type-size-num-lg:  clamp(28px, calc(24.49px + 0.899vw), 36px);
+  --wg-type-size-num-md:  clamp(20px, calc(18.25px + 0.449vw), 24px);
+  --wg-type-size-num-sm:  16px;
+  --wg-type-leading-body:    1.6;
+  --wg-type-leading-heading: 1.3;
+  --wg-type-leading-ui:      1.4;
+  --wg-type-leading-display: 1.25;
+  --wg-type-weight-regular:  400;
+  --wg-type-weight-medium:   500;
+  --wg-type-weight-semibold: 600;
+
+  /* spacing scale */
+  --wg-space-4:  4px;
+  --wg-space-8:  8px;
+  --wg-space-12: 12px;
+  --wg-space-16: 16px;
+  --wg-space-24: 24px;
+  --wg-space-32: 32px;
+  --wg-space-48: 48px;
+
+  /* radius */
+  --wg-radius-control: 4px;
+  --wg-radius-surface: 8px;
+  --wg-radius-full:    999px;
+
+  /* elevation */
+  --wg-shadow-1: 0 1px 2px rgba(12, 10, 8, 0.45);
+  --wg-shadow-2: 0 4px 12px rgba(12, 10, 8, 0.5);
+  --wg-shadow-3: 0 12px 32px rgba(12, 10, 8, 0.6);
+
+  /* motion */
+  --wg-duration-instant: 80ms;
+  --wg-duration-fast:    150ms;
+  --wg-duration-base:    250ms;
+  --wg-duration-slow:    400ms;
+  --wg-duration-ambient: 650ms;
+  --wg-ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+  --wg-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --wg-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --wg-ease-ambient:    cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root {
+  /* ======================================================================
+   * GROUP A — LOCKED BASE  (forbidden inside [data-brand])
+   * ==================================================================== */
+
+  /* §1 — Color: canvas & surfaces — Wine-Gold warm near-black ladder
+   * ---------------------------------------------------------------------
+   * Monotone-ascending: canvas/shell < surface/tile < surface-2 < surface-3,
+   * so "more elevated" is always "lighter". Depth comes from the step,
+   * the --border hairline and the --lift/--shadow-2/--halo elevation shadows.
+   * Muted text on --surface-3 uses --fg-muted-raised (--text-mid misses AA
+   * there). [data-theme="obsidian"] (themes.css) keeps the previous ladder. */
+  --canvas:           var(--wg-color-neutral-900); /* page background (the .app-main analog) — the ONE root bg */
+  --shell:            var(--wg-color-neutral-900); /* deeper shell behind the canvas; own slot so obsidian can differ */
+  --surface:          var(--wg-color-neutral-850); /* dominant surface: card/panel/button-default base */
+  --surface-2:        var(--wg-color-neutral-800); /* module card bg (.list/.rule-wrap) */
+  --surface-3:        var(--wg-color-neutral-750); /* raised panel / table head; modal, toast, tooltip */
+  --tile:             var(--wg-color-neutral-850); /* game-tile bg (.game-item/.game_bg) — fixed-tile surface */
+  --surface-hover:    var(--wg-color-neutral-750); /* hover / active menu item (ghost hover) */
+  --surface-disabled: var(--wg-color-neutral-800);
+  --scrim:            var(--wg-color-scrim-modal); /* modal scrim — SOLID, never backdrop-filter:blur */
+  --surface-wine-deep: var(--wg-color-wine-700); /* deep wine surface (VIP card fill) */
+
+  /* §3 — Semantic: EXACT win/loss + focus (PINNED neutral) ---------- */
+  --win:        var(--wg-color-green-400);  /* win/positive amount — luminance-matched to --loss (within 5%). PINNED */
+  --loss:       var(--wg-color-red-300);    /* equal-salience loss. PINNED */
+  --error:      var(--wg-color-red-400);    /* danger (validation, not outcomes). PINNED */
+  --green:      var(--wg-color-green-400);  /* flat positive accent (feedback success). PINNED */
+  --info:       var(--wg-color-blue-400);   /* info */
+  --caution:    var(--wg-color-orange-400); /* amber "allowed-but-costs-more" — NOT a reward (gold) nor a block (red/error). LOCKED neutral. PINNED */
+  --on-caution: var(--wg-color-orange-900); /* text on a solid --caution fill (solid caution badge) */
+  --focus-ring: var(--wg-color-ivory-100);  /* AA focus indicator — LOCKED neutral ivory, gap = --canvas. PINNED */
+
+  /* §3 — Text ladder on dark — ivory, not white
+   * ---------------------------------------------------------------------
+   * --text-hi is the primary ivory, --text the secondary step, --text-mid the
+   * muted step. --text-dim keeps its slot for obsidian and maps to the same
+   * AA muted step, so no functional copy falls below AA. */
+  --text-hi:  var(--wg-color-ivory-100);   /* primary text */
+  --text:     var(--wg-color-neutral-300); /* strong secondary */
+  --text-mid: var(--wg-color-neutral-400); /* muted — on --surface-3 use --fg-muted-raised */
+  --text-dim: var(--wg-color-neutral-400); /* hint text — same AA muted step */
+  --fg-muted-raised: var(--wg-color-neutral-300); /* muted copy on --surface-3 and wine surfaces */
+
+  /* Card hairline: a decorative divider. The surface step plus the --lift
+   * shadow carry the card edge, so this hairline is not load-bearing. */
+  --border:   var(--wg-color-neutral-700); /* hairline */
+  --line-default: var(--wg-color-neutral-500); /* control edge: the edge of modal, toast and tooltip */
+  --tint:     var(--wg-color-neutral-800); /* subtle warm surface step (opaque) */
+
+  /* §4 — Typography: scale (fluid clamp, Wine-Gold role ramp) ---------- */
+  --t-micro:   var(--wg-type-size-caption); /* dense caption */
+  --t-sm:      var(--wg-type-size-body-sm);
+  --t-body:    var(--wg-type-size-body);    /* body base */
+  --t-h3:      var(--wg-type-size-h4);
+  --t-h2:      var(--wg-type-size-h3);
+  --t-h1:      var(--wg-type-size-h2);      /* section heading */
+  --t-display: var(--wg-type-size-h1);
+  --t-hero:    var(--wg-type-size-display); /* hero counters */
+  --t-num:     var(--wg-type-size-num-sm);  /* inline tabular money */
+  --t-num-lg:  var(--wg-type-size-num-lg);  /* hero tabular money */
+  --lh-body:   var(--wg-type-leading-body);
+  --lh-tight:  var(--wg-type-leading-heading); /* MIN line-height for VN text (diacritics need headroom) */
+  --weight-reg:  var(--wg-type-weight-regular);
+  --weight-semi: var(--wg-type-weight-semibold);
+  --weight-bold: var(--wg-type-weight-semibold); /* strong emphasis: no 700 face is loaded */
+
+  /* Type roles: family / size / leading / weight per role. Display, h1 and h2
+   * take the display face; h3 down take the body face; numerals take the
+   * numeric face. */
+  --type-display-family:  var(--brand-font-display);
+  --type-display-size:    var(--wg-type-size-display);
+  --type-display-leading: var(--wg-type-leading-heading);
+  --type-display-weight:  var(--wg-type-weight-semibold);
+  --type-h1-family:       var(--brand-font-display);
+  --type-h1-size:         var(--wg-type-size-h1);
+  --type-h1-leading:      var(--wg-type-leading-heading);
+  --type-h1-weight:       var(--wg-type-weight-semibold);
+  --type-h2-family:       var(--brand-font-display);
+  --type-h2-size:         var(--wg-type-size-h2);
+  --type-h2-leading:      var(--wg-type-leading-heading);
+  --type-h2-weight:       var(--wg-type-weight-semibold);
+  --type-h3-family:       var(--wg-type-family-body);
+  --type-h3-size:         var(--wg-type-size-h3);
+  --type-h3-leading:      var(--wg-type-leading-heading);
+  --type-h3-weight:       var(--wg-type-weight-semibold);
+  --type-h4-family:       var(--wg-type-family-body);
+  --type-h4-size:         var(--wg-type-size-h4);
+  --type-h4-leading:      var(--wg-type-leading-heading);
+  --type-h4-weight:       var(--wg-type-weight-semibold);
+  --type-body-lg-family:  var(--wg-type-family-body);
+  --type-body-lg-size:    var(--wg-type-size-body-lg);
+  --type-body-lg-leading: var(--wg-type-leading-body);
+  --type-body-lg-weight:  var(--wg-type-weight-regular);
+  --type-body-family:     var(--wg-type-family-body);
+  --type-body-size:       var(--wg-type-size-body);
+  --type-body-leading:    var(--wg-type-leading-body);
+  --type-body-weight:     var(--wg-type-weight-regular);
+  --type-body-sm-family:  var(--wg-type-family-body);
+  --type-body-sm-size:    var(--wg-type-size-body-sm);
+  --type-body-sm-leading: var(--wg-type-leading-body);
+  --type-body-sm-weight:  var(--wg-type-weight-regular);
+  --type-caption-family:  var(--wg-type-family-body);
+  --type-caption-size:    var(--wg-type-size-caption);
+  --type-caption-leading: var(--wg-type-leading-ui);
+  --type-caption-weight:  var(--wg-type-weight-medium);
+  --type-num-lg-family:   var(--wg-type-family-numeric);
+  --type-num-lg-size:     var(--wg-type-size-num-lg);
+  --type-num-lg-leading:  var(--wg-type-leading-display); /* single-line numerals only */
+  --type-num-lg-weight:   var(--wg-type-weight-semibold);
+  --type-num-md-family:   var(--wg-type-family-numeric);
+  --type-num-md-size:     var(--wg-type-size-num-md);
+  --type-num-md-leading:  var(--wg-type-leading-display); /* single-line numerals only */
+  --type-num-md-weight:   var(--wg-type-weight-semibold);
+  --type-num-sm-family:   var(--wg-type-family-numeric);
+  --type-num-sm-size:     var(--wg-type-size-num-sm);
+  --type-num-sm-leading:  var(--wg-type-leading-ui);
+  --type-num-sm-weight:   var(--wg-type-weight-medium);
+
+  /* §5 — Spacing (4px grid) -------------------------------------------- */
+  --space-1: var(--wg-space-4);
+  --space-2: var(--wg-space-8);
+  --space-3: var(--wg-space-12);
+  --space-4: var(--wg-space-16);
+  --space-5: var(--wg-space-24);
+  --space-6: var(--wg-space-32);
+  --space-7: var(--wg-space-32); /* off the DS scale; folds into the --space-6 step */
+  --space-8: var(--wg-space-48);
+  --gutter:  var(--wg-space-16); /* the single horizontal gutter — replaces 15/16 split */
+  --field-rhythm: var(--wg-space-24); /* .input-item margin-bottom analog */
+
+  /* §6 — Radii: controls take the control step, content holders the surface step */
+  --radius-sm:   var(--wg-radius-control);
+  --radius-md:   var(--wg-radius-surface);
+  --radius-lg:   var(--wg-radius-surface);
+  --radius-card: var(--wg-radius-surface);
+  --radius-pill: var(--wg-radius-full);
+
+  /* §6 — Elevation: three shadow levels --------------------------------
+   * One shadow level per branch of the tree (no nested lifted cards).
+   * GROUP-A, so a [data-brand] block can never redefine them (lint A1). */
+  --glow-gold: var(--wg-color-gold-300); /* kept as a gold colour slot with no box-shadow use: the active state is a gold border-color change */
+  --halo:      var(--wg-shadow-3); /* level 3: modal, toast, hero */
+  --lift:      var(--wg-shadow-1); /* level 1: cards */
+  /* Level 2: menus and the QuickActionRail, which reads var(--shadow-2, …). */
+  --shadow-2:  var(--wg-shadow-2);
+
+  /* §6 — Z-index: named ladder ----------------------------------------- */
+  --z-content:  1;
+  --z-sticky:   100;
+  --z-dropdown: 1000;
+  --z-modal:    2000;
+  --z-toast:    3000;
+
+  /* §6 — Layout / chrome (FIXED-TILE system) ----- */
+  --header-h:    72px;   /* tier-1 logo/identity (120px = 72 + 48 nav) */
+  --nav-h:       48px;   /* tier-2 category row (.routers-list 48px) */
+  --logo-h:      44px;   /* main logo height inside a 170×60 lockup box */
+  --header-bg:   var(--canvas); /* sticky header — OPAQUE page canvas, same as the body (NOT the .8 blur) */
+  --rail-w:      304px;  /* member left rail */
+  --frame-w:     1424px; /* fixed content frame (.home_wrapper 1424px) */
+  --frame-min:   1150px; /* min-width clamp (.routers-list min-width) */
+  --bottombar-h: 56px;   /* + safe-area-inset-bottom */
+
+  /* §6b — grid / tile / spacing system (the dead-space fix) --------- */
+  --band-gap:    var(--wg-space-16); /* between every band; module top-margin */
+  --gap:         var(--wg-space-16); /* THE grid/rail gap (alias of --gutter; cheat-sheet name) */
+  --gap-sm:      var(--wg-space-8);  /* dense tile clusters, chip rows */
+  --gap-xs:      var(--wg-space-4);  /* label/icon pairs */
+  --feature-w:   418px;  /* home feature-rail fixed column (.img-list 418px auto) */
+  --tile-h:      205px;  /* canonical game-tile height (.game-list li 205px) */
+  --provider-w:  128px;  /* provider chip fixed cell (repeat(auto-fill,128px)) */
+  --provider-h:  48px;   /* provider chip height (.provider-btn 48px) */
+  --card-pad:    var(--wg-space-24); /* spacious module card padding */
+  --card-pad-sm: var(--wg-space-16); /* standard card padding */
+  --banner-mb:   var(--wg-space-24); /* hero/banner block bottom margin (.banner_content) */
+
+  /* §7 — Motion ---------------------------------------------------------
+   * fast for hover/press/focus, base for reveals, tabs and sheet entry, slow
+   * for page-level transitions only. Exits run at the fast step. instant is a
+   * state swap; ambient is the skeleton shimmer and the one home loop.
+   * Every duration is zeroed under reduced motion (motion.css). */
+  --dur-fast:    var(--wg-duration-fast);    /* hover, press, focus */
+  --dur-base:    var(--wg-duration-base);    /* THE default: reveals, tabs, sheet enter */
+  --dur-slow:    var(--wg-duration-slow);    /* page-level transitions only */
+  --dur-header:  var(--wg-duration-base);    /* header height collapse/expand */
+  --dur-instant: var(--wg-duration-instant); /* state swap */
+  --dur-exit:    var(--wg-duration-fast);    /* exits */
+  --dur-ambient: var(--wg-duration-ambient); /* skeleton shimmer, ambient loop */
+  --ease-standard: var(--wg-ease-standard);   /* colour, opacity, border shifts */
+  --ease-entrance: var(--wg-ease-decelerate); /* entrances */
+  --ease-exit:     var(--wg-ease-accelerate); /* exits */
+  --ease-ambient:  var(--wg-ease-ambient);    /* looping ambient motion */
+
+  /* §8 — tap targets ---------------------------------------- */
+  --tap-min: 44px; /* every interactive primitive */
+  --tap-bar: 48px; /* bottom bar */
+  --touch-gap: var(--wg-space-8); /* minimum gap between adjacent touch targets */
+  --icon-sm:   var(--wg-space-16);
+  --icon-lg:   var(--wg-space-24);
+
+  /* §9 — MEMBER-HUB PREMIUM LAYER (additive GROUP-A base; brand-following) ----
+   * Surface/effect/progress/typography tokens for the member-hub rebuild.
+   * Re-expresses per-tier raster art (bgN.png / bg_wallet.png) as pure-CSS
+   * blooms over the LOCKED --canvas / --surface. Every accent-tinted stop runs
+   * through color-mix(… var(--brand-accent) …) so the emerald brand re-skins
+   * them from a single :root definition — they intentionally do NOT appear in
+   * any [data-brand] block (A1/A3 invariant preserved). --progress-dot stays a
+   * locked neutral (the dot is brand-agnostic, like a comet head). */
+
+  /* Ambient page backdrop — faint brand bloom (top) + cool blue lift (bottom)
+   * over the locked canvas. Layered OVER var(--canvas) so a browser without
+   * color-mix degrades to the flat canvas, never to transparent/black. */
+  --page-bloom:
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--brand-accent) 6%, transparent) 0%, transparent 46%),
+    radial-gradient(140% 120% at 50% 120%, color-mix(in srgb, var(--wg-color-blue-900) 25%, transparent) 0%, transparent 55%),
+    var(--canvas);
+  /* Member content column stays flat matte so lifted cards read as raised. */
+  --member-canvas: var(--canvas);
+
+  /* Fused hero card — warm brand-accent halo behind the avatar into --surface. */
+  --header-card-grad:
+    radial-gradient(120% 140% at 14% 30%, color-mix(in srgb, var(--brand-accent) 14%, transparent) 0%, transparent 52%),
+    var(--surface);
+  /* Faint diagonal sheen on the wallet block — ivory stops. */
+  --wallet-sheen-grad:
+    linear-gradient(118deg, color-mix(in srgb, var(--wg-color-ivory-100) 5%, transparent) -10%, color-mix(in srgb, var(--wg-color-ivory-100) 1.2%, transparent) 60%, transparent 100%);
+  /* The signature corner glow — soft ivory bleed from the upper-right. */
+  --card-sheen-grad:
+    radial-gradient(circle at 78% 26%, color-mix(in srgb, var(--wg-color-ivory-100) 4%, transparent) 0%, color-mix(in srgb, var(--wg-color-ivory-100) 1%, transparent) 57%, transparent 72%);
+
+  /* QR/scan tile — a genuine pure-white surface (a QR must be on white to be
+   * scannable). The ONE intentional white block on a member surface; locked
+   * neutral, brand-agnostic (like --progress-dot). Components read this token,
+   * never a raw #fff (lint A2). */
+  --qr-surface: #ffffff;
+
+  /* Balance renders in the primary ivory (money is never gold). */
+  --balance-text: var(--text-hi);
+  --t-balance: var(--wg-type-size-num-lg); /* hero balance size — the num-lg role */
+
+  /* Membership progress track: the deep wine groove, with a thin gold fill. */
+  --progress-track: var(--surface-wine-deep);
+  --progress-fill: var(--brand-accent-fg); /* filled portion keyed to the brand text accent */
+  /* The app's ONLY `background-image:` call-site, so this one MUST stay in
+   * <image> syntax — a bare <color> would make the declaration invalid and the
+   * progress bar would lose its fill entirely. Degenerate on purpose: two
+   * identical stops render flat while the property stays valid. Do NOT
+   * collapse this to var(--brand-accent-grad). */
+  --progress-fill-grad: linear-gradient(90deg, var(--progress-fill), var(--progress-fill));
+  --progress-dot: var(--text-hi); /* locked neutral ivory comet head */
+  /* Kept as `none`: the comet head reads by its own fill against the track. */
+  --progress-dot-glow: none;
+  --progress-tag-bg: var(--surface-3); /* right-pinned next-tier pill bg */
+  --progress-tag-text: var(--brand-accent-fg); /* next-tier pill label + chevron */
+  --progress-tag-border: var(--border); /* decorative hairline */
+
+  /* Activation status chip (the not-activated shield pill on the hero). --green
+   * is already PINNED neutral; the verified state prefers Badge tone="info". */
+  --status-locked-bg: var(--wg-color-green-900); /* success tint */
+  --status-locked-text: var(--green);
+
+  /* "tạm dừng" (paused) status: distinct from danger and from loss. The label
+   * carries the state; the fill is decorative. */
+  --status-paused-fg: var(--text);
+  --status-paused-bg: var(--wg-color-neutral-700);
+
+  /* §10 — Component colour tokens: each reads a semantic name ------------ */
+  --accent-secondary-fg:   var(--brand-accent-fg); /* secondary (outline) button label */
+  --card-bg:               var(--surface);
+  --button-secondary-text: var(--accent-secondary-fg);
+  /* Checkbox = checked-bg + checked-mark; switch = checked-track + checked-knob.
+   * The knob never sits on the gold fill. */
+  --control-checked-bg:    var(--brand-accent);
+  --control-checked-mark:  var(--brand-on-accent); /* checkbox tick on the accent fill */
+  --control-checked-track: var(--surface-3);
+  --control-checked-knob:  var(--brand-accent-fg);
+  --input-text:            var(--text-hi);
+  --input-label:           var(--text);
+  --input-helper:          var(--fg-muted-raised); /* inputs also sit in modals */
+  --input-error-text:      var(--error);
+  --tab-text-rest:         var(--text);
+  --tab-text-active:       var(--brand-accent-fg); /* paired with the tab indicator */
+  --odds-up:               var(--win);  /* pair with an up arrow, never colour alone */
+  --odds-down:             var(--loss); /* pair with a down arrow */
+  --vip-bg:                var(--surface-wine-deep);
+  --vip-header-bg:         var(--header-bg);      /* header surface */
+  --modal-border:          var(--line-default);
+  --modal-meta:            var(--fg-muted-raised);
+  --toast-border:          var(--line-default);
+  --toast-meta:            var(--fg-muted-raised);
+  --tooltip-border:        var(--line-default);
+  --tooltip-meta:          var(--fg-muted-raised);
+  --feedback-bg-paused:    var(--status-paused-bg);
+
+  /* ======================================================================
+   * GROUP B — RAW RAMP (default-brand source values)
+   * Components must NOT read these directly — only the --brand-* aliases below.
+   * An alternate [data-brand] block bypasses these entirely by re-pointing
+   * the --brand-* aliases to its own hex.
+   * ==================================================================== */
+
+  /* §2 — Gold accent ---------------------------------------------------- */
+  --gold-500:      var(--wg-color-gold-500); /* primary accent fill (VIP, prices, active tabs) */
+  --gold-600:      var(--wg-color-gold-600); /* pressed/darker step */
+  /* The flat primary fallback. The primary button sheen is --brand-accent-grad;
+   * this stays a SOLID COLOUR so every `background:` call-site that reads it
+   * keeps a valid flat fill. */
+  --gold-grad:     var(--wg-color-gold-500);
+  --gold-hairline: var(--wg-color-gold-800); /* decorative gold hairline */
+  --text-on-gold:  var(--wg-color-wine-700); /* deep wine ink on the gold fill (AA at rest, hover and pressed) */
+
+  /* §3 — Secondary roles (the CTA fills are the gold primary)
+   *   --cta        → the gold text accent (links, auth focus border).
+   *   --cta-grad   → the gold primary fill (.ui-btn-primary), not a
+   *                  separate secondary fill.
+   *   --cta-accent → the gold primary fill (Register). */
+  --cta:        var(--wg-color-gold-300); /* link / focus border — gold text accent */
+  --cta-grad:   var(--wg-color-gold-500); /* primary fill — solid, not a gradient */
+  --cta-accent: var(--wg-color-gold-500); /* register accent — the gold primary */
+  --blue-soft:  var(--wg-color-neutral-300); /* soft nav text / links — secondary text */
+
+  /* §4 — Font stack (Vietnamese-first) ---------------------------------
+   * All faces are loaded by next/font/google in app/layout.tsx and injected
+   * as --font-be-vietnam / --font-playfair / --font-inter (and
+   * --font-montserrat for the emerald brand). Every face serves the Google
+   * `vietnamese` subset (U+1EA0–1EF9), so the toned vowels in `BỘ SƯU TẬP`
+   * and `Đổi thưởng` resolve INSIDE the face — no mid-word fallback.
+   * Outfit is REJECTED: latin/latin-ext only, skips U+1EA0–1EF1. */
+  --font-body: var(--wg-type-family-body);
+  --font-num:  var(--wg-type-family-numeric);
+  /* Display, h1 and h2 only — Playfair Display. h3 down use the body face. */
+  --font-head: var(--wg-type-family-display);
+
+  /* ======================================================================
+   * GROUP B — BRAND INDIRECTION  (the ONLY vars a [data-brand] re-points;
+   * the ONLY brand-tinted vars components consume). ALIAS MAP → RAW RAMP.
+   * ==================================================================== */
+  --brand-accent:          var(--gold-500);      /* → --gold-500    flat accent fill — VIP, prices, active tabs */
+  --brand-accent-fg:       var(--wg-color-gold-300); /* → gold text accent (the DS splits fill and text) */
+  --brand-accent-2:        var(--gold-600);      /* → --gold-600    pressed/darker accent step */
+  --brand-accent-grad:     linear-gradient(180deg, var(--wg-color-gold-400), var(--wg-color-gold-sheen-end)); /* primary button sheen */
+  --brand-accent-hairline: var(--gold-hairline); /* → --gold-hairline  card hairline in brand accent */
+  --brand-on-accent:       var(--text-on-gold);  /* → --text-on-gold   on-accent text (≥4.5:1 on --brand-accent) */
+  --brand-cta:             var(--cta);           /* → --cta         primary CTA text accent */
+  --brand-cta-grad:        var(--cta-grad);      /* → --cta-grad    primary CTA fill */
+  --brand-cta-accent:      var(--cta-accent);    /* → --cta-accent  register accent */
+  --brand-font-body:       var(--font-body);     /* → --font-body   brand body face (VN-diacritic complete) */
+  --brand-font-num:        var(--font-num);      /* → --font-num    brand tabular-numeral face */
+  --brand-font-head:       var(--font-head);     /* → --font-head   brand display/heading face (VN-complete) */
+  --brand-logo:            url("/assets/brand/logo.svg"); /* logo lockup slot (literal URL, no raw-ramp source) */
+
+  /* ======================================================================
+   * LUXURY VIP PROGRAM LAYER (/vip rebuild) — page-scoped palette.
+   * ----------------------------------------------------------------------
+   * A SELF-CONTAINED warm-near-black + luxury-gold palette for the /vip page
+   * only, applied via a .vipPalette page-root wrapper. Intentionally distinct
+   * from the app --canvas/--brand-accent chrome (a visible seam vs the shell
+   * is accepted & flagged). tokens.css is the ONLY file permitted literals;
+   * components read these via var() and tint via color-mix(). Names use the
+   * --vip-* prefix (NEVER --gold-*, which is RAW-RAMP-reserved). --font-cinzel
+   * is provided at runtime by next/font/google on <html> (layout.tsx). */
+
+  /* surfaces / text */
+  --vip-page-bg:        #0b0a07; /* warm near-black page */
+  --vip-panel-bg:       #17140d; /* warm panel */
+  --vip-panel-alt:      #141019; /* alt panel (cool-violet cast) */
+  --vip-inner-bg:       #0f0c07; /* inner well */
+  --vip-text-primary:   #e6ebf5;
+  --vip-text-secondary: #c9c3b4;
+  --vip-text-muted:     #8b96ad;
+  --vip-text-faint:     #6b7690;
+  --vip-text-disabled:  #565f70; /* dimmed locked-ahead values */
+
+  /* luxury gold ramp + ink */
+  --vip-gold-start: #9a7b1e;
+  --vip-gold-mid:   #e3c15a;
+  --vip-gold-end:   #f6e39a;
+  --vip-gold-ink:   #2e2404; /* ink ON a gold fill */
+  --vip-gold-grad:  linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a);
+  --vip-gold-tint:  rgba(227, 193, 90, 0.08); /* faint gold film (open FAQ / selected col) */
+
+  /* semantic (distinct from app --win/--loss) */
+  --vip-positive: #34d399; /* unlocked ✓ */
+  --vip-negative: #fb7185;
+  --vip-hairline: rgba(255, 255, 255, 0.07);
+
+  /* per-tier gradients + accents (bronze → diamond) */
+  --vip-tier-bronze-grad:   linear-gradient(135deg, #8c5a2b, #c88f5a, #e0a56b);
+  --vip-tier-bronze-acc:    #e0a56b;
+  --vip-tier-silver-grad:   linear-gradient(135deg, #8a94a6, #cbd3df, #eef2f7);
+  --vip-tier-silver-acc:    #cbd3df;
+  --vip-tier-gold-grad:     linear-gradient(135deg, #9a7b1e, #e3c15a, #f6e39a);
+  --vip-tier-gold-acc:      #e3c15a;
+  --vip-tier-platinum-grad: linear-gradient(135deg, #6b7280, #cfd6e0, #e8edf3);
+  --vip-tier-platinum-acc:  #cfd6e0;
+  --vip-tier-diamond-grad:  linear-gradient(135deg, #3f7fb5, #9fd7ee, #e6f7ff);
+  --vip-tier-diamond-acc:   #9fd7ee;
+
+  /* VIP-local radii (panels reuse --radius-card / pills --radius-pill) */
+  --vip-radius-table:   var(--wg-radius-surface);
+  --vip-radius-control: var(--wg-radius-control);
+  --vip-radius-gem:     var(--wg-radius-surface);
+
+  /* display face — the brand heading face (Playfair Display for yaobet).
+   *
+   * The display face must serve the `vietnamese` subset: a latin-only face
+   * drops U+1EA0–1EF1 mid-word (`Đồng`, `Bạc` on /vip).
+   *
+   * Kept as its own token rather than collapsed into --brand-font-head: display
+   * and heading are distinct roles, and the emerald brand re-points it to its
+   * own face (brands.css). */
+  --brand-font-display: var(--font-head);
+}

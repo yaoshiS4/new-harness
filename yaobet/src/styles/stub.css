@@ -1,0 +1,22 @@
+/* Shared minimal stub-page styling. Tokens only; mobile-first @375. Matches the
+ * existing route pages (heading uses --t-h1 / --text-hi). */
+
+@utility stub-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@utility stub-heading {
+  font-size: var(--t-h1);
+  color: var(--text-hi);
+  font-weight: var(--weight-bold);
+}
+
+@utility stub-body {
+  font-size: var(--t-body);
+  color: var(--text-mid);
+  max-width: 60ch;
+  line-height: 1.6;
+}

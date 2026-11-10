@@ -1,0 +1,208 @@
+<section>
+<h2 id="r-vip-level-table">LevelTable</h2>
+<h4>1. Purpose</h4><p>6 benefit rows × levels 1–10 for the selected tier; members see their own level spotlighted in gold and levels above it dimmed/locked.</p>
+<h4>2. Source</h4><p><code>src/components/vip/LevelTable.tsx</code>, <code>LevelTable.module.css</code></p>
+<h4>3. Structure</h4>
+<pre><code class="lang-txt">div.scroller
+  table.table
+    thead tr.headRow
+      th.th.rowHead.corner scope=col   (empty)
+      for level 1..10: th.th[.spot|.dim] scope=col
+        span.levelWord  "CẤP"
+        span.levelNum   n
+        isLockedAhead &amp;&amp; span.lock aria-hidden "🔒"
+    tbody  rows: gift, live, sports, slots, table, cash
+      tr
+        th.td.rowHead scope=row   row label
+        for level: td.td[.spot|.dim]  formatted value</code></pre>
+<h4>4. Props</h4><table><thead><tr><th>prop</th><th>type</th><th>effect</th></tr></thead><tbody>
+<tr><td>tier</td><td>VipTierDef</td><td>rebate/cash bases</td></tr>
+<tr><td>selectedTierIndex</td><td>number</td><td>gift multiplier + highlight logic</td></tr>
+<tr><td>currentTierIndex</td><td>number | null</td><td>null = guest (plain)</td></tr>
+<tr><td>currentLevel</td><td>number | null</td><td>spotlight column</td></tr>
+<tr><td>lang</td><td>Lang</td><td>labels</td></tr></tbody></table>
+<h4>5. Styles</h4>
+<table><thead><tr><th>Element</th><th>Property · value</th><th>Breakpoint</th></tr></thead><tbody>
+<tr><td>.scroller</td><td>overflow-x auto; radius 14px; border 1px rgba(255,255,255,.07); background #17140d</td><td></td></tr>
+<tr><td>.table</td><td>separate; spacing 0; table-layout fixed; width 100%; min-width 900px; font-family <span class="tok">--brand-font-num</span>; tabular-nums</td><td></td></tr>
+<tr><td>.th/.td</td><td>padding 12px 16px; centre; border-bottom 1px rgba(255,255,255,.07); border-left/right 1px transparent; nowrap; #c9c3b4; background #17140d; 14px</td><td>≤900: padding 8px 12px</td></tr>
+<tr><td>tbody last row .td</td><td>border-bottom none</td><td></td></tr>
+<tr><td>.rowHead</td><td>sticky left 0; z <span class="tok">--z-content</span> 1; width 200px; left; body font 600; #e6ebf5; background #141019; border-right 1px rgba(255,255,255,.07)</td><td></td></tr>
+<tr><td>.headRow .th</td><td>sticky top 0; z <span class="tok">--z-sticky</span> 100; #8b96ad; background #0f0c07; border-bottom 2px rgba(255,255,255,.07); padding-top/bottom 12px</td><td></td></tr>
+<tr><td>.corner</td><td>z 101; background #0f0c07</td><td></td></tr>
+<tr><td>.levelWord</td><td>block; body font 12px; letter-spacing .14em; uppercase; #6b7690; line-height 1</td><td></td></tr>
+<tr><td>.levelNum</td><td>block; margin-top 2px; Montserrat 18px 700; #e6ebf5; line-height 1.1</td><td></td></tr>
+<tr><td>.lock</td><td>block; margin-top 2px; 12px; line-height 1; opacity .7</td><td></td></tr>
+<tr><td>.spot</td><td>#e3c15a; 700; background color-mix(#e3c15a 12%, #17140d) = #2f2916; border-left/right rgba(227,193,90,.45)</td><td></td></tr>
+<tr><td>.headRow .th.spot</td><td>background color-mix(#e3c15a 16%, #0f0c07) = #312914; side borders rgba(227,193,90,.55); border-bottom-color #e3c15a</td><td></td></tr>
+<tr><td>.spot .levelWord / .levelNum</td><td>rgba(227,193,90,.75) / #f6e39a</td><td></td></tr>
+<tr><td>.dim (+ word/num)</td><td>#565f70</td><td></td></tr>
+</tbody></table>
+<details><summary>Verbatim LevelTable.module.css</summary><pre><code class="lang-css">/* ============================================================================
+ * Level table — 6 metric rows × 10 level cols of the SELECTED tier.
+ * Sticky first col + sticky header + sticky corner; horizontal scroll.
+ * Member CẤP-7 gold spotlight column; locked-ahead + above-tier dim/lock.
+ * ==========================================================================*/
+.scroller {
+  overflow-x: auto;
+  border-radius: var(--vip-radius-table);
+  border: 1px solid var(--vip-hairline);
+  background: var(--vip-panel-bg);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* RULING B1 — `table-layout: fixed` so all TEN level columns get exactly the
+ * same width. Under auto layout the widths were content-driven and the current
+ * (bold, spotlit) level came out widest: measured 74px against 70–71px for its
+ * peers. A level that renders wider *because* it is the one you are on is a
+ * size cue tied to standing, which is the pattern B1 rejects. Fixed layout also
+ * makes CẤP 10 the same width as CẤP 1. min-width is raised so the equal share
+ * still fits the widest cell ("1,000,000") without wrapping. */
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 900px;
+  font-family: var(--brand-font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- shared cell chrome ---------------------------------------------------
+ * EVERY cell reserves the same 1px side rules and the header row the same 2px
+ * bottom rule, so the gold spotlight column is a pure COLOUR change with zero
+ * layout shift — and all ten level columns stay geometrically identical
+ * (ruling B1: never rank a level/tier by physical size). */
+.th,
+.td {
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
+  border-bottom: 1px solid var(--vip-hairline);
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  white-space: nowrap;
+  color: var(--vip-text-secondary);
+  background: var(--vip-panel-bg);
+  font-size: var(--t-sm);
+}
+
+tbody tr:last-child .td {
+  border-bottom: none;
+}
+
+/* ---- sticky first column (metric labels) + corner ------------------------- */
+.rowHead {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-content);
+  /* the ONE non-peer column; the remaining width is shared equally by the ten
+   * level columns under table-layout: fixed */
+  width: 200px;
+  text-align: left;
+  font-family: var(--brand-font-body);
+  font-weight: var(--weight-semi);
+  color: var(--vip-text-primary);
+  background: var(--vip-panel-alt);
+  border-right: 1px solid var(--vip-hairline);
+}
+
+/* ---- sticky header row ---------------------------------------------------- */
+.headRow .th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  color: var(--vip-text-muted);
+  background: var(--vip-inner-bg);
+  border-bottom: 2px solid var(--vip-hairline);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.corner {
+  z-index: calc(var(--z-sticky) + 1);
+  background: var(--vip-inner-bg);
+}
+
+/* header level label: small-caps word + Cinzel numeral */
+.levelWord {
+  display: block;
+  font-family: var(--brand-font-body);
+  font-size: var(--t-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vip-text-faint);
+  line-height: 1;
+}
+
+.levelNum {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--brand-font-display);
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  color: var(--vip-text-primary);
+  line-height: 1.1;
+}
+
+/* the lock glyph recedes by OPACITY; the grayscale filter is gone */
+.lock {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-micro);
+  line-height: 1;
+  opacity: 0.7;
+}
+
+/* ---- gold spotlight column (member's current level) -----------------------
+ * Side rails + the header underline are BORDERS on the pre-reserved 1px/2px
+ * tracks above — the three inset-shadow stacks that drew them are gone. */
+.spot {
+  color: var(--vip-gold-mid);
+  font-weight: var(--weight-bold);
+  background: color-mix(in srgb, var(--vip-gold-mid) 12%, var(--vip-panel-bg));
+  border-left-color: color-mix(in srgb, var(--vip-gold-mid) 45%, transparent);
+  border-right-color: color-mix(in srgb, var(--vip-gold-mid) 45%, transparent);
+}
+
+.headRow .th.spot {
+  background: color-mix(in srgb, var(--vip-gold-mid) 16%, var(--vip-inner-bg));
+  border-left-color: color-mix(in srgb, var(--vip-gold-mid) 55%, transparent);
+  border-right-color: color-mix(in srgb, var(--vip-gold-mid) 55%, transparent);
+  border-bottom-color: var(--vip-gold-mid);
+}
+
+.spot .levelWord {
+  color: color-mix(in srgb, var(--vip-gold-mid) 75%, transparent);
+}
+
+.spot .levelNum {
+  color: var(--vip-gold-end);
+}
+
+/* ---- dimmed / locked-ahead / above-tier cells ---------------------------- */
+.dim {
+  color: var(--vip-text-disabled);
+}
+
+.dim .levelWord,
+.dim .levelNum {
+  color: var(--vip-text-disabled);
+}
+
+@media (max-width: 900px) {
+  .th,
+  .td {
+    padding: var(--space-2) var(--space-3);
+  }
+}</code></pre></details>
+<h4>6. States</h4>
+<ul><li>Guest: all cells plain; no locks.</li>
+<li>Member, selected = own tier (Vàng): CẤP 7 column .spot (gold band, bold); CẤP 8–10 .dim with 🔒 under the numeral in the header; 1–6 plain.</li>
+<li>Member, selected above own tier (Bạch Kim, Kim Cương): every level cell .dim; no lock glyphs.</li>
+<li>Member, selected below own tier: plain.</li></ul>
+<h4>7. Motion</h4><p>None.</p>
+<h4>8. Copy</h4><p>"CẤP"/"LEVEL", row labels (copy bag), values per the computed table in <a href="#r-vip-lib">r-vip-lib</a>.</p>
+<h4>9. Data</h4><p>giftAt(selectedTierIndex, l), rate(tier.rebate.*, l), rate(tier.cash, l).</p>
+<h4>10. Behaviour &amp; a11y</h4><p>Horizontal scroll below 900px wide content (min-width 900). Sticky header is sticky relative to the scroller (which has no max-height), so vertically it never sticks in practice (inference).</p>
+</section>
+

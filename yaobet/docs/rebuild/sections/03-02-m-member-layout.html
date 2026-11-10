@@ -1,0 +1,1019 @@
+<section>
+<h2 id="m-member-layout">m-member-layout — the (member) route-group frame</h2>
+
+<h3 id="m-member-area">Route-group layout: <code>src/app/(member)/layout.tsx</code></h3>
+<dl>
+<dt>URLs covered</dt><dd><code>/tai-khoan</code>, <code>/vi-tien</code>, <code>/tin-nhan</code>, <code>/gioi-thieu</code>, <code>/dai-ly</code> (route groups do not change the URL).</dd>
+<dt>Files</dt><dd><code>src/app/(member)/layout.tsx</code>, <code>src/app/(member)/member.module.css</code>.</dd>
+<dt>Kind</dt><dd>async Server Component. Fetches in parallel <code>getBalance()</code>, <code>getAccountSummary()</code>, <code>getVipProgress()</code> and passes them to the <code>MemberSidebar</code> client island.</dd>
+<dt>Auth gating</dt><dd>None at the layout level (no redirect, no server session). Gating happens client-side inside each island via <code>useRequireAuth()</code>; a guest sees the rail's guest card plus whatever guest branch each content component has (see per-component "States").</dd>
+</dl>
+<p><strong>Structure</strong></p>
+<pre><code class="lang-txt">div.area                                  (member.module.css)
+├─ MemberSidebar balance summary progress  → aside.rail (see #m-member-sidebar)
+└─ div.column
+   └─ {children}                           (the route page)</code></pre>
+<p><strong>Styles</strong></p>
+<table>
+<thead><tr><th>Selector</th><th>Property</th><th>Value</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.area</td><td>display / flex-direction</td><td>flex / column</td><td>base</td></tr>
+<tr><td>.area</td><td>gap</td><td><span class="tok">--space-4</span> → 16px</td><td>base</td></tr>
+<tr><td>.area</td><td>min-width</td><td>0</td><td>base</td></tr>
+<tr><td>.area</td><td>background</td><td><span class="tok">--page-bloom</span> (2 radial gradients over #0a0a0a, see quick-ref)</td><td>base</td></tr>
+<tr><td>.column</td><td>display / min-width</td><td>block / 0</td><td>base</td></tr>
+<tr><td>.column</td><td>background</td><td><span class="tok">--member-canvas</span> → #0a0a0a</td><td>base</td></tr>
+<tr><td>.area</td><td>flex-direction / align-items / gap</td><td>row / flex-start / <span class="tok">--gap</span> → 16px</td><td>min-width: 992px</td></tr>
+<tr><td>.column</td><td>flex / min-width</td><td>1 1 0 / 0</td><td>min-width: 992px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/app/(member)/member.module.css</code></summary>
+<pre><code class="lang-css">/* (member) route group — desktop two-column member area. Tokens only.
+ * Mobile-first @375: rail stacks above content. ≥992: 304px rail + fluid col. */
+
+.area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  /* ambient backdrop behind the rail + content: a faint gold bloom (top) + cool
+   * blue lift (bottom) over the locked --canvas (re-expresses J9's per-tier
+   * background art as pure CSS; IP-safe, brand-following via color-mix). */
+  background: var(--page-bloom);
+}
+
+.column {
+  display: block;
+  min-width: 0;
+  /* flat matte so the lifted hero/action/tile surfaces read as raised */
+  background: var(--member-canvas);
+}
+
+@media (min-width: 992px) {
+  .area {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--gap); /* J9 dominant 16px gap */
+  }
+  .column {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+</code></pre>
+</details>
+<p><strong>Composition by width</strong> (the shell frame is <code>max-width: 1424px</code>, <code>padding: 8px 16px 0</code>, bottom padding <code>calc(56px + env(safe-area-inset-bottom, 0px) + 16px)</code> below 768px and <code>32px</code> from 768px — owned by <a href="#s-shell-h">#s-shell</a>).</p>
+<table>
+<thead><tr><th>Width</th><th>Layout</th></tr></thead>
+<tbody>
+<tr><td>375</td><td>Single column. MemberSidebar renders FIRST, full width (hero card → wallet card → 2-up action cards → 12-tile grid → logout), then the page content below it with a 16px gap. The whole sidebar sits above the content on every member route, so content starts well below the fold (inference: ~800px down).</td></tr>
+<tr><td>768</td><td>Same single-column stack (breakpoint is 992). Bottom tab bar hidden from 768 (track S).</td></tr>
+<tr><td>1024</td><td>Two columns: sticky 304px rail (<code>top: calc(72px + 48px + 16px)</code> = 136px) + fluid column, 16px gap. Column width = frame width − 304 − 16 − any QuickActionRail reservation (track S reserves a rail column from 1024px; see #s-shell).</td></tr>
+<tr><td>1440</td><td>Same as 1024; frame capped at 1424px centered.</td></tr>
+</tbody>
+</table>
+<div class="callout note">The rail is <code>position: sticky</code> but has no max-height/overflow; its natural height (≈ hero 170 + wallet 150 + action cards 130 + grid 4×86+3×8+34 ≈ 400 + logout 56 + gaps, inference ≈ 950px) exceeds a 900px viewport, so on short screens the bottom of the rail (logout) is reachable only by scrolling to the page end.</div>
+
+<h3 id="m-member-sidebar">MemberSidebar — the member left rail</h3>
+<p><strong>1. Purpose</strong> — The player sees their identity card (avatar initial, name, tier ribbon, ID with copy, membership progress), a wallet card (balance + Nạp/Rút), two action cards (points store, task center), a 12-tile icon menu and a logout button.</p>
+<p><strong>2. Source</strong> — <code>src/components/account/MemberSidebar.tsx</code> (393 lines, <code>"use client"</code>), <code>src/components/account/MemberSidebar.module.css</code> (620 lines), uses <code>LogoutButton</code> (<a href="#m-logout-button">#m-logout-button</a>).</p>
+<p><strong>3. Structure</strong></p>
+<pre><code class="lang-txt">GUEST branch (if !allowed || !user):
+aside.rail  aria-label="Tài khoản"
+└─ div.guest
+   ├─ span.avatar aria-hidden  → Icon user size=28
+   ├─ p.guestTitle  "Khách"
+   ├─ p.guestText   "Đăng nhập để xem tài khoản của bạn."
+   └─ Button variant=gold size=md fullWidth onClick=promptAuth()  "Đăng nhập"
+
+MEMBER branch:
+aside.rail  aria-label="Tài khoản"
+├─ section.hero                                    (1. PROFILE CARD)
+│  ├─ span.heroSheen aria-hidden                   (absolute, z -1)
+│  ├─ div.cardTop
+│  │  └─ Link.badgeLink href="/vip"
+│  │     ├─ Icon trophy 14
+│  │     ├─ span "Nhận huy hiệu"
+│  │     └─ Icon chevronRight 14
+│  ├─ div.identity
+│  │  ├─ span.avatarWrap
+│  │  │  ├─ span.avatar aria-hidden → span.avatarInitial  {first char of displayName, uppercased, or "Y"}
+│  │  │  └─ [user.verified] span.verifiedBadge title="Đã xác minh" → Icon check 11
+│  │  └─ div.idMain
+│  │     ├─ div.nameRow
+│  │     │  ├─ span.name     {displayName}
+│  │     │  └─ span.tierTag  {vipLevel===0 ? "Thành viên mới" : vipTierName}
+│  │     └─ button.idLine type=button onClick=copyId
+│  │        ├─ span.idLabel "ID"
+│  │        ├─ span.idValue {memberId}
+│  │        ├─ Icon copy 13
+│  │        └─ [copied] span.copied "Đã sao chép"
+│  └─ ProgressBar progress  (see #m-sidebar-progress)
+├─ section.walletCard                              (2. WALLET CARD)
+│  ├─ span.walletSheen aria-hidden
+│  ├─ span.walletTitle "Ví của tôi"
+│  ├─ span.balance  {status==="live" ? formatVnd(value) : "Số dư: 0 ₫"}
+│  └─ div.walletActions
+│     ├─ Link.actBtn.actGold  href="/vi-tien#deposit"  → Icon deposit 16 + span "Nạp"
+│     └─ Link.actBtn.actGhost href="/vi-tien#withdraw" → Icon wallet 16 + span "Rút"
+├─ div.actionCards                                 (3. ACTION CARDS)
+│  ├─ Link.actionCard href="/cua-hang"
+│  │  ├─ span.cardSheen aria-hidden
+│  │  ├─ span.actionHead → Icon gift 18 .actionIcon + Icon info 14 .actionHelp
+│  │  ├─ span.actionTitle "Cửa hàng điểm"
+│  │  └─ span.actionMeta → span.actionMetaLabel "Điểm của tôi" + span.actionMetaValue {formatCount(summary.points)}
+│  └─ Link.actionCard href="/hoan-tra"
+│     ├─ span.cardSheen aria-hidden
+│     ├─ span.actionHead → Icon cashback 18 .actionIcon
+│     ├─ span.actionTitle "Trung tâm nhiệm vụ"
+│     └─ span.actionMeta → span.actionMetaLabel "Chờ mở khóa" + span.actionMetaValue "0"  (literal)
+├─ nav.menu aria-label="Tài khoản"                 (4. ICON GRID)
+│  └─ ul.menuGrid
+│     └─ li × 12
+│        └─ (a | Link).tile[.tileActive][.tileActiveGold] aria-current="page" when active
+│           ├─ span.tileIconWrap → Icon {icon} 24 .tileIcon + [messages &amp;&amp; unread&gt;0] span.unreadDot aria-hidden
+│           └─ span.tileLabel {label}
+└─ div.logoutRow → LogoutButton                    (5. LOGOUT)</code></pre>
+<p><strong>The 12 menu tiles</strong> (array <code>MENU</code>, render order = grid order, 3 columns × 4 rows):</p>
+<table>
+<thead><tr><th>#</th><th>id</th><th>Label (VN)</th><th>English gloss</th><th>Icon</th><th>href</th><th>Where the href actually lands</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>wallet</td><td>Ví của tôi</td><td>My wallet</td><td>wallet</td><td>/vi-tien</td><td>/vi-tien (member area)</td></tr>
+<tr><td>2</td><td>cashback</td><td>Hoàn trả</td><td>Cashback</td><td>cashback</td><td>/hoan-tra</td><td>redirects to /khuyen-mai (leaves member area)</td></tr>
+<tr><td>3</td><td>yield</td><td>Sinh lời</td><td>Yield / earn</td><td>yield</td><td>/hoan-tra</td><td>redirects to /khuyen-mai</td></tr>
+<tr><td>4</td><td>sellCoin</td><td>Bán xu</td><td>Sell coins</td><td>card</td><td>/cua-hang</td><td>/cua-hang (track R, not in member group)</td></tr>
+<tr><td>5</td><td>history</td><td>Lịch sử</td><td>History</td><td>history</td><td>/lich-su</td><td>redirects to /tai-khoan (shows Hồ sơ, not history)</td></tr>
+<tr><td>6</td><td>messages</td><td>Tin nhắn</td><td>Messages</td><td>message</td><td>/tin-nhan</td><td>/tin-nhan (member area)</td></tr>
+<tr><td>7</td><td>referral</td><td>Giới thiệu</td><td>Referral</td><td>referral</td><td>/gioi-thieu</td><td>/gioi-thieu (member area)</td></tr>
+<tr><td>8</td><td>security</td><td>Bảo mật</td><td>Security</td><td>shield</td><td>/tai-khoan#bao-mat</td><td>/tai-khoan, SecurityCenter section</td></tr>
+<tr><td>9</td><td>universalUpgrade</td><td>Thăng hạng toàn dân</td><td>Universal upgrade</td><td>vip</td><td>/vip</td><td>/vip (track R)</td></tr>
+<tr><td>10</td><td>promo</td><td>Khuyến mãi</td><td>Promotions</td><td>gift</td><td>/khuyen-mai</td><td>/khuyen-mai (track R/S)</td></tr>
+<tr><td>11</td><td>tutorial</td><td>Hướng dẫn</td><td>Tutorial</td><td>info</td><td>/tro-giup</td><td>/tro-giup stub</td></tr>
+<tr><td>12</td><td>honor</td><td>Vinh danh</td><td>Hall of honor</td><td>trophy</td><td>/cau-lac-bo</td><td>/cau-lac-bo (stub, uses stub.module.css)</td></tr>
+</tbody>
+</table>
+
+<p><strong>4. Props</strong></p>
+<table>
+<thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>balance</td><td><code>Envelope&lt;LiveMoney&gt;</code></td><td>required</td><td><code>status==="live"</code> → <code>formatVnd(balance.value)</code> (e.g. "6.886.000 ₫"); any other status → literal "Số dư: 0 ₫".</td></tr>
+<tr><td>summary</td><td><code>AccountSummary { points: number; rebate: MoneyValue }</code></td><td>required</td><td><code>points</code> → points-store card value via <code>formatCount</code>. <code>rebate</code> is NOT rendered anywhere.</td></tr>
+<tr><td>progress</td><td><code>Envelope&lt;VipProgress&gt;</code></td><td>required</td><td>Drives <a href="#m-sidebar-progress">ProgressBar</a>.</td></tr>
+</tbody>
+</table>
+
+<p><strong>5. Styles</strong> (complete; the verbatim module below is authoritative)</p>
+<table>
+<thead><tr><th>Element</th><th>Property</th><th>Value (token → literal)</th><th>Breakpoint</th></tr></thead>
+<tbody>
+<tr><td>.rail</td><td>display / flex-direction / gap / width / min-width</td><td>flex / column / <span class="tok">--space-4</span> 16px / 100% / 0</td><td>base</td></tr>
+<tr><td>.rail</td><td>width / position / top</td><td><span class="tok">--rail-w</span> 304px / sticky / calc(<span class="tok">--header-h</span> + <span class="tok">--nav-h</span> + <span class="tok">--space-4</span>) = 136px</td><td>min-width: 992px</td></tr>
+<tr><td>.guest</td><td>layout</td><td>flex column, align-items center, gap <span class="tok">--space-3</span> 12px, text-align center</td><td>base</td></tr>
+<tr><td>.guest</td><td>padding / bg / border / radius</td><td><span class="tok">--card-pad</span> 24px / <span class="tok">--surface</span> #141414 / 1px solid <span class="tok">--border</span> rgba(212,175,55,0.55) / <span class="tok">--radius-card</span> 16px</td><td>base</td></tr>
+<tr><td>.guestTitle</td><td>font</td><td><span class="tok">--t-h3</span> 18px, <span class="tok">--weight-semi</span> 600, color <span class="tok">--text-hi</span> #f2f0e4</td><td>base</td></tr>
+<tr><td>.guestText</td><td>font</td><td><span class="tok">--t-sm</span> 14px, color <span class="tok">--text-mid</span> #888888, line-height <span class="tok">--lh-body</span> 1.5</td><td>base</td></tr>
+<tr><td>.hero</td><td>box</td><td>position relative; isolation isolate; overflow hidden; flex column; gap 16px; padding <span class="tok">--card-pad-sm</span> 16px</td><td>base</td></tr>
+<tr><td>.hero</td><td>background / border / radius</td><td><span class="tok">--header-card-grad</span> / 1px solid <span class="tok">--brand-accent-hairline</span> rgba(212,175,55,0.55) / 16px</td><td>base</td></tr>
+<tr><td>.heroSheen, .walletSheen, .cardSheen</td><td>overlay</td><td>position absolute; inset 0; z-index -1; pointer-events none; background <span class="tok">--card-sheen-grad</span> (hero, action cards) or <span class="tok">--wallet-sheen-grad</span> (wallet)</td><td>base</td></tr>
+<tr><td>.cardTop</td><td>layout</td><td>flex; justify-content flex-end</td><td>base</td></tr>
+<tr><td>.badgeLink</td><td>box</td><td>inline-flex, align center, gap 4px; margin <code>calc(4px * -1) calc(4px * -1) 0 0</code> (−4px top/right); padding 4px 8px; radius pill</td><td>base</td></tr>
+<tr><td>.badgeLink</td><td>type</td><td>color <span class="tok">--brand-accent</span> #d4af37; 12px; 600; no underline; nowrap</td><td>base</td></tr>
+<tr><td>.badgeLink:hover</td><td>background</td><td><span class="tok">--brand-accent-hairline</span> rgba(212,175,55,0.55)</td><td>base</td></tr>
+<tr><td>.identity</td><td>layout</td><td>flex; align center; gap 12px; min-width 0</td><td>base</td></tr>
+<tr><td>.avatarWrap</td><td>box</td><td>position relative; flex 0 0 auto</td><td>base</td></tr>
+<tr><td>.avatar</td><td>box</td><td>44px × 44px (literal); grid, place-items center; radius pill; bg <span class="tok">--brand-accent-grad</span> #d4af37; color <span class="tok">--brand-on-accent</span> #0a0a0a</td><td>base</td></tr>
+<tr><td>.avatarInitial</td><td>type</td><td>18px; 700; font <span class="tok">--brand-font-num</span></td><td>base</td></tr>
+<tr><td>.verifiedBadge</td><td>box</td><td>absolute; right −2px; bottom −2px; 18×18px; grid center; radius pill; bg <span class="tok">--green</span> #31bc69; color #0a0a0a; border 2px solid <span class="tok">--surface</span> #141414</td><td>base</td></tr>
+<tr><td>.idMain</td><td>layout</td><td>flex column; gap 4px; min-width 0</td><td>base</td></tr>
+<tr><td>.nameRow</td><td>layout</td><td>flex; align center; gap 8px; min-width 0</td><td>base</td></tr>
+<tr><td>.name</td><td>type</td><td>16px; 600; #f2f0e4; overflow hidden; ellipsis; nowrap; min-width 0</td><td>base</td></tr>
+<tr><td>.tierTag</td><td>ribbon</td><td>flex 0 0 auto; inline-flex; padding <code>2px 8px 2px 11px</code>; <code>clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 6px 50%)</code>; bg #d4af37; color #0a0a0a; 12px; 700; line-height 1.3; letter-spacing 0.01em; nowrap</td><td>base</td></tr>
+<tr><td>.idLine</td><td>button reset</td><td>relative; inline-flex; align center; gap 4px; padding 0; border 0; bg none; color #888888; 14px; cursor pointer; width max-content; max-width 100%; nowrap; transition color 200ms ease-standard</td><td>base</td></tr>
+<tr><td>.idLine:hover</td><td>color</td><td>#d4af37</td><td>base</td></tr>
+<tr><td>.idLabel</td><td>color</td><td><span class="tok">--text-dim</span> #6f6f6f</td><td>base</td></tr>
+<tr><td>.idValue</td><td>type</td><td><span class="tok">--brand-font-num</span>; color <span class="tok">--text</span> #d6d3c7; letter-spacing 0.02em</td><td>base</td></tr>
+<tr><td>.copied</td><td>tooltip</td><td>absolute; left 0; bottom calc(100% + 6px); padding 2px 8px; bg <span class="tok">--shell</span> #050505; border 1px solid rgba(212,175,55,0.55); radius 4px; color #d4af37; nowrap; 12px</td><td>base</td></tr>
+<tr><td>.walletCard</td><td>box</td><td>relative; isolate; overflow hidden; flex column; gap 8px; padding 16px; bg #141414; border 1px solid <span class="tok">--border</span>; radius 16px</td><td>base</td></tr>
+<tr><td>.walletTitle</td><td>type</td><td>14px; 600; #f2f0e4</td><td>base</td></tr>
+<tr><td>.balance</td><td>type</td><td><span class="tok">--t-balance</span> 28px; line-height 1.1; 700; <span class="tok">--brand-font-num</span>; color <span class="tok">--balance-text</span> #f2f0e4</td><td>base</td></tr>
+<tr><td>.walletActions</td><td>grid</td><td>relative; grid 1fr 1fr; gap <span class="tok">--gap-sm</span> 8px; margin-top 4px</td><td>base</td></tr>
+<tr><td>.actBtn</td><td>button</td><td>inline-flex center; gap 4px; min-height 44px; radius 8px; 14px; 600; no underline; transition transform/background/border-color/color 200ms ease-standard</td><td>base</td></tr>
+<tr><td>.actBtn:hover</td><td>transform</td><td>scale(1.05) (none under reduced motion)</td><td>base</td></tr>
+<tr><td>.actGold</td><td>fill</td><td>bg #d4af37; color #0a0a0a; hover bg <span class="tok">--brand-accent-2</span> #b4952f</td><td>base</td></tr>
+<tr><td>.actGhost</td><td>fill</td><td>bg <span class="tok">--surface-3</span> #212121; color #d6d3c7; border 1px solid rgba(212,175,55,0.55); hover bg #262626, color #d4af37, border-color #d4af37</td><td>base</td></tr>
+<tr><td>.actionCards</td><td>grid</td><td>1fr 1fr; gap 8px</td><td>base</td></tr>
+<tr><td>.actionCard</td><td>box</td><td>relative; isolate; overflow hidden; flex column; gap 8px; min-height 44px; padding 16px; bg #141414; border 1px solid rgba(212,175,55,0.55); radius 16px; no underline; transition transform/border-color/background 200ms</td><td>base</td></tr>
+<tr><td>.actionCard:hover</td><td>delta</td><td>border-color #d4af37; bg #262626; transform scale(1.02)</td><td>base</td></tr>
+<tr><td>.actionHead</td><td>layout</td><td>flex; align center; justify space-between; color #d4af37</td><td>base</td></tr>
+<tr><td>.actionIcon / .actionHelp</td><td>color</td><td>#d4af37 / #6f6f6f</td><td>base</td></tr>
+<tr><td>.actionTitle</td><td>type</td><td>14px; 600; #f2f0e4; line-height 1.3</td><td>base</td></tr>
+<tr><td>.actionMeta</td><td>layout</td><td>flex column; gap 2px (literal)</td><td>base</td></tr>
+<tr><td>.actionMetaLabel / .actionMetaValue</td><td>type</td><td>12px #888888 / 16px 700 num-font #f2f0e4</td><td>base</td></tr>
+<tr><td>.menu</td><td>box</td><td>padding 16px; bg #141414; border 1px solid rgba(212,175,55,0.55); radius 16px</td><td>base</td></tr>
+<tr><td>.menuGrid</td><td>grid</td><td><code>repeat(3, 1fr)</code>; gap 8px; margin 0; padding 0; list-style none</td><td>base</td></tr>
+<tr><td>.tile</td><td>cell</td><td>relative; width 100%; height 86px (literal); flex column; align+justify center; gap 8px; radius <span class="tok">--radius-lg</span> 12px; bg <span class="tok">--tile</span> #171717; border 1px solid transparent; color #d6d3c7; 12px; centered; no underline; cursor pointer; transition transform/color/background/border-color 200ms</td><td>base</td></tr>
+<tr><td>.tile:hover</td><td>delta</td><td>color #d4af37; bg #262626; border-color rgba(212,175,55,0.55); scale(1.02)</td><td>base</td></tr>
+<tr><td>.tileActive</td><td>delta</td><td>color #d4af37; bg #262626</td><td>base</td></tr>
+<tr><td>.tileActiveGold</td><td>delta</td><td>color #d4af37; bg <code>color-mix(in srgb, #d4af37 8%, #141414)</code>; border-color rgba(212,175,55,0.55)</td><td>base</td></tr>
+<tr><td>.tileIconWrap / .tileIcon</td><td>box</td><td>relative inline-flex / 24×24px</td><td>base</td></tr>
+<tr><td>.unreadDot</td><td>dot</td><td>absolute; top −2px; right −4px; 8×8px; radius pill; bg <span class="tok">--loss</span> #f53f55; border 1px solid <span class="tok">--tile</span> #171717</td><td>base</td></tr>
+<tr><td>.tileLabel</td><td>type</td><td>600; line-height 1.3 (size inherited 12px)</td><td>base</td></tr>
+<tr><td>.logoutRow</td><td>display</td><td>block</td><td>base</td></tr>
+<tr><td>.badgeLink, .actBtn, .actionCard, .tile :focus-visible</td><td>outline</td><td>2px solid <span class="tok">--focus-ring</span> #6ea8ff; offset 2px</td><td>base</td></tr>
+</tbody>
+</table>
+<p>Inference: at 304px rail width the menu's inner width is 304 − 2×16 − 2×1 = 270px, so each tile is (270 − 2×8)/3 ≈ 84.67px wide × 86px tall; at 375px viewport the rail is 343px wide → tiles ≈ 97.67px wide.</p>
+<details><summary>Verbatim CSS — <code>src/components/account/MemberSidebar.module.css</code></summary>
+<pre><code class="lang-css">/* ============================================================================
+ * MemberSidebar — LEFT member rail (J9 .user_info_box + .menu_box). Tokens only
+ * (no raw hex — lint A2; every accent through --brand-accent indirection so the
+ * brand re-skins automatically). Mobile-first @375: full-width stacked cards;
+ * desktop ≥992: fixed 304px sticky rail.
+ *
+ * FLAT SWEEP: every box-shadow declaration is gone (--lift / --glow-gold /
+ * --progress-dot-glow all resolved to `none` at the token layer already, so
+ * these were dead declarations advertising depth this system does not have).
+ * Separation is the border hairline; lit/active is a border + colour change.
+ *
+ * Surface stack:
+ *   .hero          — PROFILE card: identity + membership progress on
+ *                    --header-card-grad + a corner --card-sheen-grad.
+ *   .walletCard    — SEPARATE wallet card: title + balance + Nạp/Rút on a cool
+ *                    --wallet-sheen-grad (distinct from the hero's gold halo).
+ *   .actionCards   — 2-up J9-style action cards (--card-sheen-grad ::sheen).
+ *   .menu          — 12-tile icon grid on raised --tile surfaces.
+ *   .logoutRow     — full-width logout, OUTSIDE the grid.
+ * ==========================================================================*/
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---- guest prompt -------------------------------------------------------- */
+.guest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--card-pad);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+.guestTitle {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.guestText {
+  font-size: var(--t-sm);
+  color: var(--text-mid);
+  line-height: var(--lh-body);
+}
+
+/* ============================================================================
+ * 1. HERO — fused identity + progress + wallet (one premium surface)
+ * ==========================================================================*/
+.hero {
+  position: relative;
+  isolation: isolate; /* keep the corner sheen behind content, clipped here */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--card-pad-sm);
+  background: var(--header-card-grad);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-card);
+}
+/* the J9 signature: a soft ice-white glow bleeding from the upper-right corner */
+.heroSheen {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--card-sheen-grad);
+}
+
+/* ---- top row: "Nhận huy hiệu" in the card's top-right corner (J9), on its
+ *  OWN row so it never shares the name line ------------------------------- */
+.cardTop {
+  display: flex;
+  justify-content: flex-end;
+}
+.badgeLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: calc(var(--space-1) * -1) calc(var(--space-1) * -1) 0 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  color: var(--brand-accent);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.badgeLink:hover {
+  background: var(--brand-accent-hairline);
+}
+/* focus is BLUE and separate (it was `outline: none` + the hover colour) */
+.badgeLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- identity: avatar (+ verified check overlay) · name·tier · plain ID --- */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.avatarWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.avatar {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+}
+.avatarInitial {
+  font-size: var(--t-h3);
+  font-weight: var(--weight-bold);
+  font-family: var(--brand-font-num);
+}
+/* verified → a small green CHECK on the avatar (bottom-right), NOT a chip */
+/* AA: the check glyph was --text-hi champagne on --green, ~1.9:1 — under the
+ * 3:1 non-text floor. --brand-on-accent is the dark ink used on every other
+ * light brand fill and clears it comfortably. */
+.verifiedBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--green);
+  color: var(--brand-on-accent);
+  border: 2px solid var(--surface);
+}
+.idMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+/* name + tier ribbon on ONE line (J9 username + tier tag) */
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.name {
+  min-width: 0;
+  font-size: var(--t-body);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* current-tier RIBBON (J9 "游客"-style banner): a gold gradient label with a
+ *  concave notch on the left edge (clip-path → pure-CSS ribbon, no raster art),
+ *  NOT a rounded pill. Dark text on gold. */
+.tierTag {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2) 2px 11px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 6px 50%);
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+/* ID as PLAIN TEXT + copy (J9 "九游ID: …"), NOT a chip/pill */
+.idLine {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-mid);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.idLine:hover {
+  color: var(--brand-accent);
+}
+.idLabel {
+  color: var(--text-dim);
+}
+.idValue {
+  font-family: var(--brand-font-num);
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.copied {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  padding: 2px var(--space-2);
+  background: var(--shell);
+  border: 1px solid var(--brand-accent-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--brand-accent);
+  white-space: nowrap;
+  font-size: var(--t-micro);
+}
+
+/* ---- progress bar (J9 header anchor) ------------------------------------- */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* track + next-tier ribbon share ONE line (J9: the tag caps the right end of
+ *  the progress bar, not a separate row above it). */
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* next-tier RIBBON (J9 "新会员"-style banner): same clip-path ribbon shape as
+ *  the tier tag, but a dark gradient with brand-gold text — a target label, not
+ *  a pill. Sits at the right end of the progress track. */
+.nextTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px var(--space-2) 3px 11px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 6px 50%);
+  /* FLAT: one solid gold-tinted dark fill. It still reads as a premium target
+   *  against the hero and stays distinct from the solid-gold current tier tag,
+   *  without the vertical gradient the system bans on chips/cards. */
+  background: color-mix(in srgb, var(--brand-accent) 14%, var(--surface-3));
+  color: var(--progress-tag-text);
+  font-size: var(--t-micro);
+  font-weight: var(--weight-semi);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+.track {
+  position: relative;
+  flex: 1 1 auto; /* fills the row; the next-tier ribbon caps the right end */
+  min-width: 0;
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--progress-track);
+}
+/* loading skeleton — a faint shimmer groove, no dot/fill */
+.trackSkeleton {
+  background: linear-gradient(
+    90deg,
+    var(--progress-track) 0%,
+    var(--surface-hover) 50%,
+    var(--progress-track) 100%
+  );
+  background-size: 200% 100%;
+}
+.fill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  height: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--progress-fill);
+  background-image: var(--progress-fill-grad);
+}
+.dot {
+  /* `left` is set inline to the live fill % so the glow sits at the leading
+   *  edge of the progress (the current point), not the track origin. */
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--progress-dot);
+  transform: translate(-50%, -50%);
+}
+.caption {
+  font-size: var(--t-micro);
+  line-height: var(--lh-tight);
+  color: var(--text-mid);
+}
+.captionTier {
+  color: var(--brand-accent);
+  font-weight: var(--weight-semi);
+}
+
+/* the "alive" pulse — transform/opacity only, GATED behind reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  .dot {
+    animation: pulseDot 1.6s var(--ease-standard) infinite alternate;
+  }
+  @keyframes pulseDot {
+    from {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.4;
+    }
+    to {
+      transform: translate(-50%, -50%) scale(1.1);
+      opacity: 1;
+    }
+  }
+  .trackSkeleton {
+    animation: progressShimmer var(--dur-slow) var(--ease-standard) infinite;
+  }
+  @keyframes progressShimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* ============================================================================
+ * 2. WALLET CARD — its OWN premium card (J9 keeps the wallet box separate from
+ * the user-info box). A cool diagonal sheen sets the near-white balance on a
+ * crafted plane, distinct from the hero's warm gold halo.
+ * ==========================================================================*/
+.walletCard {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--card-pad-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+/* faint diagonal cool sheen so the near-white balance sits on a crafted plane */
+.walletSheen {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--wallet-sheen-grad);
+}
+.walletTitle {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+}
+.balance {
+  font-size: var(--t-balance);
+  line-height: 1.1;
+  font-weight: var(--weight-bold);
+  font-family: var(--brand-font-num);
+  color: var(--balance-text); /* near-WHITE — gold is reserved for chrome/CTA */
+}
+.walletActions {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap-sm);
+  margin-top: var(--space-1);
+}
+.actBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  border-radius: var(--radius-md);
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+  /* uniform button motion: scale(1.05); hover is a COLOUR shift, not a filter */
+  transition: transform var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.actBtn:hover {
+  transform: scale(1.05);
+}
+.actBtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.actGold {
+  background: var(--brand-accent-grad);
+  color: var(--brand-on-accent);
+}
+.actGold:hover {
+  background: var(--brand-accent-2);
+}
+.actGhost {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.actGhost:hover {
+  background: var(--surface-hover);
+  color: var(--brand-accent);
+  border-color: var(--brand-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actBtn,
+  .actBtn:hover {
+    transform: none;
+  }
+}
+
+/* ============================================================================
+ * 3. ACTION CARDS — Cửa hàng điểm · Trung tâm nhiệm vụ
+ * ==========================================================================*/
+/* both action cards share one 1fr 1fr track and one hover — neither is sized
+ * by what it is worth (ruling B1) */
+.actionCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap-sm);
+}
+.actionCard {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--card-pad-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  transition: transform var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+/* uniform CARD hover = scale(1.02) + a colour shift */
+.actionCard:hover {
+  border-color: var(--brand-accent);
+  background: var(--surface-hover);
+  transform: scale(1.02);
+}
+/* focus is BLUE and separate — the old rule killed the outline and reused the
+ * hover treatment, so keyboard focus was invisible on these two cards. */
+.actionCard:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+/* the J9 corner glow on each action card */
+.cardSheen {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--card-sheen-grad);
+}
+.actionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--brand-accent);
+}
+.actionIcon {
+  color: var(--brand-accent);
+}
+.actionHelp {
+  color: var(--text-dim);
+}
+.actionTitle {
+  font-size: var(--t-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-hi);
+  line-height: var(--lh-tight);
+}
+.actionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.actionMetaLabel {
+  font-size: var(--t-micro);
+  color: var(--text-mid);
+}
+.actionMetaValue {
+  font-size: var(--t-body);
+  font-weight: var(--weight-bold);
+  font-family: var(--brand-font-num);
+  color: var(--text-hi);
+}
+
+/* ============================================================================
+ * 4. ICON GRID — 12 tiles (J9 .menu_box), raised --tile surfaces
+ * ==========================================================================*/
+.menu {
+  padding: var(--card-pad-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tile {
+  position: relative;
+  width: 100%;
+  height: 86px; /* J9 .menu_box li 86×86 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-lg); /* J9 r12 */
+  background: var(--tile); /* raised tile surface (was transparent) */
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: var(--t-micro); /* J9 12px */
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+/* every one of the 12 tiles is the same 86px cell and hovers identically */
+.tile:hover {
+  color: var(--brand-accent);
+  background: var(--surface-hover);
+  border-color: var(--brand-accent-hairline);
+  transform: scale(1.02);
+}
+/* focus is BLUE and separate — it used to be suppressed (`outline: none`) and
+ * substituted with the hover colours, which is not a focus indicator. */
+.tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.tileActive {
+  color: var(--brand-accent); /* J9 active gold #f3b867 */
+  background: var(--surface-hover); /* J9 active bg #292c34 */
+}
+/* persistent gold-active tile (Bảo mật when verified): a SOLID lit surface +
+ * a gold hairline. --wash-accent is a two-stop gradient layered over --surface;
+ * flat design does not put gradients on tiles/cards. */
+.tileActiveGold {
+  color: var(--brand-accent);
+  background: color-mix(in srgb, var(--brand-accent) 8%, var(--surface));
+  border-color: var(--brand-accent-hairline);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile:hover,
+  .actionCard,
+  .actionCard:hover {
+    transform: none;
+  }
+}
+.tileIconWrap {
+  position: relative;
+  display: inline-flex;
+}
+.tileIcon {
+  width: 24px;
+  height: 24px;
+}
+/* red unread dot on Tin nhắn (--loss is PINNED-neutral; status-critical red) */
+.unreadDot {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--loss);
+  border: 1px solid var(--tile);
+}
+.tileLabel {
+  font-weight: var(--weight-semi); /* J9 .label 600 */
+  line-height: var(--lh-tight);
+}
+
+/* ============================================================================
+ * 5. LOGOUT ROW — full-width, OUTSIDE the grid
+ * ==========================================================================*/
+.logoutRow {
+  display: block;
+}
+
+/* ---- desktop: fixed 304px rail (the layout sets the grid) ---------------- */
+@media (min-width: 992px) {
+  .rail {
+    width: var(--rail-w);
+    position: sticky;
+    top: calc(var(--header-h) + var(--nav-h) + var(--space-4));
+  }
+}
+</code></pre>
+</details>
+
+<p><strong>6. States</strong></p>
+<table>
+<thead><tr><th>State</th><th>Trigger</th><th>Delta</th></tr></thead>
+<tbody>
+<tr><td>Logged-out (guest)</td><td><code>!allowed || !user</code></td><td>Only <code>.guest</code> card renders inside <code>aside.rail</code>. The avatar inside it reuses <code>.avatar</code> (gold disc, 44px) with an <code>Icon user 28</code> instead of an initial. No hero/wallet/grid/logout.</td></tr>
+<tr><td>Level-0 member</td><td>authState <code>level-0</code></td><td>Name "Thành viên mới", initial "T", tier ribbon "Thành viên mới", no verified badge (verified=false), Bảo mật tile NOT lit, unread dot shown (1). Progress bar still shows the tiered fixture (Bạch Kim → Kim Cương).</td></tr>
+<tr><td>Tiered member</td><td>authState <code>tiered</code> (boot default)</td><td>Name "Nguyễn Văn An", initial "N", ribbon "Bạch Kim", green check badge, Bảo mật tile permanently <code>.tileActiveGold</code>, unread dot shown (2).</td></tr>
+<tr><td>ID copied</td><td>click <code>.idLine</code> and clipboard succeeds</td><td><code>span.copied</code> "Đã sao chép" appears 6px above the ID row for 2000ms (<code>window.setTimeout</code>), then removed. Clipboard failure → nothing shown.</td></tr>
+<tr><td>Balance not live</td><td>balance.status ≠ "live"</td><td>Balance text becomes literal "Số dư: 0 ₫" at the same 28px style.</td></tr>
+<tr><td>Tile active</td><td>see Behaviour</td><td><code>.tileActive</code> + <code>aria-current="page"</code>.</td></tr>
+<tr><td>Hover / focus</td><td>pointer / keyboard</td><td>See styles: tiles + action cards scale 1.02, wallet buttons scale 1.05; focus always 2px #6ea8ff outline offset 2px.</td></tr>
+<tr><td>Disabled / loading / error</td><td>—</td><td>None at component level (only the progress envelope has loading/error branches).</td></tr>
+</tbody>
+</table>
+
+<p><strong>7. Motion</strong></p>
+<table>
+<thead><tr><th>Element</th><th>Property</th><th>Duration</th><th>Easing</th><th>Reduced motion</th></tr></thead>
+<tbody>
+<tr><td>.badgeLink</td><td>background</td><td>200ms</td><td>ease-standard</td><td>instant</td></tr>
+<tr><td>.idLine</td><td>color</td><td>200ms</td><td>ease-standard</td><td>instant</td></tr>
+<tr><td>.actBtn</td><td>transform, background, border-color, color</td><td>200ms</td><td>ease-standard</td><td>transform forced <code>none</code></td></tr>
+<tr><td>.actionCard / .tile</td><td>transform, (color), background, border-color</td><td>200ms</td><td>ease-standard</td><td>transform forced <code>none</code></td></tr>
+<tr><td>.dot (progress)</td><td>keyframes <code>pulseDot</code> 1.6s ease-standard infinite alternate: scale 1→1.1, opacity 0.4→1</td><td>1.6s (literal)</td><td>ease-standard</td><td>only declared inside <code>prefers-reduced-motion: no-preference</code></td></tr>
+<tr><td>.trackSkeleton</td><td>keyframes <code>progressShimmer</code> background-position 200% 0 → −200% 0, infinite</td><td>300ms</td><td>ease-standard</td><td>only inside <code>no-preference</code></td></tr>
+</tbody>
+</table>
+
+<p><strong>8. Copy</strong></p>
+<table>
+<thead><tr><th>Vietnamese (verbatim)</th><th>English gloss</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Tài khoản</td><td>Account</td><td><code>aside</code> and <code>nav</code> aria-label (<code>vi.nav.account</code>)</td></tr>
+<tr><td>Khách</td><td>Guest</td><td>guest title (hard-coded in TSX)</td></tr>
+<tr><td>Đăng nhập để xem tài khoản của bạn.</td><td>Log in to see your account.</td><td>guest text (<code>{vi.auth.login} để xem tài khoản của bạn.</code>)</td></tr>
+<tr><td>Đăng nhập</td><td>Log in</td><td>guest button</td></tr>
+<tr><td>Nhận huy hiệu</td><td>Get a badge</td><td>top-right link → /vip</td></tr>
+<tr><td>Đã xác minh</td><td>Verified</td><td><code>title</code> tooltip of the green check</td></tr>
+<tr><td>Thành viên mới</td><td>New member</td><td>tier ribbon when vipLevel 0</td></tr>
+<tr><td>ID</td><td>ID</td><td>ID row label</td></tr>
+<tr><td>Đã sao chép</td><td>Copied</td><td>ID copy tooltip (hard-coded)</td></tr>
+<tr><td>Đang cập nhật</td><td>Updating</td><td>progress caption when absent/error</td></tr>
+<tr><td>Nạp tích lũy {remaining} để lên thẻ {next}</td><td>Deposit a cumulative {remaining} to reach card {next}</td><td>progress caption, e.g. "Nạp tích lũy 11.400.000 ₫ để lên thẻ Kim Cương"</td></tr>
+<tr><td>Ví của tôi</td><td>My wallet</td><td>wallet card title; menu tile 1</td></tr>
+<tr><td>Số dư: 0 ₫</td><td>Balance: 0 ₫</td><td>wallet balance when envelope not live</td></tr>
+<tr><td>Nạp / Rút</td><td>Deposit / Withdraw</td><td>wallet buttons</td></tr>
+<tr><td>Cửa hàng điểm / Điểm của tôi</td><td>Points store / My points</td><td>action card 1</td></tr>
+<tr><td>Trung tâm nhiệm vụ / Chờ mở khóa</td><td>Task center / Waiting to unlock</td><td>action card 2</td></tr>
+<tr><td>(12 tile labels)</td><td>see tile table</td><td>menu grid</td></tr>
+<tr><td>Đăng xuất</td><td>Log out</td><td>LogoutButton</td></tr>
+</tbody>
+</table>
+
+<p><strong>9. Data</strong></p>
+<ul>
+<li><code>getBalance()</code> → <code>{ status: "live", value: { amount: 6886000, currency: "VND", live: true, sourcedAt: &lt;now&gt; }, sourcedAt, freshnessMs: 20000 }</code> → "6.886.000 ₫". DEMO_EMPTY → <code>{ status: "absent" }</code>.</li>
+<li><code>getAccountSummary()</code> → <code>{ points: 86880, rebate: { amount: 168000, currency: "VND" } }</code> → "86.880".</li>
+<li><code>getVipProgress()</code> → <code>{ status: "live", value: { current: 18600000, target: 30000000, currentTierName: "Bạch Kim", nextTierName: "Kim Cương" }, freshnessMs: 60000 }</code>.</li>
+<li><code>useAuth().user</code> (fixtures above). <code>formatVnd(n)</code> groups with "." and appends " ₫"; <code>formatCount(n)</code> groups with "." only.</li>
+</ul>
+
+<p><strong>10. Behaviour &amp; a11y — active-item logic</strong></p>
+<ol>
+<li>On mount a <code>useEffect</code> stores <code>window.location.hash</code> without "#" in state and subscribes to <code>hashchange</code>.</li>
+<li>For each tile: split <code>href</code> on "#" → <code>[mPath, mHash]</code>. <code>isSection = mPath === "/tai-khoan" &amp;&amp; mHash !== ""</code> (only the Bảo mật tile). <code>onAccount = pathname === "/tai-khoan"</code>.</li>
+<li>If <code>isSection &amp;&amp; onAccount</code>: active when <code>mHash === hash</code>. Otherwise active when <code>m.href === pathname</code> (exact string match; no prefix matching, hash ignored for other tiles).</li>
+<li><code>lit = m.id === "security" &amp;&amp; user.verified</code> adds <code>.tileActiveGold</code> regardless of route (it does NOT set aria-current).</li>
+<li>Element choice: when <code>isSection &amp;&amp; onAccount</code> the tile is a native <code>&lt;a href="#bao-mat"&gt;</code> (so <code>hashchange</code> fires and <code>AccountSections</code> swaps panels); otherwise a <code>next/link</code> <code>Link</code>.</li>
+<li>Result per route: <code>/vi-tien</code> → tile 1 active; <code>/tin-nhan</code> → tile 6; <code>/gioi-thieu</code> → tile 7; <code>/tai-khoan#bao-mat</code> → tile 8 active; <code>/tai-khoan</code> (no hash), <code>/tai-khoan#ho-so</code>, <code>/dai-ly</code> → no tile active.</li>
+<li>Wallet buttons link to <code>/vi-tien#deposit</code> / <code>/vi-tien#withdraw</code>; <code>WalletTabs</code> reads the hash (see <a href="#m-wallet-tabs">#m-wallet-tabs</a>).</li>
+<li>Copy ID: <code>navigator.clipboard.writeText(user.memberId)</code>; success → <code>copied=true</code> for 2000ms.</li>
+<li>The decorative <code>.heroSheen/.walletSheen/.cardSheen</code> spans and the avatar are <code>aria-hidden</code>; the unread dot is <code>aria-hidden</code> (no text alternative for the unread state).</li>
+</ol>
+<div class="callout warn"><strong>Discrepancies (MemberSidebar)</strong>
+<ul>
+<li>Header comment says the guest sees no balance and that "ID chip" exists; code renders the ID as plain text (comments inside agree). The top-of-file comment item "verified/activation status chip" is not rendered — verification is only the 18px check overlay.</li>
+<li>Non-live balance renders the literal "Số dư: 0 ₫" — a fabricated 0 figure, contradicting the file's own "truthful-only (§F)" claim.</li>
+<li>"Trung tâm nhiệm vụ" value is the hard-coded string <code>"0"</code>; it links to <code>/hoan-tra</code>, which redirects to <code>/khuyen-mai</code>.</li>
+<li>Progress caption copy says "Nạp tích lũy" (cumulative DEPOSIT) while the mock type comment and <code>getVipProgress</code> describe turnover-to-next-tier.</li>
+<li>The level-0 user sees the tiered progress fixture ("Bạch Kim → Kim Cương") while their ribbon says "Thành viên mới".</li>
+<li>Hard-coded VN strings ("Khách", "Đã sao chép", "để xem tài khoản của bạn.") contradict <code>lib/i18n.ts</code> header "No component holds a hardcoded VN string".</li>
+<li>Literal px values in a "tokens only" module: 44px avatar, 18px badge, −2px offsets, 2px/11px tier padding, 6px clip notch, 3px nextTag padding, 4px track, 6px dot, 2px meta gap, 86px tile, 8px dot, 1.6s pulse, line-height 1.1.</li>
+<li><code>.trackSkeleton</code> uses a <code>linear-gradient</code> shimmer although the file header says the flat sweep removed gradients from chips/cards.</li>
+<li>Tiles 2 and 3 (Hoàn trả, Sinh lời) share one href; tile 5 Lịch sử lands on Hồ sơ; transaction history actually lives at <code>/vi-tien</code> Lịch sử tab. No tile reaches the <code>#ngan-hang</code> / <code>#vi-tien-ao</code> / <code>#ho-so</code> sections or <code>/dai-ly</code>.</li>
+<li>The unread dot uses <code>user.unreadMessages</code> (fixture 2 / 1); marking messages read in MessageCenter never updates it.</li>
+<li><code>summary.rebate</code> (168.000 ₫) is fetched and passed but never shown; the file header lists "points/rebate".</li>
+</ul></div>
+
+<h3 id="m-sidebar-progress">ProgressBar (inner component of MemberSidebar)</h3>
+<p><strong>Purpose</strong> — a thin membership track with a gold fill, a pulsing white dot at the fill edge, a next-tier ribbon at the right end and a caption. <strong>Source</strong> — <code>MemberSidebar.tsx</code> function <code>ProgressBar</code>; styles <code>.progress … .captionTier</code> in <code>MemberSidebar.module.css</code>.</p>
+<pre><code class="lang-txt">status==="loading":
+div.progress → div.track.trackSkeleton aria-hidden            (shimmer, no dot/caption)
+
+status==="absent"|"error":
+div.progress
+├─ div.track                                                  (empty groove)
+└─ p.caption "Đang cập nhật"
+
+live, nextTierName===null (max tier):
+div.progress → div.progressRow
+   ├─ div.track → span.fill style="width:100%" + span.dot style="left:100%" aria-hidden
+   └─ span.nextTag {currentTierName}
+
+live, normal:
+div.progress
+├─ div.progressRow
+│  ├─ div.track role=progressbar aria-valuemin=0 aria-valuemax=100 aria-valuenow={round(pct)} aria-label="{current} → {next}"
+│  │  ├─ span.fill style="width:{pct}%"
+│  │  └─ span.dot  style="left:{pct}%" aria-hidden
+│  └─ span.nextTag {nextTierName}
+└─ p.caption  "Nạp tích lũy" {formatVnd(remaining)} "để lên thẻ" span.captionTier{nextTierName}</code></pre>
+<p><code>pct = target &gt; 0 ? min(100, max(0, current/target*100)) : 0</code>; <code>remaining = max(0, target − current)</code>. With the fixture: pct = 62, aria-valuenow 62, aria-label "Bạch Kim → Kim Cương", caption "Nạp tích lũy 11.400.000 ₫ để lên thẻ Kim Cương".</p>
+<table>
+<thead><tr><th>Element</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.progress</td><td>flex column; gap 8px</td></tr>
+<tr><td>.progressRow</td><td>flex; align center; gap 8px</td></tr>
+<tr><td>.track</td><td>relative; flex 1 1 auto; min-width 0; width 100%; height 4px; radius 4px; bg <span class="tok">--progress-track</span> hsla(0,0%,100%,0.12)</td></tr>
+<tr><td>.trackSkeleton</td><td>bg <code>linear-gradient(90deg, hsla(0,0%,100%,0.12) 0%, #262626 50%, hsla(0,0%,100%,0.12) 100%)</code>; background-size 200% 100%</td></tr>
+<tr><td>.fill</td><td>absolute; inset-block 0; left 0; height 4px; radius 4px; background #d4af37 + background-image <span class="tok">--progress-fill-grad</span></td></tr>
+<tr><td>.dot</td><td>absolute; top 50%; 6×6px; radius pill; bg #ffffff; transform translate(−50%, −50%) (+ pulse)</td></tr>
+<tr><td>.nextTag</td><td>inline-flex; padding 3px 8px 3px 11px; same clip-path ribbon as .tierTag; bg <code>color-mix(in srgb, #d4af37 14%, #212121)</code>; color #d4af37; 12px; 600; lh 1.3; nowrap</td></tr>
+<tr><td>.caption / .captionTier</td><td>12px; lh 1.3; #888888 / #d4af37 600</td></tr>
+</tbody>
+</table>
+<div class="callout warn">In the max-tier branch the track has no <code>role="progressbar"</code> and no caption; the loading branch has no text for AT.</div>
+
+<h3 id="m-logout-button">LogoutButton / LogoutModal</h3>
+<p><strong>Purpose</strong> — a full-width "Đăng xuất" button that opens a confirm dialog; only the confirm signs out. <strong>Source</strong> — <code>src/components/account/LogoutButton.tsx</code>, <code>LogoutButton.module.css</code>.</p>
+<pre><code class="lang-txt">[!isAuthenticated] → null
+Fragment
+├─ Button variant=ghost size=lg fullWidth icon="account" className=.trigger onClick=open   "Đăng xuất"
+└─ LogoutModal  (Modal open title="Đăng xuất" size="sm")
+   ├─ body: p.body "Bạn có chắc muốn đăng xuất khỏi tài khoản?"
+   └─ footer: div.actions
+      ├─ Button variant=ghost size=md  "Huỷ"       → close
+      └─ Button variant=danger size=md "Đăng xuất" → close + signOut()</code></pre>
+<table>
+<thead><tr><th>Selector</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td>.trigger</td><td>margin-top <span class="tok">--space-2</span> 8px</td></tr>
+<tr><td>.body</td><td>16px; color #d6d3c7; line-height 1.5</td></tr>
+<tr><td>.actions</td><td>flex; justify-content flex-end; gap 12px</td></tr>
+</tbody>
+</table>
+<details><summary>Verbatim CSS — <code>src/components/account/LogoutButton.module.css</code></summary>
+<pre><code class="lang-css">/* LogoutButton — confirm-gated sign-out. Tokens only; @375 first. */
+
+.trigger {
+  margin-top: var(--space-2);
+}
+
+.body {
+  font-size: var(--t-body);
+  color: var(--text);
+  line-height: var(--lh-body);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+</code></pre>
+</details>
+<p>Behaviour: Modal (track F) provides focus trap, Esc and scrim close. After confirm, auth becomes guest and every member island re-renders its guest branch; the URL does not change. The component file also exports <code>LogoutMenuItem</code> (unused — see <a href="#m-unused">#m-unused</a>).</p>
+<div class="callout warn">Cancel label is "Huỷ" (old-style diacritic placement) while <code>vi.claim.btnCancel</code> elsewhere is "Hủy"; both strings are hard-coded. The menu-item variant references <code>styles.menuIcon</code>, which is not defined in <code>LogoutButton.module.css</code>.</div>
+</section>
+

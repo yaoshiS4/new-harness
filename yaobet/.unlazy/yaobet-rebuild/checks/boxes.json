@@ -1,0 +1,190 @@
+{
+  "_source": "sections/02-01-s-shell-h.html#s-shell-grid 'Measured boxes' (member state, viewport height 900, route /, after document.fonts.ready)",
+  "route": "/",
+  "tolerance_px": 1,
+  "viewport_height": 900,
+  "_selector_note": "Selectors are structural, taken from the original markup; identity and logo selectors are assumptions F0 confirms in its return.",
+  "boxes": {
+    "header": {
+      "selector": "header",
+      "375": [
+        0,
+        0,
+        375,
+        72
+      ],
+      "768": [
+        0,
+        0,
+        768,
+        121
+      ],
+      "1024": [
+        0,
+        0,
+        1024,
+        121
+      ],
+      "1440": [
+        0,
+        0,
+        1440,
+        121
+      ]
+    },
+    "logo": {
+      "selector": "header a[href=\"/\"] img",
+      "_src": "components/layout/Header.tsx:106 (assumption)",
+      "375": [
+        72,
+        13.5,
+        205.8,
+        44
+      ],
+      "768": [
+        16,
+        13.5,
+        205.8,
+        44
+      ],
+      "1024": [
+        16,
+        13.5,
+        205.8,
+        44
+      ],
+      "1440": [
+        24,
+        13.5,
+        205.8,
+        44
+      ]
+    },
+    "identity": {
+      "selector": "header ul[aria-label=\"Tiện ích\"] + div",
+      "_src": "components/layout/Header.tsx:126 div.identity, directly after the utility list at :112 (original)",
+      "375": [
+        315,
+        13.5,
+        44,
+        44
+      ],
+      "768": [
+        581,
+        13.5,
+        171,
+        44
+      ],
+      "1024": [
+        702,
+        13.5,
+        316.4,
+        44
+      ],
+      "1440": [
+        1099.6,
+        13.5,
+        316.4,
+        44
+      ]
+    },
+    "main": {
+      "selector": "main",
+      "_fields": "x,y,width",
+      "375": [
+        16,
+        80,
+        343
+      ],
+      "768": [
+        16,
+        129,
+        736
+      ],
+      "1024": [
+        16,
+        129,
+        932
+      ],
+      "1440": [
+        24,
+        129,
+        1332
+      ]
+    },
+    "rightRail": {
+      "selector": "aside[aria-label=\"Thông tin trực tiếp\"]",
+      "375": null,
+      "768": null,
+      "1024": null,
+      "1440": [
+        1052,
+        129,
+        304,
+        621.3
+      ]
+    },
+    "quickActionRail": {
+      "selector": "aside[aria-label=\"Thao tác nhanh\"]",
+      "375": null,
+      "768": null,
+      "1024": [
+        956,
+        209.8,
+        60,
+        480.4
+      ],
+      "1440": [
+        1372,
+        209.8,
+        60,
+        480.4
+      ]
+    },
+    "bottomTabBar": {
+      "selector": "nav[aria-label=\"Điều hướng chính\"]",
+      "375": [
+        0,
+        844,
+        375,
+        56
+      ],
+      "768": null,
+      "1024": null,
+      "1440": null
+    },
+    "footerHeight": {
+      "selector": "footer",
+      "_fields": "height",
+      "375": [
+        690.1
+      ],
+      "768": [
+        415.3
+      ],
+      "1024": [
+        415.3
+      ],
+      "1440": [
+        365.8
+      ]
+    }
+  },
+  "grid": {
+    "_what": "home ProviderGameGrid on tab 'Tất cả': column count and child count (16 games + ComingSoonTile fillers)",
+    "_src": "columns and children: sections/02-01-s-shell-h.html:59-60 ('game grid columns' 3/4/6/8, 'grid children (16 games + fillers)' 17/17/21/21); fillers_1440: sections/02-03-s-home-h.html:1044 ('Filler math', 8 columns -> 19 occupied -> 5 fillers)",
+    "columns": {
+      "375": 3,
+      "768": 4,
+      "1024": 6,
+      "1440": 8
+    },
+    "children": {
+      "375": 17,
+      "768": 17,
+      "1024": 21,
+      "1440": 21
+    },
+    "fillers_1440": 5
+  }
+}
