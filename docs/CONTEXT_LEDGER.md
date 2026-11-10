@@ -576,3 +576,24 @@ Authoritative mid-session progress checkpoints for context compaction and rot mi
 
 ---
 
+## [Milestone: Yaobet rebuild: F5 root layout passed Stage A+B, merge running] - 2026-11-05T16:38:26.969897+00:00
+- **Runtime Lock State**: unlocked
+- **Goals Completed**:
+- PreCompact 'Hook cancelled' diagnosed: 10s timeout hit under host load (hook itself 0.09s); timeout raised to 30 in .claude/settings.json; verify-claude-harness 6/6 PASS
+- F5 builder PASS (add11b6, 75ff1ad on rb-F5)
+- F5 Stage A fresh G1-G7 rc=0; parity 4 comment-only lines; favicon cmp OK
+- Backlog 15 done: ui-slide-up keyframes x1 at top level
+- F5 frontend-qc PASS, 0 Fail; L11 (§F) keep
+- **Files Modified**:
+- `.claude/settings.json (PreCompact timeout 10->30, uncommitted)`
+- `yaobet rb-F5: src/app/layout.tsx, src/app/favicon.ico`
+- **Active Constraints**:
+- PM never edits src/ or code files
+- <=2 builders, worktrees, prompts <=6000 chars
+- never pipe npm run build; redirect
+- no tags/legal terms in src
+- commits end Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+- next: merge F5 POSTMERGE rc=0 -> W8b S6 -> W9 S7,S8 ... -> I1 -> final audits
+
+---
+

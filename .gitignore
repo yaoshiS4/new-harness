@@ -51,3 +51,7 @@ backups/
 .claude/settings.local.json
 .claude/harness/*.sqlite*
 .claude/skills/**/node_modules/
+.ruff_cache/
+
+# Yaobet product repo (own git history, nested)
+yaobet/
